@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Sep 23, 2025 at 05:50 AM
+-- Generation Time: Sep 26, 2025 at 03:07 AM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -35,6 +35,18 @@ CREATE TABLE `branches` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `branches`
+--
+
+INSERT INTO `branches` (`id`, `name`, `address`, `phone`, `created_at`, `updated_at`) VALUES
+(0, 'Semua Branch', '0', '0', '2025-09-26 10:13:52', '2025-09-26 10:14:11'),
+(1, 'Cabang Satu', 'Jalan Cabang Pertama, Samarinda Kota', '+62 85211223344', '2025-09-26 10:13:52', '2025-09-26 10:14:42'),
+(2, 'Cabang Dua', 'Jalan Cabang Kedua, Samarinda Seberang', '+62 85222334455', '2025-09-26 10:13:52', '2025-09-26 10:14:42'),
+(3, 'Cabang Tiga', 'Jalan Cabang Ketiga, Loa Janan', '+62 85233445566', '2025-09-26 10:13:52', '2025-09-26 10:14:42'),
+(4, 'Cabang Empat', 'Jalan Cabang Keempat, Palaran', '+62 85244556677', '2025-09-26 10:13:52', '2025-09-26 10:14:42'),
+(5, 'Cabang Lima', 'Jalan Cabang Kelima, Mangkupalas', '+62 85255667788', '2025-09-26 10:13:52', '2025-09-26 10:14:42');
 
 -- --------------------------------------------------------
 
@@ -174,13 +186,24 @@ CREATE TABLE `transaction_items` (
 CREATE TABLE `users` (
   `id` int NOT NULL,
   `name` varchar(100) NOT NULL,
-  `email` varchar(100) NOT NULL,
+  `username` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `password` varchar(255) NOT NULL,
   `role` enum('karyawan','admin','superadmin') NOT NULL DEFAULT 'karyawan',
   `branch_id` int DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `branch_id`, `created_at`, `updated_at`) VALUES
+(1, 'King Wahyu', 'akuSuperrAdmin123', 'PASSwordnya_123', 'superadmin', 0, '2025-09-26 11:04:07', '2025-09-26 11:04:07'),
+(2, 'Boss Kebun', 'GrowAGarden#1', 'PASSwordnya_123', 'admin', 1, '2025-09-26 11:04:07', '2025-09-26 11:04:07'),
+(3, 'Boss Ikan', 'mancingmaniamantap', 'PASSwordnya_123', 'admin', 2, '2025-09-26 11:04:07', '2025-09-26 11:04:07'),
+(4, 'Kroco 1', 'kroco1', 'PASSwordnya_123', 'karyawan', 1, '2025-09-26 11:04:07', '2025-09-26 11:04:07'),
+(5, 'Kroco 2', 'kroco2', 'PASSwordnya_123', 'karyawan', 2, '2025-09-26 11:04:07', '2025-09-26 11:04:07');
 
 -- --------------------------------------------------------
 
@@ -275,7 +298,6 @@ ALTER TABLE `transaction_items`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `email` (`email`),
   ADD KEY `fk_users_branch` (`branch_id`);
 
 --
@@ -293,7 +315,7 @@ ALTER TABLE `vouchers`
 -- AUTO_INCREMENT for table `branches`
 --
 ALTER TABLE `branches`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `categories`
@@ -347,7 +369,7 @@ ALTER TABLE `transaction_items`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `vouchers`
