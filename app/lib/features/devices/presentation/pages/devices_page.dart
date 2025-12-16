@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/bottom_navigation.dart';
 
 class DevicesPage extends ConsumerWidget {
   const DevicesPage({super.key});
@@ -88,7 +87,7 @@ class DevicesPage extends ConsumerWidget {
         ),
       ),
       // BOTTOM NAVIGATION BAR
-      bottomNavigationBar: const BottomNavigation(),
+
     );
   }
 }

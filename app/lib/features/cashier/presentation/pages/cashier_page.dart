@@ -2,24 +2,23 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
 import '../../../../core/models/cart_item.dart';
-import '../../../../shared/widgets/bottom_navigation.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../widgets/product_card.dart';
 import '../widgets/cart_item_widget.dart';
 import '../widgets/coupon_card.dart';
 import '../widgets/payment_success_view.dart';
 
-enum PosView { products, cart, coupon, success }
+enum CashierView { products, cart, coupon, success }
 
-class PosPage extends StatefulWidget {
-  const PosPage({super.key});
+class CashierPage extends StatefulWidget {
+  const CashierPage({super.key});
 
   @override
-  State<PosPage> createState() => _PosPageState();
+  State<CashierPage> createState() => _CashierPageState();
 }
 
-class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
-  PosView _currentView = PosView.products;
+class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin {
+  CashierView _currentView = CashierView.products;
   final List<CartItem> _cart = [];
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _couponController = TextEditingController();
@@ -180,7 +179,7 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
           'discount': code == 'GOLD20' ? 20 : 15,
           'description': code == 'GOLD20' ? 'Premium member discount' : 'VIP customer exclusive',
         };
-        _currentView = PosView.cart;
+        _currentView = CashierView.cart;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Coupon $code applied successfully!'),
@@ -215,7 +214,7 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
     await Future.delayed(const Duration(milliseconds: 1500));
     
     setState(() {
-      _currentView = PosView.success;
+      _currentView = CashierView.success;
     });
   }
 
@@ -224,7 +223,7 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
       _cart.clear();
       _appliedCoupon = null;
       _couponController.clear();
-      _currentView = PosView.products;
+      _currentView = CashierView.products;
     });
   }
 
@@ -249,7 +248,7 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    if (_currentView == PosView.success) {
+    if (_currentView == CashierView.success) {
       return PaymentSuccessView(
         total: _total,
         appliedCoupon: _appliedCoupon,
@@ -264,13 +263,13 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
         backgroundColor: AppTheme.background,
         elevation: 0,
         actions: [
-          if (_currentView == PosView.products && _cart.isNotEmpty)
+          if (_currentView == CashierView.products && _cart.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Stack(
                 children: [
                   IconButton(
-                    onPressed: () => _changeView(PosView.cart),
+                    onPressed: () => _changeView(CashierView.cart),
                     icon: const Icon(Icons.shopping_cart_outlined),
                   ),
                   Positioned(
@@ -300,32 +299,31 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
                 ],
               ),
             ),
-          if (_currentView != PosView.products)
+          if (_currentView != CashierView.products)
             IconButton(
-              onPressed: () => _changeView(PosView.products),
+              onPressed: () => _changeView(CashierView.products),
               icon: const Icon(Icons.close),
             ),
         ],
       ),
       body: Column(
         children: [
-          if (_currentView == PosView.products) _buildSearchBar(),
+          if (_currentView == CashierView.products) _buildSearchBar(),
           Expanded(child: _buildCurrentView()),
         ],
       ),
-      bottomNavigationBar: const BottomNavigation(),
     );
   }
 
   String _getAppBarTitle() {
     switch (_currentView) {
-      case PosView.products:
+      case CashierView.products:
         return 'New Sale';
-      case PosView.cart:
+      case CashierView.cart:
         return 'Cart';
-      case PosView.coupon:
+      case CashierView.coupon:
         return 'Apply Coupon';
-      case PosView.success:
+      case CashierView.success:
         return 'Payment Success';
     }
   }
@@ -346,13 +344,13 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
 
   Widget _buildCurrentView() {
     switch (_currentView) {
-      case PosView.products:
+      case CashierView.products:
         return _buildProductsView();
-      case PosView.cart:
+      case CashierView.cart:
         return _buildCartView();
-      case PosView.coupon:
+      case CashierView.coupon:
         return _buildCouponView();
-      case PosView.success:
+      case CashierView.success:
         return const SizedBox(); // Handled in main build method
     }
   }
@@ -446,7 +444,7 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
               text: 'Add Coupon / Voucher',
               variant: ButtonVariant.outline,
               icon: Icons.local_offer_outlined,
-              onPressed: () => _changeView(PosView.coupon),
+              onPressed: () => _changeView(CashierView.coupon),
               fullWidth: true,
             ),
           
@@ -591,7 +589,7 @@ class _PosPageState extends State<PosPage> with TickerProviderStateMixin {
     );
   }
 
-  void _changeView(PosView newView) {
+  void _changeView(CashierView newView) {
     setState(() {
       _currentView = newView;
     });

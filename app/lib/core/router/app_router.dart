@@ -1,43 +1,40 @@
+// import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:gg_store_cashier/shared/layout/scaffold_with_bottom_navbar.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
-import '../../features/pos/presentation/pages/pos_page.dart';
+import '../../features/cashier/presentation/pages/cashier_page.dart';
 import '../../features/inventory/presentation/pages/inventory_page.dart';
 import '../../features/inventory/presentation/pages/inventory_detail_page.dart';
 import '../../features/devices/presentation/pages/devices_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 
-class AppRouter {
+mixin AppRouter {
   static const String login = '/';
   static const String dashboard = '/dashboard';
-  static const String pos = '/pos';
+  static const String cashier = '/cashier';
   static const String inventory = '/inventory';
   static const String inventoryDetail = '/inventory/:id';
   static const String devices = '/devices';
   static const String settings = '/settings';
 
+  static final _rootNavigatorkey = GlobalKey<NavigatorState>();
+  static final dashboardNavKey = GlobalKey<NavigatorState>();
+  static final cashierNavKey = GlobalKey<NavigatorState>();
+  static final inventoryNavKey = GlobalKey<NavigatorState>();
+  static final devicesNavKey = GlobalKey<NavigatorState>();
+  static final settingsNavKey = GlobalKey<NavigatorState>();
+
   static final GoRouter router = GoRouter(
+    navigatorKey: _rootNavigatorkey,
     initialLocation: login,
-    routes: [
+    routes: <RouteBase>[
+      //  YG GK KENAK LAYOUT BOTTOM NAVBAR TARUH SINI ATAU DILUAR SHELL
       GoRoute(
         path: login,
         name: 'login',
         builder: (context, state) => const LoginPage(),
-      ),
-      GoRoute(
-        path: dashboard,
-        name: 'dashboard',
-        builder: (context, state) => const DashboardPage(),
-      ),
-      GoRoute(
-        path: pos,
-        name: 'pos',
-        builder: (context, state) => const PosPage(),
-      ),
-      GoRoute(
-        path: inventory,
-        name: 'inventory',
-        builder: (context, state) => const InventoryPage(),
       ),
       GoRoute(
         path: inventoryDetail,
@@ -47,16 +44,48 @@ class AppRouter {
           return InventoryDetailPage(productId: id);
         },
       ),
-      GoRoute(
-        path: devices,
-        name: 'devices',
-        builder: (context, state) => const DevicesPage(),
-      ),
-      GoRoute(
-        path: settings,
-        name: 'settings',
-        builder: (context, state) => const SettingsPage(),
-      ),
+      // HALAMAN YANG BUTUH LAYOUT SCAFFOLD + BOTTOM NAV TARUH DI SINI
+      StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) {
+            return ScaffoldWithBottomNavbar(navigationShell);
+          },
+          branches: [
+            StatefulShellBranch(navigatorKey: dashboardNavKey, routes: [
+              GoRoute(
+                path: dashboard,
+                name: 'dashboard',
+                builder: (context, state) => const DashboardPage(),
+              ),
+            ]),
+            StatefulShellBranch(navigatorKey: cashierNavKey, routes: [
+              GoRoute(
+                path: cashier,
+                name: 'cashier',
+                builder: (context, state) => const CashierPage(),
+              ),
+            ]),
+            StatefulShellBranch(navigatorKey: inventoryNavKey, routes: [
+              GoRoute(
+                path: inventory,
+                name: 'inventory',
+                builder: (context, state) => const InventoryPage(),
+              ),
+            ]),
+            StatefulShellBranch(navigatorKey: devicesNavKey, routes: [
+              GoRoute(
+                path: devices,
+                name: 'devices',
+                builder: (context, state) => const DevicesPage(),
+              ),
+            ]),
+            StatefulShellBranch(navigatorKey: settingsNavKey, routes: [
+              GoRoute(
+                path: settings,
+                name: 'settings',
+                builder: (context, state) => const SettingsPage(),
+              ),
+            ]),
+          ]),
     ],
   );
 }

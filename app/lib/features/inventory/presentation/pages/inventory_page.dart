@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/bottom_navigation.dart';
 // Import Header baru
 import '../widgets/inventory_header.dart';
-import 'inventory_detail_page.dart';
 
 class InventoryPage extends StatelessWidget {
   const InventoryPage({super.key});
@@ -94,9 +93,9 @@ class InventoryPage extends StatelessWidget {
           ),
 
           // 2. STICKY HEADER untuk Search, Filter, dan Summary
-          SliverPersistentHeader(
+          const SliverPersistentHeader(
             delegate: _InventoryHeaderDelegate(
-              child: const InventoryHeader(),
+              child: InventoryHeader(),
             ),
             pinned: true, // Membuat header tetap di atas saat di-scroll
             floating: false,
@@ -133,7 +132,6 @@ class InventoryPage extends StatelessWidget {
           )
         ],
       ),
-      bottomNavigationBar: const BottomNavigation(),
     );
   }
 }
@@ -217,12 +215,7 @@ class _ProductListTile extends StatelessWidget {
           // LOGIKA NAVIGASI: Mengarahkan ke InventoryDetailPage
           // ===============================================
           onTap: () {
-            // Kita navigasi ke InventoryDetailPage dan mengirimkan SKU sebagai productId
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => InventoryDetailPage(productId: sku),
-              ),
-            );
+            context.pushNamed('inventoryDetail', pathParameters: {'id': sku});
           },
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

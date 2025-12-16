@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/bottom_navigation.dart';
 
 // Ganti StatelessWidget menjadi ConsumerWidget untuk arsitektur Riverpod
 class SettingsPage extends ConsumerWidget {
@@ -147,7 +146,6 @@ class SettingsPage extends ConsumerWidget {
           ),
         ),
       ),
-      bottomNavigationBar: const BottomNavigation(),
     );
   }
 }

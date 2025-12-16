@@ -1,68 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/router/app_router.dart';
 
 class BottomNavigation extends StatelessWidget {
-  const BottomNavigation({super.key});
+  final StatefulNavigationShell navigationShell;
+  const BottomNavigation(this.navigationShell, {super.key});
 
   @override
   Widget build(BuildContext context) {
-    final currentLocation = GoRouterState.of(context).uri.path;
-    
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.card,
-        border: Border(
-          top: BorderSide(color: AppTheme.border, width: 1),
-        ),
-      ),
-      child: SafeArea(
-        child: Container(
-          height: 80,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                activeIcon: Icons.home,
-                label: 'Home',
-                isActive: currentLocation == AppRouter.dashboard,
-                onTap: () => context.go(AppRouter.dashboard),
-              ),
-              _NavItem(
-                icon: Icons.shopping_cart_outlined,
-                activeIcon: Icons.shopping_cart,
-                label: 'Cashier',
-                isActive: currentLocation == AppRouter.pos,
-                onTap: () => context.go(AppRouter.pos),
-              ),
-              _NavItem(
-                icon: Icons.inventory_2_outlined,
-                activeIcon: Icons.inventory_2,
-                label: 'Inventory',
-                isActive: currentLocation.startsWith(AppRouter.inventory),
-                onTap: () => context.go(AppRouter.inventory),
-              ),
-              _NavItem(
-                icon: Icons.bluetooth_outlined,
-                activeIcon: Icons.bluetooth,
-                label: 'Devices',
-                isActive: currentLocation == AppRouter.devices,
-                onTap: () => context.go(AppRouter.devices),
-              ),
-              _NavItem(
-                icon: Icons.settings_outlined,
-                activeIcon: Icons.settings,
-                label: 'Settings',
-                isActive: currentLocation == AppRouter.settings,
-                onTap: () => context.go(AppRouter.settings),
-              ),
-            ],
+    final currentIndex = navigationShell.currentIndex;
+
+    return LayoutBuilder(builder: (context, constraints) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: AppTheme.card,
+          border: Border(
+            top: BorderSide(color: AppTheme.border, width: 1),
           ),
         ),
-      ),
+        child: SafeArea(
+          child: Container(
+            height: 80,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _NavItem(
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home,
+                    label: 'Home',
+                    isActive: currentIndex == 0,
+                    onTap: () => _onTap(0),
+                  ),
+                  _NavItem(
+                    icon: Icons.shopping_cart_outlined,
+                    activeIcon: Icons.shopping_cart,
+                    label: 'Cashier',
+                    isActive: currentIndex == 1,
+                    onTap: () => _onTap(1),
+                  ),
+                  _NavItem(
+                    icon: Icons.inventory_2_outlined,
+                    activeIcon: Icons.inventory_2,
+                    label: 'Inventory',
+                    isActive: currentIndex == 2,
+                    onTap: () => _onTap(2),
+                  ),
+                  _NavItem(
+                    icon: Icons.bluetooth_outlined,
+                    activeIcon: Icons.bluetooth,
+                    label: 'Devices',
+                    isActive: currentIndex == 3,
+                    onTap: () => _onTap(3),
+                  ),
+                  _NavItem(
+                    icon: Icons.settings_outlined,
+                    activeIcon: Icons.settings,
+                    label: 'Settings',
+                    isActive: currentIndex == 4,
+                    onTap: () => _onTap(4),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  void _onTap(int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
     );
   }
 }

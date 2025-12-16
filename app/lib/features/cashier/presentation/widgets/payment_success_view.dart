@@ -234,7 +234,6 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
           ),
         ),
       ),
-      bottomNavigationBar: const BottomNavigation(),
     );
   }
 }

@@ -12,16 +12,17 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage>
-    with TickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _storeIdController = TextEditingController(text: AppConstants.defaultStoreId);
-  final _passwordController = TextEditingController(text: AppConstants.defaultPassword);
-  
+  final _storeIdController =
+      TextEditingController(text: AppConstants.defaultStoreId);
+  final _passwordController =
+      TextEditingController(text: AppConstants.defaultPassword);
+
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _rememberMe = false;
-  
+
   late AnimationController _logoAnimationController;
   late AnimationController _formAnimationController;
   late Animation<double> _logoScaleAnimation;
@@ -38,7 +39,7 @@ class _LoginPageState extends State<LoginPage>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _formAnimationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -80,10 +81,10 @@ class _LoginPageState extends State<LoginPage>
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    
+
     // Simulate login API call
     await Future.delayed(const Duration(milliseconds: 1500));
-    
+
     if (mounted) {
       setState(() => _isLoading = false);
       context.go(AppRouter.dashboard);
@@ -92,117 +93,120 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    
+    // final size = MediaQuery.of(context).size;
+
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: SizedBox(
-            height: size.height - MediaQuery.of(context).padding.top,
-            child: Column(
-              children: [
-                // Header Section with Logo
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppTheme.gold.withOpacity(0.1),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Decorative circles
-                        Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppTheme.gold.withOpacity(0.1),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppTheme.gold.withOpacity(0.05),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            // Logo
-                            AnimatedBuilder(
-                              animation: _logoScaleAnimation,
-                              builder: (context, child) {
-                                return Transform.scale(
-                                  scale: _logoScaleAnimation.value,
-                                  child: Container(
-                                    width: 96,
-                                    height: 96,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(24),
-                                      gradient: const LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [AppTheme.gold, AppTheme.goldLight],
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppTheme.gold.withOpacity(0.3),
-                                          blurRadius: 20,
-                                          spreadRadius: 0,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.store,
-                                      size: 48,
-                                      color: AppTheme.background,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+        child: LayoutBuilder(builder: (context, constraints) {
+          return Column(
+            children: [
+              // Header Section with Logo
+              Expanded(
+                flex: 2,
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppTheme.gold.withOpacity(0.1),
+                        Colors.transparent,
                       ],
                     ),
                   ),
-                ),
-                
-                // Form Section
-                Expanded(
-                  flex: 3,
-                  child: SlideTransition(
-                    position: _formSlideAnimation,
-                    child: Container(
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.card,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(40),
-                          topRight: Radius.circular(40),
-                        ),
-                        border: Border(
-                          top: BorderSide(color: AppTheme.border),
-                        ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Decorative circles
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppTheme.gold.withOpacity(0.1),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppTheme.gold.withOpacity(0.05),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          // Logo
+                          AnimatedBuilder(
+                            animation: _logoScaleAnimation,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _logoScaleAnimation.value,
+                                child: Container(
+                                  width: 96,
+                                  height: 96,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(24),
+                                    gradient: const LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        AppTheme.gold,
+                                        AppTheme.goldLight
+                                      ],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.gold.withOpacity(0.3),
+                                        blurRadius: 20,
+                                        spreadRadius: 0,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.store,
+                                    size: 48,
+                                    color: AppTheme.background,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Form Section
+              Flexible(
+                flex: 3,
+                child: SlideTransition(
+                  position: _formSlideAnimation,
+                  child: Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.card,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(40),
+                        topRight: Radius.circular(40),
+                      ),
+                      border: Border(
+                        top: BorderSide(color: AppTheme.border),
+                      ),
+                    ),
+                    child: SingleChildScrollView(
                       child: Padding(
                         padding: const EdgeInsets.all(32),
                         child: Form(
@@ -213,19 +217,25 @@ class _LoginPageState extends State<LoginPage>
                               // Welcome Text
                               Text(
                                 'Welcome Back',
-                                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .displaySmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 'Sign in to your store account',
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: AppTheme.mutedForeground,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      color: AppTheme.mutedForeground,
+                                    ),
                               ),
                               const SizedBox(height: 32),
-                              
+                                        
                               // Store ID Field
                               Text(
                                 'Store ID',
@@ -246,7 +256,7 @@ class _LoginPageState extends State<LoginPage>
                                 },
                               ),
                               const SizedBox(height: 20),
-                              
+                                        
                               // Password Field
                               Text(
                                 'Password',
@@ -276,17 +286,19 @@ class _LoginPageState extends State<LoginPage>
                                   if (value == null || value.isEmpty) {
                                     return 'Please enter your password';
                                   }
-                                  if (value.length < AppConstants.minPasswordLength) {
+                                  if (value.length <
+                                      AppConstants.minPasswordLength) {
                                     return 'Password must be at least ${AppConstants.minPasswordLength} characters';
                                   }
                                   return null;
                                 },
                               ),
                               const SizedBox(height: 16),
-                              
+                                        
                               // Remember Me & Forgot Password
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
@@ -301,7 +313,9 @@ class _LoginPageState extends State<LoginPage>
                                       ),
                                       Text(
                                         'Remember me',
-                                        style: Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
                                       ),
                                     ],
                                   ),
@@ -313,8 +327,8 @@ class _LoginPageState extends State<LoginPage>
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 32),
-                              
+                              const SizedBox(height: 24),
+                                        
                               // Login Button
                               CustomButton(
                                 text: 'Sign In',
@@ -323,9 +337,7 @@ class _LoginPageState extends State<LoginPage>
                                 fullWidth: true,
                                 size: ButtonSize.extraLarge,
                               ),
-                              
-                              const Spacer(),
-                              
+                                        
                               // Support Link
                               Center(
                                 child: TextButton(
@@ -334,9 +346,12 @@ class _LoginPageState extends State<LoginPage>
                                   },
                                   child: Text(
                                     'Need help? Contact support',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppTheme.mutedForeground,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: AppTheme.mutedForeground,
+                                        ),
                                   ),
                                 ),
                               ),
@@ -347,10 +362,10 @@ class _LoginPageState extends State<LoginPage>
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
+              ),
+            ],
+          );
+        }),
       ),
     );
   }
