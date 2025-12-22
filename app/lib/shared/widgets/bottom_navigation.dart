@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -11,6 +12,15 @@ class BottomNavigation extends StatelessWidget {
     final currentIndex = navigationShell.currentIndex;
 
     return LayoutBuilder(builder: (context, constraints) {
+      double fontSize;
+
+      if (constraints.maxWidth <= Breakpoints.compactStandart) {
+        fontSize = 10;
+      } else if (constraints.maxWidth <= Breakpoints.medium) {
+        fontSize = 12;
+      } else {
+        fontSize = 14;
+      }
       return Container(
         decoration: const BoxDecoration(
           color: AppTheme.card,
@@ -21,12 +31,13 @@ class BottomNavigation extends StatelessWidget {
         child: SafeArea(
           child: Container(
             height: 80,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             child: Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _NavItem(
+                    fontSize: fontSize,
                     icon: Icons.home_outlined,
                     activeIcon: Icons.home,
                     label: 'Home',
@@ -34,6 +45,7 @@ class BottomNavigation extends StatelessWidget {
                     onTap: () => _onTap(0),
                   ),
                   _NavItem(
+                    fontSize: fontSize,
                     icon: Icons.shopping_cart_outlined,
                     activeIcon: Icons.shopping_cart,
                     label: 'Cashier',
@@ -41,6 +53,7 @@ class BottomNavigation extends StatelessWidget {
                     onTap: () => _onTap(1),
                   ),
                   _NavItem(
+                    fontSize: fontSize,
                     icon: Icons.inventory_2_outlined,
                     activeIcon: Icons.inventory_2,
                     label: 'Inventory',
@@ -48,6 +61,7 @@ class BottomNavigation extends StatelessWidget {
                     onTap: () => _onTap(2),
                   ),
                   _NavItem(
+                    fontSize: fontSize,
                     icon: Icons.bluetooth_outlined,
                     activeIcon: Icons.bluetooth,
                     label: 'Devices',
@@ -55,6 +69,7 @@ class BottomNavigation extends StatelessWidget {
                     onTap: () => _onTap(3),
                   ),
                   _NavItem(
+                    fontSize: fontSize,
                     icon: Icons.settings_outlined,
                     activeIcon: Icons.settings,
                     label: 'Settings',
@@ -79,14 +94,15 @@ class BottomNavigation extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
+  final double fontSize;
   final IconData icon;
   final IconData activeIcon;
   final String label;
   final bool isActive;
   final VoidCallback onTap;
-
   const _NavItem({
     required this.icon,
+    required this.fontSize,
     required this.activeIcon,
     required this.label,
     required this.isActive,
@@ -113,14 +129,16 @@ class _NavItem extends StatelessWidget {
                 isActive ? activeIcon : icon,
                 key: ValueKey(isActive),
                 color: isActive ? AppTheme.gold : AppTheme.mutedForeground,
-                size: 24,
+                size: 20,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               label,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
+                
+                fontSize: fontSize,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 color: isActive ? AppTheme.gold : AppTheme.mutedForeground,
               ),

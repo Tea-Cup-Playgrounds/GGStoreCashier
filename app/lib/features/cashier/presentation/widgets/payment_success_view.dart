@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
-import '../../../../shared/widgets/bottom_navigation.dart';
+// import '../../../../shared/widgets/bottom_navigation.dart';
 
 class PaymentSuccessView extends StatefulWidget {
   final double total;

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:gg_store_cashier/shared/layout/scaffold_with_bottom_navbar.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/cashier/presentation/pages/cashier_page.dart';
 import '../../features/inventory/presentation/pages/inventory_page.dart';
 import '../../features/inventory/presentation/pages/inventory_detail_page.dart';
@@ -12,7 +12,7 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 
 mixin AppRouter {
   static const String login = '/';
-  static const String dashboard = '/dashboard';
+  static const String home = '/home';
   static const String cashier = '/cashier';
   static const String inventory = '/inventory';
   static const String inventoryDetail = '/inventory/:id';
@@ -20,7 +20,7 @@ mixin AppRouter {
   static const String settings = '/settings';
 
   static final _rootNavigatorkey = GlobalKey<NavigatorState>();
-  static final dashboardNavKey = GlobalKey<NavigatorState>();
+  static final homeNavKey = GlobalKey<NavigatorState>();
   static final cashierNavKey = GlobalKey<NavigatorState>();
   static final inventoryNavKey = GlobalKey<NavigatorState>();
   static final devicesNavKey = GlobalKey<NavigatorState>();
@@ -50,11 +50,11 @@ mixin AppRouter {
             return ScaffoldWithBottomNavbar(navigationShell);
           },
           branches: [
-            StatefulShellBranch(navigatorKey: dashboardNavKey, routes: [
+            StatefulShellBranch(navigatorKey: homeNavKey, routes: [
               GoRoute(
-                path: dashboard,
-                name: 'dashboard',
-                builder: (context, state) => const DashboardPage(),
+                path: home,
+                name: 'home',
+                builder: (context, state) => const HomePage(),
               ),
             ]),
             StatefulShellBranch(navigatorKey: cashierNavKey, routes: [

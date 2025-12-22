@@ -42,6 +42,8 @@ class QuickActionCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               label,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w500,
               ),

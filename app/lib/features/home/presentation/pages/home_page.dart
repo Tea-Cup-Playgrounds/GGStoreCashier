@@ -6,15 +6,14 @@ import '../widgets/stat_card.dart';
 import '../widgets/quick_action_card.dart';
 import '../widgets/transaction_item.dart';
 
-class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _DashboardPageState extends State<DashboardPage>
-    with TickerProviderStateMixin {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late List<Animation<Offset>> _slideAnimations;
   late List<Animation<double>> _fadeAnimations;
@@ -113,7 +112,7 @@ class _DashboardPageState extends State<DashboardPage>
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -140,70 +139,78 @@ class _DashboardPageState extends State<DashboardPage>
                           children: [
                             Text(
                               _getGreeting(),
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: AppTheme.mutedForeground,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    color: AppTheme.mutedForeground,
+                                  ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Flagship Store',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ],
                         ),
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Stats Grid
                   SlideTransition(
                     position: _slideAnimations[1],
                     child: FadeTransition(
                       opacity: _fadeAnimations[1],
-                      child: GridView.count(
+                      child: GridView(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 1.2,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                                mainAxisExtent: 140),
                         children: const [
                           StatCard(
                             icon: Icons.attach_money,
-                            label: "Today's Sales",
-                            value: '\$2,458',
-                            trend: 12.5,
+                            label: "Transaksi Hari Ini",
+                            value: '32144',
+                            trend: 123.5,
                             isPositive: true,
                             isHighlighted: true,
                           ),
                           StatCard(
                             icon: Icons.shopping_bag_outlined,
-                            label: 'Orders',
-                            value: '48',
-                            trend: 8.2,
+                            label: 'Transaksi Bulan Ini',
+                            value: '580',
+                            trend: 80.2,
                             isPositive: true,
                           ),
                           StatCard(
                             icon: Icons.trending_up,
-                            label: 'Avg. Order',
-                            value: '\$51.21',
+                            label: 'Jumlah Pelanggan',
+                            value: '59',
                           ),
                           StatCard(
-                            icon: Icons.access_time,
-                            label: 'Active Hours',
-                            value: '6.5h',
+                            icon: Icons.inventory_2_outlined,
+                            label: 'Stock Krisis',
+                            value: '0',
                           ),
                         ],
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Quick Actions
                   SlideTransition(
                     position: _slideAnimations[2],
@@ -214,35 +221,49 @@ class _DashboardPageState extends State<DashboardPage>
                         children: [
                           Text(
                             'Quick Actions',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
                           const SizedBox(height: 16),
-                          Row(
+                          GridView(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    mainAxisSpacing: 16,
+                                    crossAxisSpacing: 16,
+                                    mainAxisExtent: 130),
                             children: [
-                              Expanded(
-                                child: QuickActionCard(
-                                  icon: Icons.shopping_cart_outlined,
-                                  label: 'New Sale',
-                                  onTap: () => context.go(AppRouter.cashier),
-                                ),
+                              QuickActionCard(
+                                icon: Icons.shopping_cart_outlined,
+                                label: 'New Sale',
+                                onTap: () => context.go(AppRouter.cashier),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: QuickActionCard(
-                                  icon: Icons.local_offer_outlined,
-                                  label: 'Apply Coupon',
-                                  onTap: () => context.go(AppRouter.cashier),
-                                ),
+                              QuickActionCard(
+                                icon: Icons.shopping_cart_outlined,
+                                label: 'Pasang Kupon',
+                                onTap: () => context.go(AppRouter.cashier),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: QuickActionCard(
-                                  icon: Icons.inventory_2_outlined,
-                                  label: 'Check Stock',
-                                  onTap: () => context.go(AppRouter.inventory),
-                                ),
+                              QuickActionCard(
+                                icon: Icons.inventory_2_outlined,
+                                label: 'Check Stock',
+                                onTap: () => context.go(AppRouter.inventory),
+                              ),
+                              QuickActionCard(
+                                icon: Icons.bluetooth,
+                                label: 'Kontrol Devices',
+                                onTap: () => context.go(AppRouter.cashier),
+                              ),
+                    
+                              QuickActionCard(
+                                icon: Icons.add,
+                                label: 'Tambah Stock',
+                                onTap: () => context.go(AppRouter.inventory),
                               ),
                             ],
                           ),
@@ -250,9 +271,9 @@ class _DashboardPageState extends State<DashboardPage>
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Recent Transactions
                   SlideTransition(
                     position: _slideAnimations[3],
@@ -266,9 +287,12 @@ class _DashboardPageState extends State<DashboardPage>
                             children: [
                               Text(
                                 'Recent Transactions',
-                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                               ),
                               TextButton(
                                 onPressed: () {
@@ -279,9 +303,12 @@ class _DashboardPageState extends State<DashboardPage>
                                   children: [
                                     Text(
                                       'View All',
-                                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                        color: AppTheme.gold,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelLarge
+                                          ?.copyWith(
+                                            color: AppTheme.gold,
+                                          ),
                                     ),
                                     const SizedBox(width: 4),
                                     const Icon(
@@ -299,7 +326,8 @@ class _DashboardPageState extends State<DashboardPage>
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _recentTransactions.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final transaction = _recentTransactions[index];
                               return SlideTransition(
@@ -321,7 +349,7 @@ class _DashboardPageState extends State<DashboardPage>
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 100), // Bottom padding for navigation
                 ],
               ),

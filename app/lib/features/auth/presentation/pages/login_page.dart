@@ -87,7 +87,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
 
     if (mounted) {
       setState(() => _isLoading = false);
-      context.go(AppRouter.dashboard);
+      context.go(AppRouter.home);
     }
   }
 

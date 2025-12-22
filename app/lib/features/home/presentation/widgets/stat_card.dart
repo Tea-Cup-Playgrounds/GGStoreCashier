@@ -27,7 +27,8 @@ class StatCard extends StatelessWidget {
         color: isHighlighted ? AppTheme.gold.withOpacity(0.1) : AppTheme.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isHighlighted ? AppTheme.gold.withOpacity(0.3) : AppTheme.border,
+          color:
+              isHighlighted ? AppTheme.gold.withOpacity(0.3) : AppTheme.border,
         ),
         boxShadow: isHighlighted
             ? [
@@ -55,13 +56,15 @@ class StatCard extends StatelessWidget {
                 child: Icon(
                   icon,
                   size: 20,
-                  color: isHighlighted ? AppTheme.gold : AppTheme.mutedForeground,
+                  color:
+                      isHighlighted ? AppTheme.gold : AppTheme.mutedForeground,
                 ),
               ),
               const Spacer(),
               if (trend != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: isPositive
                         ? AppTheme.success.withOpacity(0.1)
@@ -74,15 +77,24 @@ class StatCard extends StatelessWidget {
                       Icon(
                         isPositive ? Icons.trending_up : Icons.trending_down,
                         size: 12,
-                        color: isPositive ? AppTheme.success : AppTheme.destructive,
+                        color: isPositive
+                            ? AppTheme.success
+                            : AppTheme.destructive,
                       ),
                       const SizedBox(width: 2),
-                      Text(
-                        '${trend!.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: isPositive ? AppTheme.success : AppTheme.destructive,
+                      SizedBox(
+                        width: 50,
+                        child: Text(
+                          '${trend!.toStringAsFixed(1)}%',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isPositive
+                                ? AppTheme.success
+                                : AppTheme.destructive,
+                          ),
                         ),
                       ),
                     ],
@@ -93,17 +105,19 @@ class StatCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             value,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: isHighlighted ? AppTheme.gold : AppTheme.foreground,
-            ),
+                  fontWeight: FontWeight.bold,
+                  color: isHighlighted ? AppTheme.gold : AppTheme.foreground,
+                ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.mutedForeground,
-            ),
+                  color: AppTheme.mutedForeground,
+                ),
           ),
         ],
       ),
