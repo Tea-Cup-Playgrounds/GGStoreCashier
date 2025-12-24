@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 // Import Header baru
@@ -77,7 +78,8 @@ class InventoryPage extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 16.0),
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // TODO: Aksi Tambah Item
+                    context.push(AppRouter.inventoryAddItem);
+                    debugPrint("kontol woe");
                   },
                   icon: const Icon(Icons.add),
                   label: const Text('Add Item'),
@@ -165,15 +167,6 @@ class _InventoryHeaderDelegate extends SliverPersistentHeaderDelegate {
     return true;
   }
 }
-
-// File: lib/features/inventory/presentation/pages/inventory_page.dart
-
-// ... (Kode sebelumnya untuk InventoryPage, SliverAppBar, SliverPersistentHeader, dll.)
-
-// =========================================================================
-// WIDGET ITEM LIST (Disesuaikan untuk Navigasi)
-// =========================================================================
-
 class _ProductListTile extends StatelessWidget {
   final String name;
   final String sku; // SKU akan digunakan sebagai productId untuk navigasi

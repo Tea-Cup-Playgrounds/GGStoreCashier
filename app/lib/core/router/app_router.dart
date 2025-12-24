@@ -1,5 +1,5 @@
-// import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
+import 'package:gg_store_cashier/features/inventory/presentation/pages/inventory_add_item_page.dart';
 import 'package:gg_store_cashier/shared/layout/scaffold_with_bottom_navbar.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -15,7 +15,8 @@ mixin AppRouter {
   static const String home = '/home';
   static const String cashier = '/cashier';
   static const String inventory = '/inventory';
-  static const String inventoryDetail = '/inventory/:id';
+  static const String inventoryDetail = '/inventory/detail/:id';
+  static const String inventoryAddItem = '/inventory/add';
   static const String devices = '/devices';
   static const String settings = '/settings';
 
@@ -43,6 +44,11 @@ mixin AppRouter {
           final id = state.pathParameters['id']!;
           return InventoryDetailPage(productId: id);
         },
+      ),
+      GoRoute(
+        path: inventoryAddItem,
+        name: 'inventoryAddItem',
+        builder: (context, state) => const InventoryAddItemPage(),
       ),
       // HALAMAN YANG BUTUH LAYOUT SCAFFOLD + BOTTOM NAV TARUH DI SINI
       StatefulShellRoute.indexedStack(

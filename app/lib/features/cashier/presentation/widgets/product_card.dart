@@ -37,25 +37,24 @@ class ProductCard extends StatelessWidget {
               ),
               child: Stack(
                 children: [
-                  // Placeholder for product image
-                  const Center(
-                    child: Icon(
-                      Icons.inventory_2_outlined,
-                      size: 48,
-                      color: AppTheme.mutedForeground,
-                    ),
+                  Image.asset(
+                    'assets/products/example.jpg',
+                    width: 500,
+                    height: 500,
+                    fit: BoxFit.cover,
                   ),
-                  
+
                   // Stock status badge
                   if (product.isLowStock)
                     Positioned(
                       top: 8,
                       right: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: product.isOutOfStock 
-                              ? AppTheme.destructive 
+                          color: product.isOutOfStock
+                              ? AppTheme.destructive
                               : AppTheme.warning,
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -69,14 +68,15 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  
+
                   // Category badge
                   if (product.category != null)
                     Positioned(
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppTheme.card.withOpacity(0.8),
                           borderRadius: BorderRadius.circular(8),
@@ -95,7 +95,7 @@ class ProductCard extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Product Info
           Expanded(
             flex: 2,
@@ -107,8 +107,8 @@ class ProductCard extends StatelessWidget {
                   Text(
                     product.name,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                          fontWeight: FontWeight.w600,
+                        ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -116,11 +116,16 @@ class ProductCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '\$${product.sellPrice.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppTheme.gold,
-                          fontWeight: FontWeight.bold,
+                      SizedBox(
+                        width: 120,
+                        child: Text(
+                          '\$${product.sellPrice.toStringAsFixed(2)}',
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: AppTheme.gold,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                         ),
                       ),
                       GestureDetector(
@@ -128,16 +133,16 @@ class ProductCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: product.isOutOfStock 
-                                ? AppTheme.mutedForeground 
+                            color: product.isOutOfStock
+                                ? AppTheme.mutedForeground
                                 : AppTheme.gold,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.add,
                             size: 16,
-                            color: product.isOutOfStock 
-                                ? AppTheme.surface 
+                            color: product.isOutOfStock
+                                ? AppTheme.surface
                                 : AppTheme.background,
                           ),
                         ),
