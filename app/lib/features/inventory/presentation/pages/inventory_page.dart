@@ -1,64 +1,108 @@
 import 'package:flutter/material.dart';
 import 'package:gg_store_cashier/core/router/app_router.dart';
+import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
-// Import Header baru
 import '../widgets/inventory_header.dart';
 
-class InventoryPage extends StatelessWidget {
+class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
+
+  @override
+  State<InventoryPage> createState() => _InventoryPageState();
+}
+
+class _InventoryPageState extends State<InventoryPage> {
+  late final TextEditingController searchController;
+  InventoryFilter selectedFilter = InventoryFilter.all;
+  InventoryFilter _currentFilter = InventoryFilter.all;
+
+  void _onSearchChanged(String value) {
+    debugPrint('Search: $value');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  void _onFilterChanged(InventoryFilter filter) {
+    if (selectedFilter == filter) return;
+
+    setState(() {
+      selectedFilter = filter;
+      _currentFilter = filter;
+    });
+
+    // ============================
+    // TODO: FETCH KE API
+    // ============================
+    // fetchInventory(
+    //   filter: filter,
+    //   search: searchController.text,
+    // );
+
+    debugPrint('Filter changed to: $filter');
+  }
 
   @override
   Widget build(BuildContext context) {
     // Data dummy untuk daftar produk
     final List<Map<String, dynamic>> dummyProducts = [
       {
+        'image': "https://picsum.photos/200",
         'name': 'Premium Sunglasses',
         'sku': 'SUN-003',
         'inStock': 4,
         'price': 149.99,
         'isLowStock': true,
-        'icon': Icons.archive_outlined
       },
       {
+        'image': "https://picsum.photos/200",
         'name': 'Gold Bracelet',
         'sku': 'BRC-004',
         'inStock': 12,
         'price': 199.99,
         'isLowStock': false,
-        'icon': Icons.diamond_outlined
       },
       {
+        'image': "https://picsum.photos/200/300",
         'name': 'Silk Scarf',
         'sku': 'SCF-005',
         'inStock': 22,
         'price': 79.99,
         'isLowStock': false,
-        'icon': Icons.all_inbox
       },
       {
+        'image': "https://picsum.photos/200",
         'name': 'Diamond Earrings',
         'sku': 'EAR-006',
         'inStock': 0,
         'price': 449.99,
         'isLowStock': true,
-        'icon': Icons.diamond_outlined
       },
       {
+        'image': "https://picsum.photos/200",
         'name': 'Cashmere Sweater',
         'sku': 'SWT-007',
         'inStock': 3,
         'price': 259.99,
         'isLowStock': true,
-        'icon': Icons.archive_outlined
       },
       {
+        'image': "https://picsum.photos/200",
         'name': 'Pearl Necklace',
         'sku': 'NCK-008',
         'inStock': 7,
         'price': 349.99,
         'isLowStock': false,
-        'icon': Icons.diamond_outlined
       },
     ];
 
@@ -66,7 +110,7 @@ class InventoryPage extends StatelessWidget {
       backgroundColor: AppTheme.background,
       body: CustomScrollView(
         slivers: [
-          // 1. SLIVER APP BAR (Sticky)
+          // 1. App Bar
           SliverAppBar(
             title: const Text('Inventory'),
             backgroundColor: AppTheme.background,
@@ -79,7 +123,6 @@ class InventoryPage extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     context.push(AppRouter.inventoryAddItem);
-                    debugPrint("kontol woe");
                   },
                   icon: const Icon(Icons.add),
                   label: const Text('Add Item'),
@@ -90,20 +133,22 @@ class InventoryPage extends StatelessWidget {
                 ),
               ),
             ],
-            // Hilangkan garis kuning dengan mengatur scrolledUnderElevation
             scrolledUnderElevation: 0,
           ),
 
           // 2. STICKY HEADER untuk Search, Filter, dan Summary
-          const SliverPersistentHeader(
+          SliverPersistentHeader(
             delegate: _InventoryHeaderDelegate(
-              child: InventoryHeader(),
+              child: InventoryHeader(
+                searchController: searchController,
+                onSearchChanged: _onSearchChanged,
+                currentFilter: _currentFilter,
+                onFilterChanged: _onFilterChanged,
+              ),
             ),
-            pinned: true, // Membuat header tetap di atas saat di-scroll
-            floating: false,
+            pinned: true,
           ),
-
-          // 3. SLIVER LIST (Daftar Produk yang dapat di-scroll)
+          // Items
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
@@ -111,12 +156,12 @@ class InventoryPage extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: _ProductListTile(
+                    image: product['image'],
                     name: product['name'],
                     sku: product['sku'],
                     inStock: product['inStock'],
                     price: product['price'],
                     isLowStock: product['isLowStock'],
-                    iconData: product['icon'],
                   ),
                 );
               },
@@ -138,10 +183,6 @@ class InventoryPage extends StatelessWidget {
   }
 }
 
-// =========================================================================
-// WIDGET PEMBANTU SLIVER
-// =========================================================================
-
 // Delegate untuk membuat InventoryHeader menjadi Sticky
 class _InventoryHeaderDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
@@ -156,24 +197,25 @@ class _InventoryHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   double get maxExtent =>
-      300.0; // Sesuaikan tinggi maksimum yang dibutuhkan header
+      280.0; // Sesuaikan tinggi maksimum yang dibutuhkan header
 
   @override
   double get minExtent =>
-      300.0; // Atur min dan maxExtent sama agar tidak bisa diciutkan
+      280.0; // Atur min dan maxExtent sama agar tidak bisa diciutkan
 
   @override
   bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
     return true;
   }
 }
+
 class _ProductListTile extends StatelessWidget {
   final String name;
-  final String sku; // SKU akan digunakan sebagai productId untuk navigasi
+  final String sku;
   final int inStock;
   final double price;
   final bool isLowStock;
-  final IconData iconData;
+  final String image;
 
   const _ProductListTile({
     required this.name,
@@ -181,7 +223,7 @@ class _ProductListTile extends StatelessWidget {
     required this.inStock,
     required this.price,
     required this.isLowStock,
-    required this.iconData,
+    required this.image,
   });
 
   @override
@@ -218,13 +260,15 @@ class _ProductListTile extends StatelessWidget {
 
           leading: Container(
             width: 48,
-            height: 48,
+            height: 48, // ✅ FIXED SQUARE
             decoration: BoxDecoration(
               color: AppTheme.card,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(4),
             ),
-            child: Center(
-              child: Icon(iconData, color: AppTheme.mutedForeground, size: 24),
+            clipBehavior: Clip.antiAlias, // 🔥 WAJIB agar image ikut rounded
+            child: Image.network(
+              image,
+              fit: BoxFit.cover, // ✅ isi kotak tanpa gepeng
             ),
           ),
 
@@ -264,16 +308,6 @@ class _ProductListTile extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
               ),
-              if (isLowStock || isOutOfStock)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Icon(
-                    Icons.warning_amber_rounded,
-                    color:
-                        isOutOfStock ? AppTheme.destructive : AppTheme.warning,
-                    size: 18,
-                  ),
-                ),
               const SizedBox(width: 8),
               const Icon(
                 Icons.arrow_forward_ios_rounded,
