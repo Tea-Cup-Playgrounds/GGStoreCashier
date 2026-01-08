@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gg_store_cashier/core/router/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
 
 // Ganti StatelessWidget menjadi ConsumerWidget untuk arsitektur Riverpod
 class SettingsPage extends ConsumerWidget {
@@ -11,7 +13,6 @@ class SettingsPage extends ConsumerWidget {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleSmall!.copyWith(
-            color: AppTheme.mutedForeground,
             letterSpacing: 0.8,
           ),
     );
@@ -20,10 +21,10 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: const Text('Settings'),
-        backgroundColor: AppTheme.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         centerTitle: false,
       ),
@@ -53,25 +54,23 @@ class SettingsPage extends ConsumerWidget {
               // 3. BAGIAN DEVICES
               _buildSectionTitle(context, 'Devices'),
               const SizedBox(height: 8.0),
-              // Barcode Scanner (Status Connected)
               _SettingsTile(
                 title: 'Barcode Scanner',
                 subtitle: 'Zebra DS9308 - Connected',
                 icon: Icons.qr_code_scanner,
                 statusColor: AppTheme.success,
                 onTap: () {
-                  // TODO: Implement navigation to device detail
+                  context.push(AppRouter.scannerDevices);
                 },
               ),
               const SizedBox(height: 8.0),
-              // Receipt Printer (Status Disconnected)
               _SettingsTile(
                 title: 'Receipt Printer',
                 subtitle: 'Epson TM-T88VI - Disconnected',
                 icon: Icons.print_outlined,
                 statusColor: AppTheme.mutedForeground,
                 onTap: () {
-                  // TODO: Implement navigation to device detail
+                  context.push(AppRouter.printerDevices);
                 },
               ),
               const SizedBox(height: 32.0),
@@ -93,7 +92,7 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: 'Dark mode',
                 icon: Icons.light_mode_outlined,
                 onTap: () {
-                  // TODO: Implement navigation
+                  context.push(AppRouter.apprearance);
                 },
               ),
               const SizedBox(height: 32.0),
@@ -124,7 +123,7 @@ class SettingsPage extends ConsumerWidget {
               Center(
                 child: TextButton.icon(
                   onPressed: () {
-                    // TODO: Implement Sign Out Logic
+                    context.pushNamed("login");
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text('Sign Out'),
@@ -160,20 +159,29 @@ class _StoreProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color.fromARGB(255, 48, 40, 5), // gold
-            Color.fromARGB(255, 34, 28, 5), // gold
-            Color(0xFF1F1F1F), // dark
-          ],
+          colors: isDark
+              ? [
+                  const Color(0xFF302805),
+                  const Color(0xFF221C05),
+                  const Color(0xFF1F1F1F),
+                ]
+              : [
+                  scheme.primaryContainer,
+                  scheme.secondaryContainer,
+                  scheme.surface,
+                ],
         ),
-        border: Border.all(color: AppTheme.border, width: 0.5),
+        border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant, width: 0.5),
       ),
       child: Row(
         children: [
@@ -232,7 +240,7 @@ class _StoreProfileHeader extends StatelessWidget {
   }
 }
 
-// Widget Kustom untuk Tile Pengaturan (Icon Abu-abu & Box Gelap)
+// Pembungkus List Settings
 class _SettingsTile extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -250,67 +258,60 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Card(
-      // Mengatur warna Card ke background agar border Container terlihat
-      color: AppTheme.background,
+      color: colors.secondary,
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        // WARNA BOX YANG LEBIH GELAP
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border, width: 1.0),
+        side: BorderSide(
+          color: theme.colorScheme.outline,
         ),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: Icon(
-            icon,
-            // ICON ABU-ABU
-            color: AppTheme.mutedForeground,
-            size: 24,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Icon(
+          icon,
+          color: colors.onSurface.withOpacity(0.6),
+          size: 24,
+        ),
+        title: Text(
+          title,
+          style: theme.textTheme.titleMedium,
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            subtitle,
+            style: theme.textTheme.bodySmall,
           ),
-          title: Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Lingkaran Status
-              if (statusColor != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      shape: BoxShape.circle,
-                    ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (statusColor != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
                   ),
                 ),
-              // Ikon Panah
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: AppTheme.mutedForeground,
               ),
-            ],
-          ),
-          onTap: onTap,
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: colors.onSurface.withOpacity(0.4),
+            ),
+          ],
         ),
+        onTap: onTap,
       ),
     );
   }
