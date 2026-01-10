@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
 
 enum ButtonVariant { primary, secondary, outline, ghost }
+
 enum ButtonSize { small, medium, large, extraLarge }
 
 class CustomButton extends StatelessWidget {
@@ -26,12 +26,14 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return SizedBox(
       width: fullWidth ? double.infinity : null,
       height: _getHeight(),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
-        style: _getButtonStyle(),
+        style: _getButtonStyle(context, colorScheme),
         child: isLoading
             ? SizedBox(
                 width: 20,
@@ -39,7 +41,7 @@ class CustomButton extends StatelessWidget {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    _getLoadingColor(),
+                    _getLoadingColor(colorScheme),
                   ),
                 ),
               )
@@ -57,94 +59,34 @@ class CustomButton extends StatelessWidget {
     );
   }
 
-  double _getHeight() {
-    switch (size) {
-      case ButtonSize.small:
-        return 36;
-      case ButtonSize.medium:
-        return 44;
-      case ButtonSize.large:
-        return 52;
-      case ButtonSize.extraLarge:
-        return 60;
-    }
-  }
+  // =========================
+  // SIZE
+  // =========================
 
-  double _getIconSize() {
-    switch (size) {
-      case ButtonSize.small:
-        return 16;
-      case ButtonSize.medium:
-        return 18;
-      case ButtonSize.large:
-        return 20;
-      case ButtonSize.extraLarge:
-        return 22;
-    }
-  }
+  double _getHeight() => switch (size) {
+        ButtonSize.small => 36,
+        ButtonSize.medium => 44,
+        ButtonSize.large => 52,
+        ButtonSize.extraLarge => 60,
+      };
 
-  Color _getLoadingColor() {
-    switch (variant) {
-      case ButtonVariant.primary:
-        return AppTheme.background;
-      case ButtonVariant.secondary:
-        return AppTheme.foreground;
-      case ButtonVariant.outline:
-        return AppTheme.foreground;
-      case ButtonVariant.ghost:
-        return AppTheme.gold;
-    }
-  }
+  double _getIconSize() => switch (size) {
+        ButtonSize.small => 16,
+        ButtonSize.medium => 18,
+        ButtonSize.large => 20,
+        ButtonSize.extraLarge => 22,
+      };
 
-  ButtonStyle _getButtonStyle() {
-    final baseStyle = ElevatedButton.styleFrom(
-      elevation: 0,
-      padding: _getPadding(),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      textStyle: _getTextStyle(),
-    );
-
-    switch (variant) {
-      case ButtonVariant.primary:
-        return baseStyle.copyWith(
-          backgroundColor: WidgetStateProperty.all(AppTheme.gold),
-          foregroundColor: WidgetStateProperty.all(AppTheme.background),
-        );
-      case ButtonVariant.secondary:
-        return baseStyle.copyWith(
-          backgroundColor: WidgetStateProperty.all(AppTheme.secondary),
-          foregroundColor: WidgetStateProperty.all(AppTheme.secondaryForeground),
-        );
-      case ButtonVariant.outline:
-        return baseStyle.copyWith(
-          backgroundColor: WidgetStateProperty.all(Colors.transparent),
-          foregroundColor: WidgetStateProperty.all(AppTheme.foreground),
-          side: WidgetStateProperty.all(
-            const BorderSide(color: AppTheme.border),
-          ),
-        );
-      case ButtonVariant.ghost:
-        return baseStyle.copyWith(
-          backgroundColor: WidgetStateProperty.all(Colors.transparent),
-          foregroundColor: WidgetStateProperty.all(AppTheme.gold),
-        );
-    }
-  }
-
-  EdgeInsets _getPadding() {
-    switch (size) {
-      case ButtonSize.small:
-        return const EdgeInsets.symmetric(horizontal: 12, vertical: 6);
-      case ButtonSize.medium:
-        return const EdgeInsets.symmetric(horizontal: 16, vertical: 8);
-      case ButtonSize.large:
-        return const EdgeInsets.symmetric(horizontal:20, vertical: 12);
-      case ButtonSize.extraLarge:
-        return const EdgeInsets.symmetric(horizontal: 24, vertical: 16);
-    }
-  }
+  EdgeInsets _getPadding() => switch (size) {
+        ButtonSize.small =>
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        ButtonSize.medium =>
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ButtonSize.large =>
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        ButtonSize.extraLarge =>
+          const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      };
 
   TextStyle _getTextStyle() {
     final fontSize = switch (size) {
@@ -159,4 +101,83 @@ class CustomButton extends StatelessWidget {
       fontWeight: FontWeight.w600,
     );
   }
+
+  // =========================
+  // STYLE
+  // =========================
+
+  ButtonStyle _getButtonStyle(
+    BuildContext context,
+    ColorScheme colorScheme,
+  ) {
+    final baseStyle = Theme.of(context).elevatedButtonTheme.style?.copyWith(
+              padding: WidgetStateProperty.all(_getPadding()),
+              textStyle: WidgetStateProperty.all(_getTextStyle()),
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              elevation: WidgetStateProperty.all(0),
+            ) ??
+        ElevatedButton.styleFrom(
+          elevation: 0,
+          padding: _getPadding(),
+          textStyle: _getTextStyle(),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        );
+
+    BorderSide border(Color color) => BorderSide(color: color, width: 1);
+
+    switch (variant) {
+      case ButtonVariant.primary:
+        return baseStyle.copyWith(
+          backgroundColor: WidgetStateProperty.all(colorScheme.primary),
+          foregroundColor: WidgetStateProperty.all(colorScheme.onPrimary),
+          side: WidgetStateProperty.all(
+            border(colorScheme.primary),
+          ),
+        );
+
+      case ButtonVariant.secondary:
+        return baseStyle.copyWith(
+          backgroundColor: WidgetStateProperty.all(colorScheme.secondary),
+          foregroundColor: WidgetStateProperty.all(colorScheme.onSecondary),
+          side: WidgetStateProperty.all(
+            border(colorScheme.secondary),
+          ),
+        );
+
+      case ButtonVariant.outline:
+        return baseStyle.copyWith(
+          backgroundColor: WidgetStateProperty.all(Colors.transparent),
+          foregroundColor: WidgetStateProperty.all(colorScheme.onSurface),
+          side: WidgetStateProperty.all(
+            border(colorScheme.outlineVariant),
+          ),
+        );
+
+      case ButtonVariant.ghost:
+        return baseStyle.copyWith(
+          backgroundColor: WidgetStateProperty.all(Colors.transparent),
+          foregroundColor: WidgetStateProperty.all(colorScheme.primary),
+          side: WidgetStateProperty.all(
+            border(colorScheme.primary.withOpacity(0.4)),
+          ),
+        );
+    }
+  }
+
+  // =========================
+  // LOADING COLOR
+  // =========================
+
+  Color _getLoadingColor(ColorScheme colorScheme) => switch (variant) {
+        ButtonVariant.primary => colorScheme.onPrimary,
+        ButtonVariant.secondary => colorScheme.onSecondary,
+        ButtonVariant.outline => colorScheme.onSurface,
+        ButtonVariant.ghost => colorScheme.primary,
+      };
 }

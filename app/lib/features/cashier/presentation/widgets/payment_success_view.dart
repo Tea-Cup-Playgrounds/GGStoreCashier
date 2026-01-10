@@ -87,7 +87,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -95,7 +95,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-              
+
               // Success Icon
               AnimatedBuilder(
                 animation: _scaleAnimation,
@@ -120,18 +120,18 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                           ),
                         ],
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.check,
                         size: 60,
-                        color: AppTheme.background,
+                        color: Theme.of(context).colorScheme.surface,
                       ),
                     ),
                   );
                 },
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // Success Text
               SlideTransition(
                 position: _slideAnimation,
@@ -141,26 +141,27 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                     children: [
                       Text(
                         'Payment Successful',
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Transaction completed successfully',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.mutedForeground,
-                        ),
+                              color: AppTheme.mutedForeground,
+                            ),
                         textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 40),
-              
+
               // Payment Details
               SlideTransition(
                 position: _slideAnimation,
@@ -170,7 +171,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: AppTheme.card,
+                      color: AppTheme.background,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: AppTheme.border),
                     ),
@@ -178,32 +179,40 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                       children: [
                         Text(
                           'Total Paid',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppTheme.mutedForeground,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: AppTheme.mutedForeground,
+                                  ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '\$${widget.total.toStringAsFixed(2)}',
-                          style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.gold,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .displayMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.gold,
+                              ),
                         ),
                         if (widget.appliedCoupon != null) ...[
                           const SizedBox(height: 12),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: AppTheme.success.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               '${widget.appliedCoupon!['discount']}% off applied (${widget.appliedCoupon!['code']})',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.success,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: AppTheme.success,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           ),
                         ],
@@ -212,9 +221,9 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                   ),
                 ),
               ),
-              
+
               const Spacer(),
-              
+
               // New Transaction Button
               SlideTransition(
                 position: _slideAnimation,
@@ -228,7 +237,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 100), // Space for bottom navigation
             ],
           ),

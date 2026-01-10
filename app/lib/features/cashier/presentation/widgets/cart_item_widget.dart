@@ -21,9 +21,9 @@ class CartItemWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -34,8 +34,8 @@ class CartItemWidget extends StatelessWidget {
                 Text(
                   cartItem.product.name,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                        fontWeight: FontWeight.w600,
+                      ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -43,9 +43,9 @@ class CartItemWidget extends StatelessWidget {
                 Text(
                   '\$${cartItem.subtotal.toStringAsFixed(2)}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.gold,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: AppTheme.gold,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
@@ -66,7 +66,8 @@ class CartItemWidget extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppTheme.card,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppTheme.border),
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant),
                   ),
                   child: const Icon(
                     Icons.remove,
@@ -81,8 +82,8 @@ class CartItemWidget extends StatelessWidget {
                 child: Text(
                   '${cartItem.quantity}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ),
               GestureDetector(

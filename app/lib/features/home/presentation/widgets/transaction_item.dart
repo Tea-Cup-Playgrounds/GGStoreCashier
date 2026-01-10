@@ -22,16 +22,16 @@ class TransactionItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.card,
+        color: Theme.of(context).colorScheme.secondary,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.surface,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -51,15 +51,15 @@ class TransactionItem extends StatelessWidget {
                     Text(
                       '$items items',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     Text(
                       '\$${total.toStringAsFixed(2)}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.gold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.gold,
+                          ),
                     ),
                   ],
                 ),
@@ -70,20 +70,21 @@ class TransactionItem extends StatelessWidget {
                     Text(
                       time,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.mutedForeground,
-                      ),
+                            color: AppTheme.mutedForeground,
+                          ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppTheme.surface,
+                        color: AppTheme.background,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         paymentMethod,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppTheme.mutedForeground,
-                        ),
+                              color: AppTheme.mutedForeground,
+                            ),
                       ),
                     ),
                   ],

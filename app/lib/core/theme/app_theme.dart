@@ -135,7 +135,7 @@ class AppTheme {
             error: destructive,
             onError: destructiveForeground,
             outline: surface,
-            outlineVariant: surface),
+            outlineVariant: Color.fromARGB(255, 86, 86, 86)),
         scaffoldBackgroundColor: background,
         textTheme: textTheme,
         appBarTheme: AppBarTheme(
@@ -258,8 +258,8 @@ class AppTheme {
             color: Colors.black,
           ),
         ),
-        cardTheme: const CardTheme(
-          color: lightSettingsTile,
+        cardTheme: CardTheme(
+          color: Colors.grey.shade200,
           elevation: 0,
           margin: EdgeInsets.zero,
         ),
@@ -278,6 +278,13 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: gold, width: 2),
           ),
+        ),
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          backgroundColor: foreground,
+          selectedItemColor: gold,
+          unselectedItemColor: Colors.grey.shade700,
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
         ),
       );
 }

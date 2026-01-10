@@ -5,8 +5,6 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_theme.dart';
-import 'package:dotted_border/dotted_border.dart';
 import 'package:gg_store_cashier/shared/widgets/image_input.dart';
 
 class InventoryAddItemPage extends StatefulWidget {
@@ -25,7 +23,7 @@ class _InventoryAddItemState extends State<InventoryAddItemPage> {
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   File? _productImage;
-  final _imageKey = GlobalKey<ImageInputState>();
+  // final _imageKey = GlobalKey<ImageInputState>();
 
   @override
   void dispose() {
@@ -41,16 +39,15 @@ class _InventoryAddItemState extends State<InventoryAddItemPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         leading: IconButton(
             onPressed: () => context.pop(), icon: const Icon(Icons.arrow_back)),
         title: const Text(
           "Tambah Product",
-          style: TextStyle(
-              fontWeight: FontWeight.w600, color: AppTheme.foreground),
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: AppTheme.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
       ),
       body: SingleChildScrollView(

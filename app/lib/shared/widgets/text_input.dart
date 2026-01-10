@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:gg_store_cashier/core/theme/app_theme.dart';
 
 class TextInput extends StatelessWidget {
   final String label;
@@ -30,7 +29,6 @@ class TextInput extends StatelessWidget {
         child: Text(
           label,
           style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                color: AppTheme.foreground,
                 fontWeight: FontWeight.w500,
               ),
         ),

@@ -28,9 +28,10 @@ class InventoryHeader extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.card,
+          color: Theme.of(context).colorScheme.secondary,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border),
+          border:
+              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,13 +56,7 @@ class InventoryHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              title,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppTheme.mutedForeground),
-            ),
+            Text(title, style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),
@@ -86,11 +81,14 @@ class InventoryHeader extends StatelessWidget {
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
             decoration: BoxDecoration(
-              color:
-                  isSelected ? AppTheme.card : Colors.transparent, // ✨ tambahan
+              color: isSelected
+                  ? Theme.of(context).colorScheme.surface
+                  : Colors.transparent, //
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: isSelected ? AppTheme.foreground : AppTheme.border,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).colorScheme.outlineVariant,
                 width: isSelected ? 1.5 : 1,
               ),
             ),
@@ -116,8 +114,8 @@ class InventoryHeader extends StatelessWidget {
                       fontWeight:
                           isSelected ? FontWeight.w600 : FontWeight.w400,
                       color: isSelected
-                          ? AppTheme.foreground
-                          : AppTheme.mutedForeground,
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Theme.of(context).colorScheme.outlineVariant,
                     ),
                 child: Text(label),
               ),
@@ -149,7 +147,7 @@ class InventoryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppTheme.background,
+      color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

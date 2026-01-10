@@ -24,11 +24,14 @@ class StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isHighlighted ? AppTheme.gold.withOpacity(0.1) : AppTheme.card,
+        color: isHighlighted
+            ? AppTheme.gold.withOpacity(0.1)
+            : Theme.of(context).colorScheme.secondary,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color:
-              isHighlighted ? AppTheme.gold.withOpacity(0.3) : AppTheme.border,
+          color: isHighlighted
+              ? AppTheme.gold.withOpacity(0.3)
+              : Theme.of(context).colorScheme.outlineVariant,
         ),
         boxShadow: isHighlighted
             ? [
@@ -50,7 +53,7 @@ class StatCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isHighlighted
                       ? AppTheme.gold.withOpacity(0.2)
-                      : AppTheme.surface,
+                      : Theme.of(context).colorScheme.secondary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -108,16 +111,16 @@ class StatCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: isHighlighted ? AppTheme.gold : AppTheme.foreground,
+                  color: isHighlighted
+                      ? AppTheme.gold
+                      : Theme.of(context).colorScheme.onSecondary,
                 ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.mutedForeground,
-                ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(),
           ),
         ],
       ),

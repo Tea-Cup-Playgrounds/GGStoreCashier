@@ -107,13 +107,12 @@ class _InventoryPageState extends State<InventoryPage> {
     ];
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: CustomScrollView(
         slivers: [
           // 1. App Bar
           SliverAppBar(
             title: const Text('Inventory'),
-            backgroundColor: AppTheme.background,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             elevation: 0,
             centerTitle: false,
             pinned: true, // Membuat AppBar tetap di atas
@@ -235,7 +234,7 @@ class _ProductListTile extends StatelessWidget {
             ? AppTheme.warning
             : AppTheme.success;
 
-    final Color tileBackgroundColor = AppTheme.surface;
+    final Color tileBackgroundColor = Theme.of(context).colorScheme.secondary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -243,7 +242,6 @@ class _ProductListTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: tileBackgroundColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border, width: 1.0),
         ),
         child: ListTile(
           // ===============================================

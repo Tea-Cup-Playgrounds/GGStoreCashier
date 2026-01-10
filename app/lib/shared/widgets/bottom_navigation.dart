@@ -22,10 +22,11 @@ class BottomNavigation extends StatelessWidget {
         fontSize = 14;
       }
       return Container(
-        decoration: const BoxDecoration(
-          color: AppTheme.card,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
           border: Border(
-            top: BorderSide(color: AppTheme.border, width: 1),
+            top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant, width: 1.2),
           ),
         ),
         child: SafeArea(
@@ -60,7 +61,6 @@ class BottomNavigation extends StatelessWidget {
                     isActive: currentIndex == 2,
                     onTap: () => _onTap(2),
                   ),
-                
                   _NavItem(
                     fontSize: fontSize,
                     icon: Icons.settings_outlined,
@@ -121,7 +121,13 @@ class _NavItem extends StatelessWidget {
               child: Icon(
                 isActive ? activeIcon : icon,
                 key: ValueKey(isActive),
-                color: isActive ? AppTheme.gold : AppTheme.mutedForeground,
+                color: isActive
+                    ? Theme.of(context)
+                        .bottomNavigationBarTheme
+                        .selectedItemColor
+                    : Theme.of(context)
+                        .bottomNavigationBarTheme
+                        .unselectedItemColor,
                 size: 20,
               ),
             ),
@@ -130,10 +136,15 @@ class _NavItem extends StatelessWidget {
               label,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                
                 fontSize: fontSize,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                color: isActive ? AppTheme.gold : AppTheme.mutedForeground,
+                color: isActive
+                    ? Theme.of(context)
+                        .bottomNavigationBarTheme
+                        .selectedItemColor
+                    : Theme.of(context)
+                        .bottomNavigationBarTheme
+                        .unselectedItemColor,
               ),
             ),
           ],

@@ -30,7 +30,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   };
 
   File? _pickedImage;
-  final _imageKey = GlobalKey<ImageInputState>();
+  // final _imageKey = GlobalKey<ImageInputState>();
   late TextEditingController _productNameController;
   late TextEditingController _skuController;
   late TextEditingController _categoryController;
@@ -67,11 +67,11 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         // Tombol kembali otomatis
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.foreground),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
         // Judul dan Subtitle Kustom
@@ -82,19 +82,16 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
               'Edit Item',
               style: Theme.of(context).textTheme.headlineMedium!.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.foreground,
                   ),
             ),
             Text(
               widget
                   .productId, // Menggunakan productId (WAT-001) sebagai subtitle
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: AppTheme.mutedForeground,
-                  ),
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(),
             ),
           ],
         ),
-        backgroundColor: AppTheme.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
           // Tombol Hapus (Warna Destructive)

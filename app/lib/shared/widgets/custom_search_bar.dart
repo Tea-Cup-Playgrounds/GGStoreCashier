@@ -23,9 +23,9 @@ class CustomSearchBar extends StatelessWidget {
       style: Theme.of(context).textTheme.bodyMedium,
       decoration: InputDecoration(
         hintText: hintText,
-        prefixIcon: const Icon(
+        prefixIcon: Icon(
           Icons.search,
-          color: AppTheme.mutedForeground,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
         suffixIcon: controller != null && controller!.text.isNotEmpty
             ? IconButton(
@@ -40,7 +40,7 @@ class CustomSearchBar extends StatelessWidget {
                 },
               )
             : null,
-        fillColor: AppTheme.surface,
+        fillColor: Theme.of(context).colorScheme.surface,
         filled: true,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

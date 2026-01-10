@@ -52,7 +52,7 @@ class ImageInputState extends State<ImageInput> {
   void _showPickOption() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -101,7 +101,9 @@ class ImageInputState extends State<ImageInput> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _errorText != null ? Colors.redAccent : AppTheme.border;
+    final borderColor = _errorText != null
+        ? Colors.redAccent
+        : Theme.of(context).colorScheme.outlineVariant;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,7 +112,6 @@ class ImageInputState extends State<ImageInput> {
           Text(
             widget.label,
             style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                  color: AppTheme.foreground,
                   fontWeight: FontWeight.w600,
                 ),
           ),
@@ -130,7 +131,7 @@ class ImageInputState extends State<ImageInput> {
               child: Container(
                 height: widget.height,
                 width: double.infinity,
-                color: AppTheme.surface,
+                color: Theme.of(context).colorScheme.surface,
                 child: Stack(
                   children: [
                     _buildImage(),

@@ -17,15 +17,16 @@ class CashierPage extends StatefulWidget {
   State<CashierPage> createState() => _CashierPageState();
 }
 
-class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin {
+class _CashierPageState extends State<CashierPage>
+    with TickerProviderStateMixin {
   CashierView _currentView = CashierView.products;
   final List<CartItem> _cart = [];
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _couponController = TextEditingController();
-  
+
   Map<String, dynamic>? _appliedCoupon;
   bool _isApplyingCoupon = false;
-  
+
   late AnimationController _viewAnimationController;
   // late Animation<Offset> _slideAnimation;
 
@@ -173,17 +174,19 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
     if (code.isEmpty) return;
 
     setState(() => _isApplyingCoupon = true);
-    
+
     // Simulate API call
     await Future.delayed(const Duration(milliseconds: 1000));
-    
+
     setState(() {
       _isApplyingCoupon = false;
       if (code == 'GOLD20' || code == 'VIP15') {
         _appliedCoupon = {
           'code': code,
           'discount': code == 'GOLD20' ? 20 : 15,
-          'description': code == 'GOLD20' ? 'Premium member discount' : 'VIP customer exclusive',
+          'description': code == 'GOLD20'
+              ? 'Premium member discount'
+              : 'VIP customer exclusive',
         };
         _currentView = CashierView.cart;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -191,7 +194,8 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
             content: Text('Coupon $code applied successfully!'),
             backgroundColor: AppTheme.success,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         );
       } else {
@@ -200,7 +204,8 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
             content: const Text('Invalid or expired coupon code'),
             backgroundColor: AppTheme.destructive,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         );
       }
@@ -218,7 +223,7 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
     );
 
     await Future.delayed(const Duration(milliseconds: 1500));
-    
+
     setState(() {
       _currentView = CashierView.success;
     });
@@ -234,21 +239,21 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
   }
 
   double get _subtotal => _cart.fold(0, (sum, item) => sum + item.subtotal);
-  
+
   double get _discount {
     if (_appliedCoupon == null) return 0;
     return _subtotal * (_appliedCoupon!['discount'] / 100);
   }
-  
+
   double get _total => _subtotal - _discount;
 
   List<Product> get _filteredProducts {
     final query = _searchController.text.toLowerCase();
     if (query.isEmpty) return _products;
-    
+
     return _products.where((product) {
       return product.name.toLowerCase().contains(query) ||
-             (product.category?.toLowerCase().contains(query) ?? false);
+          (product.category?.toLowerCase().contains(query) ?? false);
     }).toList();
   }
 
@@ -263,10 +268,10 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: Text(_getAppBarTitle()),
-        backgroundColor: AppTheme.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
           if (_currentView == CashierView.products && _cart.isNotEmpty)
@@ -293,8 +298,8 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
                       ),
                       child: Text(
                         '${_cart.fold(0, (sum, item) => sum + item.quantity)}',
-                        style: const TextStyle(
-                          color: AppTheme.background,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.surface,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -411,7 +416,8 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: _cart.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = _cart[index];
                     return CartItemWidget(
@@ -431,9 +437,11 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
   Widget _buildCartSummary() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: AppTheme.card,
-        border: Border(top: BorderSide(color: AppTheme.border)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        border: Border(
+            top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant)),
       ),
       child: Column(
         children: [
@@ -453,14 +461,14 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
               onPressed: () => _changeView(CashierView.coupon),
               fullWidth: true,
             ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Totals
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.surface,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppTheme.border),
             ),
@@ -478,7 +486,8 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Discount', style: TextStyle(color: AppTheme.success)),
+                      const Text('Discount',
+                          style: TextStyle(color: AppTheme.success)),
                       Text(
                         '-\$${_discount.toStringAsFixed(2)}',
                         style: const TextStyle(color: AppTheme.success),
@@ -487,7 +496,7 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
                   ),
                 ],
                 const SizedBox(height: 8),
-                const Divider(color: AppTheme.border),
+                Divider(color: Theme.of(context).colorScheme.outlineVariant),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -495,24 +504,24 @@ class _CashierPageState extends State<CashierPage> with TickerProviderStateMixin
                     Text(
                       'Total',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     Text(
                       '\$${_total.toStringAsFixed(2)}',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.gold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.gold,
+                          ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Payment Buttons
           Row(
             children: [
