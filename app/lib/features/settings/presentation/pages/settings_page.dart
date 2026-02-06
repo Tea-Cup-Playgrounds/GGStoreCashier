@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/router/app_router.dart';
+import 'package:gg_store_cashier/core/provider/auth_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 
@@ -101,6 +102,15 @@ class SettingsPage extends ConsumerWidget {
               _buildSectionTitle(context, 'Support'),
               const SizedBox(height: 8.0),
               _SettingsTile(
+                title: 'User Management',
+                subtitle: 'Manage users and permissions',
+                icon: Icons.people_outline,
+                onTap: () {
+                  context.push(AppRouter.userManagement);
+                },
+              ),
+              const SizedBox(height: 8.0),
+              _SettingsTile(
                 title: 'Privacy & Security',
                 subtitle: 'Password, 2FA',
                 icon: Icons.security_outlined,
@@ -122,8 +132,35 @@ class SettingsPage extends ConsumerWidget {
               // 6. SIGN OUT BUTTON
               Center(
                 child: TextButton.icon(
-                  onPressed: () {
-                    context.pushNamed("login");
+                  onPressed: () async {
+                    // Show confirmation dialog
+                    final shouldLogout = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Sign Out'),
+                        content: const Text('Are you sure you want to sign out?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('Sign Out'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.destructive,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (shouldLogout == true) {
+                      await ref.read(authProvider.notifier).logout();
+                      if (context.mounted) {
+                        context.go(AppRouter.login);
+                      }
+                    }
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text('Sign Out'),

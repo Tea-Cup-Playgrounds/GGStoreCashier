@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:gg_store_cashier/core/router/transition_factory.dart';
+import 'package:gg_store_cashier/core/router/auth_guard.dart';
 import 'package:gg_store_cashier/features/devices/presentation/pages/printer_devices_page.dart';
 import 'package:gg_store_cashier/features/devices/presentation/pages/scanner_devices_page.dart';
 import 'package:gg_store_cashier/features/inventory/presentation/pages/inventory_add_item_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/appearance_page.dart';
+import 'package:gg_store_cashier/features/users/presentation/pages/user_management_page.dart';
 import 'package:gg_store_cashier/shared/layout/scaffold_with_bottom_navbar.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -25,6 +27,7 @@ mixin AppRouter {
   static const String scannerDevices = '/devices/scanner';
   static const String printerDevices = '/devices/printer';
   static const String settings = '/settings';
+  static const String userManagement = '/users';
 
   static final _rootNavigatorkey = GlobalKey<NavigatorState>();
   static final homeNavKey = GlobalKey<NavigatorState>();
@@ -36,6 +39,7 @@ mixin AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorkey,
     initialLocation: login,
+    redirect: AuthGuard.redirectLogic,
     routes: <RouteBase>[
       //  YG GK KENAK LAYOUT BOTTOM NAVBAR TARUH SINI ATAU DILUAR SHELL
       GoRoute(
@@ -84,6 +88,14 @@ mixin AppRouter {
             context: context,
             state: state,
             child: const PrinterDevicesPage()),
+      ),
+      GoRoute(
+        path: userManagement,
+        name: 'userManagement',
+        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
+            context: context,
+            state: state,
+            child: const UserManagementPage()),
       ),
       // HALAMAN YANG BUTUH LAYOUT SCAFFOLD + BOTTOM NAV TARUH DI SINI
       StatefulShellRoute.indexedStack(

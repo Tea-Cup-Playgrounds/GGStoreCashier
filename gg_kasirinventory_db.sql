@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Sep 26, 2025 at 03:07 AM
+-- Generation Time: Feb 03, 2026 at 06:29 AM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -18,8 +18,24 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `gg_kasirinventory_db`
+-- Database: `gg_kasir_db`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `absensi`
+--
+
+CREATE TABLE `absensi` (
+  `id` int NOT NULL,
+  `absensi_image` varchar(30) NOT NULL,
+  `kehadiran` enum('Hadir','Izin','Sakit','Tidak Masuk','Tanpa Keterangan') NOT NULL,
+  `users_id` int NOT NULL,
+  `branches_id` int NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -58,6 +74,7 @@ CREATE TABLE `categories` (
   `id` int NOT NULL,
   `name` varchar(100) NOT NULL,
   `description` text,
+  `category_image` varchar(30) DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -87,11 +104,10 @@ CREATE TABLE `products` (
   `name` varchar(150) NOT NULL,
   `barcode` varchar(100) DEFAULT NULL,
   `category_id` int DEFAULT NULL,
-  `cost_price` decimal(12,2) NOT NULL,
   `sell_price` decimal(12,2) NOT NULL,
   `stock` int DEFAULT '0',
+  `product_image` varchar(30) DEFAULT NULL,
   `branch_id` int DEFAULT NULL,
-  `supplier_id` int DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -124,22 +140,6 @@ CREATE TABLE `stock_movements` (
   `type` enum('in','out') NOT NULL,
   `qty` int NOT NULL,
   `note` text,
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `suppliers`
---
-
-CREATE TABLE `suppliers` (
-  `id` int NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `email` varchar(100) DEFAULT NULL,
-  `address` text,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -227,6 +227,14 @@ CREATE TABLE `vouchers` (
 --
 
 --
+-- Indexes for table `absensi`
+--
+ALTER TABLE `absensi`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_users_id` (`users_id`) USING BTREE,
+  ADD KEY `idx_branches_id` (`branches_id`) USING BTREE;
+
+--
 -- Indexes for table `branches`
 --
 ALTER TABLE `branches`
@@ -252,8 +260,7 @@ ALTER TABLE `products`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `barcode` (`barcode`),
   ADD KEY `idx_products_category` (`category_id`),
-  ADD KEY `idx_products_branch` (`branch_id`),
-  ADD KEY `idx_products_supplier` (`supplier_id`);
+  ADD KEY `idx_products_branch` (`branch_id`);
 
 --
 -- Indexes for table `returns`
@@ -270,12 +277,6 @@ ALTER TABLE `stock_movements`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_stock_branch` (`branch_id`),
   ADD KEY `idx_stock_product_branch` (`product_id`,`branch_id`);
-
---
--- Indexes for table `suppliers`
---
-ALTER TABLE `suppliers`
-  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `transactions`
@@ -348,12 +349,6 @@ ALTER TABLE `stock_movements`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `suppliers`
---
-ALTER TABLE `suppliers`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
@@ -392,8 +387,7 @@ ALTER TABLE `payments`
 --
 ALTER TABLE `products`
   ADD CONSTRAINT `fk_products_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_products_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `returns`

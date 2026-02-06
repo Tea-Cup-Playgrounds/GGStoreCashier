@@ -1,10 +1,12 @@
+import '../config/api_config.dart';
+
 class AppConstants {
   // App Info
   static const String appName = 'GG Store Cashier';
   static const String appVersion = '1.0.0';
   
-  // API Configuration
-  static const String baseUrl = 'http://localhost:5000/api';
+  // API Configuration - Now using ApiConfig
+  static String get baseUrl => ApiConfig.apiUrl;
   
   // Storage Keys
   static const String tokenKey = 'auth_token';

@@ -148,7 +148,7 @@ class AppTheme {
             color: foreground,
           ),
         ),
-        cardTheme: const CardTheme(
+        cardTheme: const CardThemeData(
           color: card,
           elevation: 0,
           margin: EdgeInsets.zero,
@@ -258,7 +258,7 @@ class AppTheme {
             color: Colors.black,
           ),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: Colors.grey.shade200,
           elevation: 0,
           margin: EdgeInsets.zero,

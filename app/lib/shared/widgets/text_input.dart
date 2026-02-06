@@ -9,45 +9,62 @@ class TextInput extends StatelessWidget {
   final bool readOnly;
   final String? hintText;
   final String? Function(String?)? validator;
+  final IconData? prefixIcon;
+  final Widget? suffixIcon;
+  final bool obscureText;
+  final void Function(String)? onChanged;
 
-  const TextInput(
-      {super.key,
-      required this.label,
-      required this.controller,
-      this.validator,
-      this.hintText,
-      this.onTap,
-      this.keyboardType = TextInputType.text,
-      this.maxLines = 1,
-      this.readOnly = false});
+  const TextInput({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.validator,
+    this.hintText,
+    this.onTap,
+    this.keyboardType = TextInputType.text,
+    this.maxLines = 1,
+    this.readOnly = false,
+    this.prefixIcon,
+    this.suffixIcon,
+    this.obscureText = false,
+    this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.only(bottom: 8.0),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-        ),
-      ),
-      TextFormField(
-        maxLines: maxLines,
-        controller: controller,
-        onTap: onTap,
-        keyboardType: keyboardType,
-        readOnly: readOnly,
-        style: Theme.of(context).textTheme.bodyMedium,
-        decoration: InputDecoration(
-          hintText: hintText,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.titleMedium!.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
-      ),
-    ]);
+        TextFormField(
+          maxLines: maxLines,
+          controller: controller,
+          onTap: onTap,
+          onChanged: onChanged,
+          keyboardType: keyboardType,
+          readOnly: readOnly,
+          obscureText: obscureText,
+          validator: validator,
+          style: Theme.of(context).textTheme.bodyMedium,
+          decoration: InputDecoration(
+            hintText: hintText,
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
+            suffixIcon: suffixIcon,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

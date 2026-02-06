@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/router/app_router.dart';
-import '../../../../core/constants/app_constants.dart';
+import '../../../../core/provider/auth_provider.dart';
+import '../../../../core/services/connectivity_test.dart';
+import '../../../../core/widgets/api_config_dialog.dart';
 import '../../../../shared/widgets/custom_button.dart';
+import '../../../../shared/widgets/text_input.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
+class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _storeIdController =
-      TextEditingController(text: AppConstants.defaultStoreId);
-  final _passwordController =
-      TextEditingController(text: AppConstants.defaultPassword);
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _isLoading = false;
   bool _rememberMe = false;
 
   late AnimationController _logoAnimationController;
@@ -72,7 +73,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   void dispose() {
     _logoAnimationController.dispose();
     _formAnimationController.dispose();
-    _storeIdController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -80,226 +81,215 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    // First test connectivity
+    print('Testing server connectivity...');
+    final isConnected = await ConnectivityTest.testConnection();
+    
+    if (!isConnected) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot connect to server. Please check your connection.'),
+            backgroundColor: AppTheme.destructive,
+          ),
+        );
+      }
+      return;
+    }
 
-    // Simulate login API call
-    await Future.delayed(const Duration(milliseconds: 1500));
+    print('Server connectivity OK, attempting login...');
+    final authNotifier = ref.read(authProvider.notifier);
+    final success = await authNotifier.login(
+      _usernameController.text.trim(),
+      _passwordController.text,
+    );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
+    if (success && mounted) {
       context.go(AppRouter.home);
     }
+    // Error handling is done through the provider state
+  }
+
+  String? _validateUsername(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Username is required';
+    }
+    if (value.trim().length < 3) {
+      return 'Username must be at least 3 characters';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    // final size = MediaQuery.of(context).size;
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: LayoutBuilder(builder: (context, constraints) {
-          return Column(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
             children: [
-              // Header Section with Logo
               Expanded(
-                flex: 2,
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppTheme.gold.withOpacity(0.1),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Decorative circles
-                      Stack(
-                        alignment: Alignment.center,
+                child: Center(
+                  child: SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 400),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
+                          // Logo Section
+                          ScaleTransition(
+                            scale: _logoScaleAnimation,
+                            child: Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
                                 color: AppTheme.gold.withOpacity(0.1),
-                                width: 1,
+                                borderRadius: BorderRadius.circular(60),
+                                border: Border.all(
+                                  color: AppTheme.gold.withOpacity(0.3),
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.store,
+                                size: 60,
+                                color: AppTheme.gold,
                               ),
                             ),
                           ),
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppTheme.gold.withOpacity(0.05),
-                                width: 1,
-                              ),
+                          const SizedBox(height: 32),
+                          
+                          // Title
+                          Text(
+                            'Welcome Back',
+                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                              color: AppTheme.foreground,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          // Logo
-                          AnimatedBuilder(
-                            animation: _logoScaleAnimation,
-                            builder: (context, child) {
-                              return Transform.scale(
-                                scale: _logoScaleAnimation.value,
-                                child: Container(
-                                  width: 96,
-                                  height: 96,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(24),
-                                    gradient: const LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        AppTheme.gold,
-                                        AppTheme.goldLight
-                                      ],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppTheme.gold.withOpacity(0.3),
-                                        blurRadius: 20,
-                                        spreadRadius: 0,
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sign in to your account',
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: AppTheme.mutedForeground,
+                            ),
+                          ),
+                          const SizedBox(height: 48),
+
+                          // Error Message
+                          if (authState.error != null) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              margin: const EdgeInsets.only(bottom: 24),
+                              decoration: BoxDecoration(
+                                color: AppTheme.destructive.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppTheme.destructive.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.error_outline,
+                                        color: AppTheme.destructive,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          authState.error!,
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: AppTheme.destructive,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  child: const Icon(
-                                    Icons.store,
-                                    size: 48,
-                                    color: AppTheme.background,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                                  if (authState.remainingAttempts != null && authState.remainingAttempts! > 0) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Remaining attempts: ${authState.remainingAttempts}',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: AppTheme.destructive,
+                                      ),
+                                    ),
+                                  ],
+                                  if (authState.isLockedOut) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Account locked for ${ref.read(authProvider.notifier).getRemainingLockoutMinutes()} minutes',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: AppTheme.destructive,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
 
-              // Form Section
-              Flexible(
-                flex: 3,
-                child: SlideTransition(
-                  position: _formSlideAnimation,
-                  child: Container(
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.card,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(40),
-                        topRight: Radius.circular(40),
-                      ),
-                      border: Border(
-                        top: BorderSide(color: AppTheme.border),
-                      ),
-                    ),
-                    child: SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Welcome Text
-                              Text(
-                                'Welcome Back',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .displaySmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Sign in to your store account',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge
-                                    ?.copyWith(
-                                      color: AppTheme.mutedForeground,
-                                    ),
-                              ),
-                              const SizedBox(height: 32),
-                                        
-                              // Store ID Field
-                              Text(
-                                'Store ID',
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _storeIdController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Enter your store ID',
-                                  prefixIcon: Icon(Icons.person_outline),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter your store ID';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 20),
-                                        
-                              // Password Field
-                              Text(
-                                'Password',
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscurePassword,
-                                decoration: InputDecoration(
-                                  hintText: 'Enter your password',
-                                  prefixIcon: const Icon(Icons.lock_outline),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _obscurePassword = !_obscurePassword;
-                                      });
-                                    },
-                                  ),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter your password';
-                                  }
-                                  if (value.length <
-                                      AppConstants.minPasswordLength) {
-                                    return 'Password must be at least ${AppConstants.minPasswordLength} characters';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                                        
-                              // Remember Me & Forgot Password
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                          // Login Form
+                          SlideTransition(
+                            position: _formSlideAnimation,
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
                                 children: [
+                                  // Username Field
+                                  TextInput(
+                                    controller: _usernameController,
+                                    label: 'Username',
+                                    hintText: 'Enter your username',
+                                    prefixIcon: Icons.person_outline,
+                                    validator: _validateUsername,
+                                    keyboardType: TextInputType.text,
+                                  ),
+                                  const SizedBox(height: 24),
+
+                                  // Password Field
+                                  TextInput(
+                                    controller: _passwordController,
+                                    label: 'Password',
+                                    hintText: 'Enter your password',
+                                    prefixIcon: Icons.lock_outline,
+                                    obscureText: _obscurePassword,
+                                    validator: _validatePassword,
+                                    suffixIcon: IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                        color: AppTheme.mutedForeground,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Remember Me
                                   Row(
                                     children: [
                                       Checkbox(
@@ -313,59 +303,65 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                       ),
                                       Text(
                                         'Remember me',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall,
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: AppTheme.foreground,
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  TextButton(
-                                    onPressed: () {
-                                      // TODO: Implement forgot password
-                                    },
-                                    child: const Text('Forgot password?'),
+                                  const SizedBox(height: 32),
+
+                                  // Login Button
+                                  CustomButton(
+                                    text: 'Sign In',
+                                    fullWidth: true,
+                                    isLoading: authState.isLoading,
+                                    onPressed: (authState.isLockedOut && !ref.read(authProvider.notifier).isLockoutExpired()) 
+                                        ? null 
+                                        : _handleLogin,
+                                    variant: ButtonVariant.primary,
+                                    size: ButtonSize.large,
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 24),
-                                        
-                              // Login Button
-                              CustomButton(
-                                text: 'Sign In',
-                                onPressed: _handleLogin,
-                                isLoading: _isLoading,
-                                fullWidth: true,
-                                size: ButtonSize.extraLarge,
-                              ),
-                                        
-                              // Support Link
-                              Center(
-                                child: TextButton(
-                                  onPressed: () {
-                                    // TODO: Implement contact support
-                                  },
-                                  child: Text(
-                                    'Need help? Contact support',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: AppTheme.mutedForeground,
-                                        ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
+              
+              // Footer
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'GG Store Cashier v1.0.0',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.mutedForeground,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => const ApiConfigDialog(),
+                      );
+                    },
+                    child: Text(
+                      'API Config',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.gold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
-          );
-        }),
+          ),
+        ),
       ),
     );
   }
