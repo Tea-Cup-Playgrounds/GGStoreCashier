@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Feb 03, 2026 at 06:29 AM
+-- Generation Time: Feb 10, 2026 at 01:16 PM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -199,11 +199,12 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `branch_id`, `created_at`, `updated_at`) VALUES
-(1, 'King Wahyu', 'akuSuperrAdmin123', 'PASSwordnya_123', 'superadmin', 0, '2025-09-26 11:04:07', '2025-09-26 11:04:07'),
-(2, 'Boss Kebun', 'GrowAGarden#1', 'PASSwordnya_123', 'admin', 1, '2025-09-26 11:04:07', '2025-09-26 11:04:07'),
-(3, 'Boss Ikan', 'mancingmaniamantap', 'PASSwordnya_123', 'admin', 2, '2025-09-26 11:04:07', '2025-09-26 11:04:07'),
-(4, 'Kroco 1', 'kroco1', 'PASSwordnya_123', 'karyawan', 1, '2025-09-26 11:04:07', '2025-09-26 11:04:07'),
-(5, 'Kroco 2', 'kroco2', 'PASSwordnya_123', 'karyawan', 2, '2025-09-26 11:04:07', '2025-09-26 11:04:07');
+(1, 'King Wahyu', 'superadmin', '$2b$12$P07jhhBCn0QnCyXHQRfYGOVIx/SW16WxSPfuajScCLErrr1vwxGny', 'superadmin', 0, '2025-09-26 11:04:07', '2026-02-06 10:49:48'),
+(2, 'Boss Kebun', 'GrowAGarden#1', '$2b$12$kioin3Gy78nh3h/WC60n8uuI.fzQnhQe3J6BXM9kMHONobeej1U5.', 'admin', 1, '2025-09-26 11:04:07', '2026-02-03 15:47:52'),
+(3, 'Boss Ikan', 'mancingmaniamantap', '$2b$12$MHPui3mOe1Me7TbjOTxtkO1uOi0twI0bFin2ITQAzpqE4zXoy7kuS', 'admin', 2, '2025-09-26 11:04:07', '2026-02-03 15:47:52'),
+(4, 'Kroco 1', 'kroco1', '$2b$12$0pZIlcdAgmXOgpaM2jLYX.MMizLVAJDTwdsf3HZpG6qHTLHs8s8mu', 'karyawan', 1, '2025-09-26 11:04:07', '2026-02-03 15:47:53'),
+(5, 'Kroco 2', 'kroco2', '$2b$12$UGJzu61DCfmxl.e8U9vRfuy0VVKH0n4i4iJWiCy9b/JtypulmcLza', 'karyawan', 2, '2025-09-26 11:04:07', '2026-02-03 15:47:53'),
+(6, 'Karyawan Testing', 'karyawantesting1', '$2b$12$W3YaLIp4M2devPpicLbNYuSl97Vm3XG/kaQFZx6AhQTCZTnexu46K', 'karyawan', 1, '2026-02-06 10:52:23', '2026-02-06 16:29:42');
 
 -- --------------------------------------------------------
 
@@ -364,7 +365,7 @@ ALTER TABLE `transaction_items`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `vouchers`
