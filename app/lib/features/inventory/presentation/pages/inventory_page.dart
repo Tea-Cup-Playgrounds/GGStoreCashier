@@ -8,6 +8,7 @@ import 'package:gg_store_cashier/core/provider/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/inventory_header.dart';
+import 'category_management_page.dart';
 
 class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
@@ -16,8 +17,9 @@ class InventoryPage extends ConsumerStatefulWidget {
   ConsumerState<InventoryPage> createState() => _InventoryPageState();
 }
 
-class _InventoryPageState extends ConsumerState<InventoryPage> {
+class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTickerProviderStateMixin {
   late final TextEditingController searchController;
+  late TabController _tabController;
   InventoryFilter selectedFilter = InventoryFilter.all;
   InventoryFilter _currentFilter = InventoryFilter.all;
 
@@ -29,11 +31,13 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
   void initState() {
     super.initState();
     searchController = TextEditingController();
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
     searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -57,7 +61,97 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
     final horizontalPadding = Breakpoints.getHorizontalPadding(screenType, orientation);
-    
+
+    return Scaffold(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
+          child: Column(
+            children: [
+              // App Bar
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    children: [
+                      Text(
+                        'Inventory',
+                        style: TextStyle(
+                          fontSize: screenType == ScreenType.tablet ? 24 : 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (!isKaryawan)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            context.push(AppRouter.inventoryAddItem);
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Item'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.gold,
+                            foregroundColor: AppTheme.background,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: screenType == ScreenType.tablet ? 24 : 16,
+                              vertical: screenType == ScreenType.tablet ? 16 : 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Tab Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: AppTheme.gold,
+                  unselectedLabelColor: AppTheme.mutedForeground,
+                  indicatorColor: AppTheme.gold,
+                  tabs: const [
+                    Tab(text: 'Products'),
+                    Tab(text: 'Categories'),
+                  ],
+                ),
+              ),
+
+              // Tab Views
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildProductsTab(screenType, horizontalPadding),
+                    const CategoryManagementPage(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductsTab(ScreenType screenType, double horizontalPadding) {
     final List<Map<String, dynamic>> dummyProducts = [
       {
         'image': "https://picsum.photos/200",
@@ -109,88 +203,47 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       },
     ];
 
-    return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
-          child: CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                title: Text(
-                  'Inventory',
-                  style: TextStyle(fontSize: screenType == ScreenType.tablet ? 24 : null),
-                ),
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                elevation: 0,
-                centerTitle: false,
-                pinned: true,
-                actions: [
-                  // Hide "Add Item" button for karyawan
-                  if (!isKaryawan)
-                    Padding(
-                      padding: EdgeInsets.only(right: horizontalPadding),
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          context.push(AppRouter.inventoryAddItem);
-                        },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Item'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.gold,
-                          foregroundColor: AppTheme.background,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: screenType == ScreenType.tablet ? 24 : 16,
-                            vertical: screenType == ScreenType.tablet ? 16 : 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-                scrolledUnderElevation: 0,
-              ),
-
-              SliverPersistentHeader(
-                delegate: _InventoryHeaderDelegate(
-                  child: InventoryHeader(
-                    searchController: searchController,
-                    onSearchChanged: _onSearchChanged,
-                    currentFilter: _currentFilter,
-                    onFilterChanged: _onFilterChanged,
-                  ),
-                ),
-                pinned: true,
-              ),
-              
-              SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final product = dummyProducts[index];
-                      return _ProductListTile(
-                        image: product['image'],
-                        name: product['name'],
-                        sku: product['sku'],
-                        inStock: product['inStock'],
-                        price: product['price'],
-                        isLowStock: product['isLowStock'],
-                        isTablet: screenType == ScreenType.tablet,
-                      );
-                    },
-                    childCount: dummyProducts.length,
-                  ),
-                ),
-              ),
-
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: MediaQuery.of(context).padding.bottom + 80,
-                ),
-              )
-            ],
+    return CustomScrollView(
+      slivers: [
+        SliverPersistentHeader(
+          delegate: _InventoryHeaderDelegate(
+            child: InventoryHeader(
+              searchController: searchController,
+              onSearchChanged: _onSearchChanged,
+              currentFilter: _currentFilter,
+              onFilterChanged: _onFilterChanged,
+            ),
+          ),
+          pinned: true,
+        ),
+        
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final product = dummyProducts[index];
+                return _ProductListTile(
+                  image: product['image'],
+                  name: product['name'],
+                  sku: product['sku'],
+                  inStock: product['inStock'],
+                  price: product['price'],
+                  isLowStock: product['isLowStock'],
+                  isTablet: screenType == ScreenType.tablet,
+                );
+              },
+              childCount: dummyProducts.length,
+            ),
           ),
         ),
-      ),
+
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: MediaQuery.of(context).padding.bottom + 80,
+          ),
+        )
+      ],
     );
   }
 }
@@ -315,7 +368,7 @@ class _ProductListTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '\${price.toStringAsFixed(2)}',
+                '\$${price.toStringAsFixed(2)}',
                 style: Theme.of(context).textTheme.titleLarge!.copyWith(
                       color: AppTheme.gold,
                       fontWeight: FontWeight.bold,

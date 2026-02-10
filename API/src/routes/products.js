@@ -48,7 +48,7 @@ router.get('/', filterByBranch, async (req, res) => {
     }
 });
 
-// Get product by ID
+// Get product by ID (with branch validation)
 router.get('/:id', async (req, res) => {
     try {
         const [products] = await pool.execute(
@@ -62,6 +62,15 @@ router.get('/:id', async (req, res) => {
 
         if (products.length === 0) {
             return res.status(404).json({ error: 'Product not found' });
+        }
+
+        // Check branch ownership for non-superadmin users
+        if (req.user.role !== 'superadmin') {
+            if (products[0].branch_id !== req.user.branch_id) {
+                return res.status(403).json({ 
+                    error: 'You can only view products from your own branch' 
+                });
+            }
         }
 
         res.json({ product: products[0] });
@@ -142,14 +151,14 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
     }
 });
 
-// Update product (admin/superadmin only, with branch filtering)
+// Update product (admin/superadmin only, with branch filtering and ownership validation)
 router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadProduct.single('product_image'), async (req, res) => {
     try {
         const { name, barcode, category_id, sell_price, stock, branch_id } = req.body;
 
-        // Get old product data to delete old image if new one is uploaded
+        // Get old product data to verify ownership and delete old image if new one is uploaded
         const [oldProducts] = await pool.execute(
-            'SELECT product_image FROM products WHERE id = ?',
+            'SELECT branch_id, product_image FROM products WHERE id = ?',
             [req.params.id]
         );
 
@@ -158,6 +167,18 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
                 deleteFile(`uploads/products/${req.file.filename}`);
             }
             return res.status(404).json({ error: 'Product not found' });
+        }
+
+        // Check branch ownership for non-superadmin users
+        if (req.user.role !== 'superadmin') {
+            if (oldProducts[0].branch_id !== req.user.branch_id) {
+                if (req.file) {
+                    deleteFile(`uploads/products/${req.file.filename}`);
+                }
+                return res.status(403).json({ 
+                    error: 'You can only update products from your own branch' 
+                });
+            }
         }
 
         // Get image filename if uploaded, otherwise keep old one

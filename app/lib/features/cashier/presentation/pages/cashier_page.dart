@@ -149,15 +149,6 @@ class _CashierPageState extends State<CashierPage>
         _cart.add(CartItem.fromProduct(product));
       }
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${product.name} added to cart'),
-        backgroundColor: AppTheme.gold,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
   }
 
   void _updateCartItemQuantity(String id, int delta) {

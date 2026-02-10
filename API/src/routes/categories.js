@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { uploadCategory, deleteFile } = require('../utils/upload');
 
 const router = express.Router();
 
@@ -42,55 +43,108 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new category (admin/superadmin only)
-router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
+router.post('/', requireRole(['admin', 'superadmin']), uploadCategory.single('category_image'), async (req, res) => {
     try {
         const { name, description } = req.body;
 
         if (!name) {
+            if (req.file) {
+                deleteFile(`uploads/categories/${req.file.filename}`);
+            }
             return res.status(400).json({ 
                 error: 'Category name is required' 
             });
         }
 
+        const categoryImage = req.file ? req.file.filename : null;
+
         const [result] = await pool.execute(
-            'INSERT INTO categories (name, description) VALUES (?, ?)',
-            [name, description]
+            'INSERT INTO categories (name, description, category_image) VALUES (?, ?, ?)',
+            [name, description, categoryImage]
+        );
+
+        // Get the created category
+        const [categories] = await pool.execute(
+            'SELECT * FROM categories WHERE id = ?',
+            [result.insertId]
         );
 
         res.status(201).json({ 
             message: 'Category created successfully',
-            categoryId: result.insertId 
+            categoryId: result.insertId,
+            category: categories[0]
         });
 
     } catch (error) {
+        if (req.file) {
+            deleteFile(`uploads/categories/${req.file.filename}`);
+        }
         console.error('Create category error:', error);
         res.status(500).json({ error: 'Failed to create category' });
     }
 });
 
 // Update category (admin/superadmin only)
-router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
+router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('category_image'), async (req, res) => {
     try {
         const { name, description } = req.body;
 
         if (!name) {
+            if (req.file) {
+                deleteFile(`uploads/categories/${req.file.filename}`);
+            }
             return res.status(400).json({ 
                 error: 'Category name is required' 
             });
         }
 
-        const [result] = await pool.execute(
-            'UPDATE categories SET name = ?, description = ?, updated_at = NOW() WHERE id = ?',
-            [name, description, req.params.id]
+        // Get old category data
+        const [oldCategories] = await pool.execute(
+            'SELECT category_image FROM categories WHERE id = ?',
+            [req.params.id]
         );
 
-        if (result.affectedRows === 0) {
+        if (oldCategories.length === 0) {
+            if (req.file) {
+                deleteFile(`uploads/categories/${req.file.filename}`);
+            }
             return res.status(404).json({ error: 'Category not found' });
         }
 
-        res.json({ message: 'Category updated successfully' });
+        const categoryImage = req.file ? req.file.filename : oldCategories[0].category_image;
+
+        const [result] = await pool.execute(
+            'UPDATE categories SET name = ?, description = ?, category_image = ?, updated_at = NOW() WHERE id = ?',
+            [name, description, categoryImage, req.params.id]
+        );
+
+        if (result.affectedRows === 0) {
+            if (req.file) {
+                deleteFile(`uploads/categories/${req.file.filename}`);
+            }
+            return res.status(404).json({ error: 'Category not found' });
+        }
+
+        // Delete old image if new one was uploaded
+        if (req.file && oldCategories[0].category_image) {
+            deleteFile(`uploads/categories/${oldCategories[0].category_image}`);
+        }
+
+        // Get updated category
+        const [categories] = await pool.execute(
+            'SELECT * FROM categories WHERE id = ?',
+            [req.params.id]
+        );
+
+        res.json({ 
+            message: 'Category updated successfully',
+            category: categories[0]
+        });
 
     } catch (error) {
+        if (req.file) {
+            deleteFile(`uploads/categories/${req.file.filename}`);
+        }
         console.error('Update category error:', error);
         res.status(500).json({ error: 'Failed to update category' });
     }
@@ -111,6 +165,16 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
             });
         }
 
+        // Get category image before deletion
+        const [categories] = await pool.execute(
+            'SELECT category_image FROM categories WHERE id = ?',
+            [req.params.id]
+        );
+
+        if (categories.length === 0) {
+            return res.status(404).json({ error: 'Category not found' });
+        }
+
         const [result] = await pool.execute(
             'DELETE FROM categories WHERE id = ?',
             [req.params.id]
@@ -118,6 +182,11 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Category not found' });
+        }
+
+        // Delete category image if exists
+        if (categories[0].category_image) {
+            deleteFile(`uploads/categories/${categories[0].category_image}`);
         }
 
         res.json({ message: 'Category deleted successfully' });
