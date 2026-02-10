@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/user.dart';
+import './socket_service.dart';
 
 class AuthService {
   static final _dio = Dio(BaseOptions(
@@ -76,8 +77,12 @@ class AuthService {
         // Store token and user data
         await _storeAuthData(token, user);
 
+        // Connect to Socket.IO for real-time updates
+        SocketService.connect(token, user.branchId ?? 0);
+
         if (ApiConfig.enableLogging) {
           print('Login successful for user: ${user.username}');
+          print('Socket.IO connection initiated for branch: ${user.branchId}');
         }
 
         return AuthResult.success(user);
@@ -186,6 +191,9 @@ class AuthService {
     } catch (e) {
       // Continue with local logout even if server call fails
     } finally {
+      // Disconnect Socket.IO
+      SocketService.disconnect();
+      
       // Clear local storage
       await _clearAuthData();
     }

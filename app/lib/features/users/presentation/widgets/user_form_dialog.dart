@@ -9,8 +9,15 @@ import '../providers/user_management_provider.dart';
 
 class UserFormDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic>? user;
+  final bool isSuperAdmin;
+  final int? restrictedBranchId;
 
-  const UserFormDialog({super.key, this.user});
+  const UserFormDialog({
+    super.key,
+    this.user,
+    this.isSuperAdmin = false,
+    this.restrictedBranchId,
+  });
 
   @override
   ConsumerState<UserFormDialog> createState() => _UserFormDialogState();
@@ -39,6 +46,9 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
       _usernameController.text = widget.user!['username']?.toString() ?? '';
       _selectedRole = widget.user!['role']?.toString() ?? 'karyawan';
       _selectedBranch = widget.user!['branch_id']?.toString() ?? '1';
+    } else if (widget.restrictedBranchId != null) {
+      // For admin, set their branch as default
+      _selectedBranch = widget.restrictedBranchId.toString();
     }
   }
 
@@ -237,11 +247,15 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppTheme.foreground,
                             ),
-                            items: const [
-                              DropdownMenuItem(value: 'karyawan', child: Text('Employee')),
-                              DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                              DropdownMenuItem(value: 'superadmin', child: Text('Super Admin')),
-                            ],
+                            items: widget.isSuperAdmin
+                                ? const [
+                                    DropdownMenuItem(value: 'karyawan', child: Text('Employee')),
+                                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                                    DropdownMenuItem(value: 'superadmin', child: Text('Super Admin')),
+                                  ]
+                                : const [
+                                    DropdownMenuItem(value: 'karyawan', child: Text('Employee')),
+                                  ],
                             onChanged: (value) {
                               setState(() {
                                 _selectedRole = value!;
@@ -264,7 +278,9 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: AppTheme.surface,
+                          color: widget.restrictedBranchId != null 
+                              ? AppTheme.muted 
+                              : AppTheme.surface,
                           border: Border.all(color: AppTheme.border),
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -276,15 +292,28 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppTheme.foreground,
                             ),
-                            items: const [
-                              DropdownMenuItem(value: '1', child: Text('Main Branch')),
-                              DropdownMenuItem(value: '2', child: Text('Branch 2')),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedBranch = value!;
-                              });
-                            },
+                            items: widget.isSuperAdmin
+                                ? const [
+                                    DropdownMenuItem(value: '0', child: Text('All Branches (Global)')),
+                                    DropdownMenuItem(value: '1', child: Text('Cabang Satu')),
+                                    DropdownMenuItem(value: '2', child: Text('Cabang Dua')),
+                                    DropdownMenuItem(value: '3', child: Text('Cabang Tiga')),
+                                    DropdownMenuItem(value: '4', child: Text('Cabang Empat')),
+                                    DropdownMenuItem(value: '5', child: Text('Cabang Lima')),
+                                  ]
+                                : [
+                                    DropdownMenuItem(
+                                      value: widget.restrictedBranchId?.toString() ?? '1',
+                                      child: Text('Branch ${widget.restrictedBranchId ?? 1}'),
+                                    ),
+                                  ],
+                            onChanged: widget.restrictedBranchId != null
+                                ? null // Disable for admin
+                                : (value) {
+                                    setState(() {
+                                      _selectedBranch = value!;
+                                    });
+                                  },
                           ),
                         ),
                       ),

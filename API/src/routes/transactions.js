@@ -134,6 +134,7 @@ router.post('/', async (req, res) => {
         const transactionId = transactionResult.insertId;
 
         // Add transaction items and update stock
+        const updatedProducts = [];
         for (const item of items) {
             // Add transaction item
             await connection.execute(
@@ -147,6 +148,20 @@ router.post('/', async (req, res) => {
                 'UPDATE products SET stock = stock - ? WHERE id = ?',
                 [item.qty, item.product_id]
             );
+
+            // Get updated product info
+            const [products] = await connection.execute(
+                `SELECT p.*, c.name as category_name, b.name as branch_name 
+                 FROM products p 
+                 LEFT JOIN categories c ON p.category_id = c.id 
+                 LEFT JOIN branches b ON p.branch_id = b.id 
+                 WHERE p.id = ?`,
+                [item.product_id]
+            );
+            
+            if (products.length > 0) {
+                updatedProducts.push(products[0]);
+            }
 
             // Add stock movement record
             await connection.execute(
@@ -164,11 +179,50 @@ router.post('/', async (req, res) => {
             );
         }
 
+        // Get complete transaction data
+        const [transactions] = await connection.execute(
+            `SELECT t.*, u.name as user_name, b.name as branch_name
+             FROM transactions t 
+             LEFT JOIN users u ON t.user_id = u.id 
+             LEFT JOIN branches b ON t.branch_id = b.id 
+             WHERE t.id = ?`,
+            [transactionId]
+        );
+
         await connection.commit();
+
+        // Emit real-time events
+        const io = req.app.get('io');
+        if (io) {
+            // Emit transaction created event
+            io.to(`branch-${req.user.branch_id}`).emit('transaction-created', transactions[0]);
+            io.to('branch-0').emit('transaction-created', transactions[0]);
+
+            // Emit stock updates for each product
+            updatedProducts.forEach(product => {
+                io.to(`branch-${product.branch_id}`).emit('product-updated', product);
+                io.to('branch-0').emit('product-updated', product);
+            });
+
+            // Emit payment event
+            io.to(`branch-${req.user.branch_id}`).emit('payment-completed', {
+                transactionId,
+                method: payment_method,
+                amount: payment_amount,
+                branchId: req.user.branch_id
+            });
+            io.to('branch-0').emit('payment-completed', {
+                transactionId,
+                method: payment_method,
+                amount: payment_amount,
+                branchId: req.user.branch_id
+            });
+        }
 
         res.status(201).json({ 
             message: 'Transaction created successfully',
-            transactionId 
+            transactionId,
+            transaction: transactions[0]
         });
 
     } catch (error) {

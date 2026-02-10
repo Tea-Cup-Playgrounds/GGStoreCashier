@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
 import '../../../../core/models/cart_item.dart';
+import '../../../../core/helper/screen_type_utils.dart';
+import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../widgets/product_card.dart';
 import '../widgets/cart_item_widget.dart';
@@ -26,9 +28,18 @@ class _CashierPageState extends State<CashierPage>
 
   Map<String, dynamic>? _appliedCoupon;
   bool _isApplyingCoupon = false;
+  String _selectedPaymentMethod = 'cash';
 
   late AnimationController _viewAnimationController;
   // late Animation<Offset> _slideAnimation;
+
+  // Payment methods from database
+  final List<Map<String, dynamic>> _paymentMethods = [
+    {'value': 'cash', 'label': 'Cash', 'icon': Icons.payments_outlined},
+    {'value': 'card', 'label': 'Card', 'icon': Icons.credit_card},
+    {'value': 'transfer', 'label': 'Bank Transfer', 'icon': Icons.account_balance},
+    {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet},
+  ];
 
   // Sample products
   final List<Product> _products = [
@@ -259,6 +270,9 @@ class _CashierPageState extends State<CashierPage>
 
   @override
   Widget build(BuildContext context) {
+    final screenType = getScreenType(context);
+    final orientation = getOrientation(context);
+    
     if (_currentView == CashierView.success) {
       return PaymentSuccessView(
         total: _total,
@@ -267,14 +281,17 @@ class _CashierPageState extends State<CashierPage>
       );
     }
 
+    // Use split-screen for tablets
+    final isTablet = screenType == ScreenType.tablet;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: Text(_getAppBarTitle()),
+        title: Text(isTablet ? 'New Sale' : _getAppBarTitle()),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
-          if (_currentView == CashierView.products && _cart.isNotEmpty)
+          if (!isTablet && _currentView == CashierView.products && _cart.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Stack(
@@ -310,19 +327,312 @@ class _CashierPageState extends State<CashierPage>
                 ],
               ),
             ),
-          if (_currentView != CashierView.products)
+          if (!isTablet && _currentView != CashierView.products)
             IconButton(
               onPressed: () => _changeView(CashierView.products),
               icon: const Icon(Icons.close),
             ),
         ],
       ),
-      body: Column(
-        children: [
-          if (_currentView == CashierView.products) _buildSearchBar(),
-          Expanded(child: _buildCurrentView()),
-        ],
-      ),
+      body: isTablet ? _buildTabletLayout(orientation) : _buildPhoneLayout(),
+    );
+  }
+
+  // Tablet split-screen layout
+  Widget _buildTabletLayout(OrientationType orientation) {
+    final isLandscape = orientation == OrientationType.landscape;
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final leftWidth = isLandscape 
+            ? constraints.maxWidth * 0.6 
+            : constraints.maxWidth * 0.5;
+        
+        return Row(
+          children: [
+            // Left: Products
+            SizedBox(
+              width: leftWidth,
+              child: Column(
+                children: [
+                  // Search
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        hintText: 'Search products...',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onChanged: (value) => setState(() {}),
+                    ),
+                  ),
+                  // Products Grid
+                  Expanded(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isLandscape ? 3 : 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 0.8,
+                      ),
+                      itemCount: _filteredProducts.length,
+                      itemBuilder: (context, index) {
+                        final product = _filteredProducts[index];
+                        return ProductCard(
+                          product: product,
+                          onAdd: () => _addToCart(product),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Divider
+            Container(
+              width: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            
+            // Right: Cart & Summary
+            Expanded(
+              child: Column(
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Order Summary',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (_cart.isNotEmpty)
+                          Text(
+                            '${_cart.fold(0, (sum, item) => sum + item.quantity)} items',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.mutedForeground,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Cart Items
+                  Expanded(
+                    child: _cart.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.shopping_cart_outlined,
+                                  size: 64,
+                                  color: AppTheme.mutedForeground.withOpacity(0.5),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Cart is empty',
+                                  style: TextStyle(
+                                    color: AppTheme.mutedForeground,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _cart.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final item = _cart[index];
+                              return CartItemWidget(
+                                cartItem: item,
+                                onIncrease: (id) => _updateCartItemQuantity(id, 1),
+                                onDecrease: (id) => _updateCartItemQuantity(id, -1),
+                                onRemove: _removeFromCart,
+                              );
+                            },
+                          ),
+                  ),
+                  
+                  // Summary & Payment
+                  if (_cart.isNotEmpty)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardTheme.color,
+                        border: Border(
+                          top: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                      ),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Coupon
+                            if (_appliedCoupon != null)
+                              CouponCard(
+                                code: _appliedCoupon!['code'],
+                                discount: '${_appliedCoupon!['discount']}% OFF',
+                                description: _appliedCoupon!['description'],
+                                isApplied: true,
+                              )
+                            else
+                              CustomButton(
+                                text: 'Add Coupon',
+                                variant: ButtonVariant.outline,
+                                icon: Icons.local_offer_outlined,
+                                onPressed: () => _changeView(CashierView.coupon),
+                                fullWidth: true,
+                              ),
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Price Summary
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppTheme.muted.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('Subtotal'),
+                                      Text(
+                                        '\$${_subtotal.toStringAsFixed(2)}',
+                                        style: const TextStyle(fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_discount > 0) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'Discount',
+                                          style: TextStyle(color: AppTheme.success),
+                                        ),
+                                        Text(
+                                          '-\$${_discount.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            color: AppTheme.success,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  const SizedBox(height: 12),
+                                  const Divider(),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Total',
+                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        '\$${_total.toStringAsFixed(2)}',
+                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.gold,
+                                          fontSize: 24,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Payment Method Dropdown
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: AppTheme.border),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedPaymentMethod,
+                                  isExpanded: true,
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  items: _paymentMethods.map((method) {
+                                    return DropdownMenuItem<String>(
+                                      value: method['value'],
+                                      child: Row(
+                                        children: [
+                                          Icon(method['icon'] as IconData, size: 20),
+                                          const SizedBox(width: 12),
+                                          Text(method['label'] as String),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() => _selectedPaymentMethod = value);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            
+                            // Process Payment Button
+                            CustomButton(
+                              text: 'Process Payment',
+                              icon: Icons.check_circle_outline,
+                              onPressed: () => _processPayment(_selectedPaymentMethod),
+                              fullWidth: true,
+                              size: ButtonSize.large,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Phone layout (original)
+  Widget _buildPhoneLayout() {
+    return Column(
+      children: [
+        if (_currentView == CashierView.products) _buildSearchBar(),
+        Expanded(child: _buildCurrentView()),
+      ],
     );
   }
 
@@ -522,28 +832,47 @@ class _CashierPageState extends State<CashierPage>
 
           const SizedBox(height: 16),
 
-          // Payment Buttons
-          Row(
-            children: [
-              Expanded(
-                child: CustomButton(
-                  text: 'Cash',
-                  variant: ButtonVariant.outline,
-                  icon: Icons.payments_outlined,
-                  onPressed: () => _processPayment('Cash'),
-                  size: ButtonSize.large,
-                ),
+          // Payment Method Dropdown
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedPaymentMethod,
+                isExpanded: true,
+                icon: const Icon(Icons.arrow_drop_down),
+                items: _paymentMethods.map((method) {
+                  return DropdownMenuItem<String>(
+                    value: method['value'],
+                    child: Row(
+                      children: [
+                        Icon(method['icon'] as IconData, size: 20),
+                        const SizedBox(width: 12),
+                        Text(method['label'] as String),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedPaymentMethod = value);
+                  }
+                },
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: CustomButton(
-                  text: 'Card',
-                  icon: Icons.credit_card,
-                  onPressed: () => _processPayment('Card'),
-                  size: ButtonSize.large,
-                ),
-              ),
-            ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Process Payment Button
+          CustomButton(
+            text: 'Process Payment',
+            icon: Icons.check_circle_outline,
+            onPressed: () => _processPayment(_selectedPaymentMethod),
+            fullWidth: true,
+            size: ButtonSize.large,
           ),
         ],
       ),

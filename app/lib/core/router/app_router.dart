@@ -5,7 +5,7 @@ import 'package:gg_store_cashier/features/devices/presentation/pages/printer_dev
 import 'package:gg_store_cashier/features/devices/presentation/pages/scanner_devices_page.dart';
 import 'package:gg_store_cashier/features/inventory/presentation/pages/inventory_add_item_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/appearance_page.dart';
-import 'package:gg_store_cashier/features/users/presentation/pages/user_management_page.dart';
+import 'package:gg_store_cashier/features/users/presentation/pages/user_management_router_page.dart';
 import 'package:gg_store_cashier/shared/layout/scaffold_with_bottom_navbar.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -95,7 +95,7 @@ mixin AppRouter {
         pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
             context: context,
             state: state,
-            child: const UserManagementPage()),
+            child: const UserManagementRouterPage()),
       ),
       // HALAMAN YANG BUTUH LAYOUT SCAFFOLD + BOTTOM NAV TARUH DI SINI
       StatefulShellRoute.indexedStack(

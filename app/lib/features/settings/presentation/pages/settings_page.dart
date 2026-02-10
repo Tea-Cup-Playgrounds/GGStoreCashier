@@ -21,6 +21,10 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isKaryawan = user?.isEmployee ?? false;
+    
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -101,15 +105,18 @@ class SettingsPage extends ConsumerWidget {
               // 5. BAGIAN SUPPORT
               _buildSectionTitle(context, 'Support'),
               const SizedBox(height: 8.0),
-              _SettingsTile(
-                title: 'User Management',
-                subtitle: 'Manage users and permissions',
-                icon: Icons.people_outline,
-                onTap: () {
-                  context.push(AppRouter.userManagement);
-                },
-              ),
-              const SizedBox(height: 8.0),
+              // Hide "User Management" for karyawan
+              if (!isKaryawan) ...[
+                _SettingsTile(
+                  title: 'User Management',
+                  subtitle: 'Manage users and permissions',
+                  icon: Icons.people_outline,
+                  onTap: () {
+                    context.push(AppRouter.userManagement);
+                  },
+                ),
+                const SizedBox(height: 8.0),
+              ],
               _SettingsTile(
                 title: 'Privacy & Security',
                 subtitle: 'Password, 2FA',

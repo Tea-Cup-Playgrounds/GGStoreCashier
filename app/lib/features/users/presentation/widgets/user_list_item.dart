@@ -4,14 +4,16 @@ import '../../../../shared/widgets/custom_button.dart';
 
 class UserListItem extends StatelessWidget {
   final Map<String, dynamic> user;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final bool isSuperAdmin;
 
   const UserListItem({
     super.key,
     required this.user,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
+    this.isSuperAdmin = false,
   });
 
   Color _getRoleColor(String role) {
@@ -34,7 +36,7 @@ class UserListItem extends StatelessWidget {
       case 'admin':
         return 'Admin';
       case 'karyawan':
-        return 'Employee';
+        return 'Karyawan';
       default:
         return role;
     }
@@ -157,21 +159,38 @@ class UserListItem extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CustomButton(
-              text: 'Edit',
-              icon: Icons.edit,
-              size: ButtonSize.small,
-              variant: ButtonVariant.outline,
-              onPressed: onEdit,
-            ),
-            const SizedBox(width: 8),
-            CustomButton(
-              text: 'Delete',
-              icon: Icons.delete,
-              size: ButtonSize.small,
-              variant: ButtonVariant.outline,
-              onPressed: onDelete,
-            ),
+            if (onEdit != null)
+              CustomButton(
+                text: 'Edit',
+                icon: Icons.edit,
+                size: ButtonSize.small,
+                variant: ButtonVariant.outline,
+                onPressed: onEdit!,
+              ),
+            if (onEdit != null && onDelete != null)
+              const SizedBox(width: 8),
+            if (onDelete != null)
+              CustomButton(
+                text: 'Delete',
+                icon: Icons.delete,
+                size: ButtonSize.small,
+                variant: ButtonVariant.outline,
+                onPressed: onDelete!,
+              ),
+            if (onEdit == null && onDelete == null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.mutedForeground.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'View Only',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.mutedForeground,
+                  ),
+                ),
+              ),
           ],
         ),
       ],
@@ -255,7 +274,7 @@ class UserListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Branch',
+                    'Cabang',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppTheme.mutedForeground,
                       fontSize: 11,
@@ -263,7 +282,7 @@ class UserListItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    user['branch_name']?.toString() ?? 'No Branch',
+                    user['branch_name']?.toString() ?? 'Tidak ada cabang',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppTheme.foreground,
                     ),
@@ -276,7 +295,7 @@ class UserListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Created',
+                    'Dibuat',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppTheme.mutedForeground,
                       fontSize: 11,
@@ -298,27 +317,47 @@ class UserListItem extends StatelessWidget {
         // Actions
         Row(
           children: [
-            Expanded(
-              child: CustomButton(
-                text: 'Edit',
-                icon: Icons.edit,
-                size: ButtonSize.small,
-                variant: ButtonVariant.outline,
-                fullWidth: true,
-                onPressed: onEdit,
+            if (onEdit != null)
+              Expanded(
+                child: CustomButton(
+                  text: 'Edit',
+                  icon: Icons.edit,
+                  size: ButtonSize.small,
+                  variant: ButtonVariant.outline,
+                  fullWidth: true,
+                  onPressed: onEdit!,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: CustomButton(
-                text: 'Delete',
-                icon: Icons.delete,
-                size: ButtonSize.small,
-                variant: ButtonVariant.outline,
-                fullWidth: true,
-                onPressed: onDelete,
+            if (onEdit != null && onDelete != null)
+              const SizedBox(width: 12),
+            if (onDelete != null)
+              Expanded(
+                child: CustomButton(
+                  text: 'Delete',
+                  icon: Icons.delete,
+                  size: ButtonSize.small,
+                  variant: ButtonVariant.outline,
+                  fullWidth: true,
+                  onPressed: onDelete!,
+                ),
               ),
-            ),
+            if (onEdit == null && onDelete == null)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.mutedForeground.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'View Only',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.mutedForeground,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
           ],
         ),
       ],

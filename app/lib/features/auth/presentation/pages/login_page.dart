@@ -6,6 +6,8 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/services/connectivity_test.dart';
 import '../../../../core/widgets/api_config_dialog.dart';
+import '../../../../core/helper/screen_type_utils.dart';
+import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/text_input.dart';
 
@@ -133,233 +135,248 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final screenType = getScreenType(context);
+    final orientation = getOrientation(context);
+    
+    // Responsive sizing
+    final horizontalPadding = Breakpoints.getHorizontalPadding(screenType, orientation);
+    final logoSize = screenType == ScreenType.tablet ? 140.0 : 120.0;
+    final maxWidth = screenType == ScreenType.tablet ? 500.0 : 400.0;
+    final spacing = screenType == ScreenType.tablet ? 40.0 : 32.0;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 400),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Logo Section
-                          ScaleTransition(
-                            scale: _logoScaleAnimation,
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: AppTheme.gold.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(60),
-                                border: Border.all(
-                                  color: AppTheme.gold.withOpacity(0.3),
-                                  width: 2,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 24.0),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: maxWidth),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Logo Section
+                              ScaleTransition(
+                                scale: _logoScaleAnimation,
+                                child: Container(
+                                  width: logoSize,
+                                  height: logoSize,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.gold.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(logoSize / 2),
+                                    border: Border.all(
+                                      color: AppTheme.gold.withOpacity(0.3),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.store,
+                                    size: logoSize / 2,
+                                    color: AppTheme.gold,
+                                  ),
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.store,
-                                size: 60,
-                                color: AppTheme.gold,
+                              SizedBox(height: spacing),
+                              
+                              // Title
+                              Text(
+                                'Welcome Back',
+                                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  color: AppTheme.foreground,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: screenType == ScreenType.tablet ? 40 : null,
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          
-                          // Title
-                          Text(
-                            'Welcome Back',
-                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              color: AppTheme.foreground,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Sign in to your account',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: AppTheme.mutedForeground,
-                            ),
-                          ),
-                          const SizedBox(height: 48),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Sign in to your account',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: AppTheme.mutedForeground,
+                                  fontSize: screenType == ScreenType.tablet ? 18 : null,
+                                ),
+                              ),
+                              SizedBox(height: spacing + 16),
 
-                          // Error Message
-                          if (authState.error != null) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              margin: const EdgeInsets.only(bottom: 24),
-                              decoration: BoxDecoration(
-                                color: AppTheme.destructive.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: AppTheme.destructive.withOpacity(0.3),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                              // Error Message
+                              if (authState.error != null) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  margin: const EdgeInsets.only(bottom: 24),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.destructive.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppTheme.destructive.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(
-                                        Icons.error_outline,
-                                        color: AppTheme.destructive,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          authState.error!,
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.error_outline,
                                             color: AppTheme.destructive,
-                                            fontWeight: FontWeight.w500,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              authState.error!,
+                                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                color: AppTheme.destructive,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (authState.remainingAttempts != null && authState.remainingAttempts! > 0) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Remaining attempts: ${authState.remainingAttempts}',
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: AppTheme.destructive,
+                                          ),
+                                        ),
+                                      ],
+                                      if (authState.isLockedOut) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Account locked for ${ref.read(authProvider.notifier).getRemainingLockoutMinutes()} minutes',
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: AppTheme.destructive,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+
+                              // Login Form
+                              SlideTransition(
+                                position: _formSlideAnimation,
+                                child: Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    children: [
+                                      // Username Field
+                                      TextInput(
+                                        controller: _usernameController,
+                                        label: 'Username',
+                                        hintText: 'Enter your username',
+                                        prefixIcon: Icons.person_outline,
+                                        validator: _validateUsername,
+                                        keyboardType: TextInputType.text,
+                                      ),
+                                      const SizedBox(height: 24),
+
+                                      // Password Field
+                                      TextInput(
+                                        controller: _passwordController,
+                                        label: 'Password',
+                                        hintText: 'Enter your password',
+                                        prefixIcon: Icons.lock_outline,
+                                        obscureText: _obscurePassword,
+                                        validator: _validatePassword,
+                                        suffixIcon: IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _obscurePassword = !_obscurePassword;
+                                            });
+                                          },
+                                          icon: Icon(
+                                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                            color: AppTheme.mutedForeground,
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  if (authState.remainingAttempts != null && authState.remainingAttempts! > 0) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Remaining attempts: ${authState.remainingAttempts}',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppTheme.destructive,
-                                      ),
-                                    ),
-                                  ],
-                                  if (authState.isLockedOut) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Account locked for ${ref.read(authProvider.notifier).getRemainingLockoutMinutes()} minutes',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppTheme.destructive,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
+                                      const SizedBox(height: 16),
 
-                          // Login Form
-                          SlideTransition(
-                            position: _formSlideAnimation,
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                children: [
-                                  // Username Field
-                                  TextInput(
-                                    controller: _usernameController,
-                                    label: 'Username',
-                                    hintText: 'Enter your username',
-                                    prefixIcon: Icons.person_outline,
-                                    validator: _validateUsername,
-                                    keyboardType: TextInputType.text,
-                                  ),
-                                  const SizedBox(height: 24),
-
-                                  // Password Field
-                                  TextInput(
-                                    controller: _passwordController,
-                                    label: 'Password',
-                                    hintText: 'Enter your password',
-                                    prefixIcon: Icons.lock_outline,
-                                    obscureText: _obscurePassword,
-                                    validator: _validatePassword,
-                                    suffixIcon: IconButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _obscurePassword = !_obscurePassword;
-                                        });
-                                      },
-                                      icon: Icon(
-                                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                                        color: AppTheme.mutedForeground,
+                                      // Remember Me
+                                      Row(
+                                        children: [
+                                          Checkbox(
+                                            value: _rememberMe,
+                                            onChanged: (value) {
+                                              setState(() {
+                                                _rememberMe = value ?? false;
+                                              });
+                                            },
+                                            activeColor: AppTheme.gold,
+                                          ),
+                                          Text(
+                                            'Remember me',
+                                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                              color: AppTheme.foreground,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
+                                      SizedBox(height: spacing),
 
-                                  // Remember Me
-                                  Row(
-                                    children: [
-                                      Checkbox(
-                                        value: _rememberMe,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _rememberMe = value ?? false;
-                                          });
-                                        },
-                                        activeColor: AppTheme.gold,
-                                      ),
-                                      Text(
-                                        'Remember me',
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: AppTheme.foreground,
-                                        ),
+                                      // Login Button
+                                      CustomButton(
+                                        text: 'Sign In',
+                                        fullWidth: true,
+                                        isLoading: authState.isLoading,
+                                        onPressed: (authState.isLockedOut && !ref.read(authProvider.notifier).isLockoutExpired()) 
+                                            ? null 
+                                            : _handleLogin,
+                                        variant: ButtonVariant.primary,
+                                        size: ButtonSize.large,
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 32),
-
-                                  // Login Button
-                                  CustomButton(
-                                    text: 'Sign In',
-                                    fullWidth: true,
-                                    isLoading: authState.isLoading,
-                                    onPressed: (authState.isLockedOut && !ref.read(authProvider.notifier).isLockoutExpired()) 
-                                        ? null 
-                                        : _handleLogin,
-                                    variant: ButtonVariant.primary,
-                                    size: ButtonSize.large,
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              
-              // Footer
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'GG Store Cashier v1.0.0',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.mutedForeground,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => const ApiConfigDialog(),
-                      );
-                    },
-                    child: Text(
-                      'API Config',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.gold,
+                  
+                  // Footer
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'GG Store Cashier v1.0.0',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.mutedForeground,
+                        ),
                       ),
-                    ),
+                      TextButton(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => const ApiConfigDialog(),
+                          );
+                        },
+                        child: Text(
+                          'API Config',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.gold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),

@@ -88,10 +88,15 @@ router.post('/check-password-strength', requireRole(['admin', 'superadmin']), (r
     }
 });
 
-// Get all users (admin/superadmin only)
+// Get all users (admin/superadmin only, with branch filtering)
 router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     try {
         const { branch_id, role, search, page = 1, limit = 10 } = req.query;
+        
+        // Convert to integers immediately
+        const pageNum = parseInt(page, 10);
+        const limitNum = parseInt(limit, 10);
+        const offsetNum = (pageNum - 1) * limitNum;
         
         let query = `
             SELECT u.id, u.name, u.username, u.role, u.branch_id, u.created_at, u.updated_at,
@@ -102,9 +107,14 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         `;
         const params = [];
 
-        if (branch_id && branch_id !== '0') {
+        // Admin can only see users from their own branch
+        if (req.user.role === 'admin') {
             query += ' AND u.branch_id = ?';
-            params.push(branch_id);
+            params.push(req.user.branch_id);
+        } else if (branch_id && branch_id !== '0') {
+            // Superadmin can filter by branch
+            query += ' AND u.branch_id = ?';
+            params.push(parseInt(branch_id, 10));
         }
 
         if (role && SECURITY_PATTERNS.ROLE.test(role)) {
@@ -122,10 +132,12 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
 
         query += ' ORDER BY u.created_at DESC';
         
-        // Add pagination
-        const offset = (parseInt(page) - 1) * parseInt(limit);
-        query += ' LIMIT ? OFFSET ?';
-        params.push(parseInt(limit), offset);
+        // Use string interpolation for LIMIT/OFFSET to avoid parameter type issues
+        // These are safe since we validate and convert them to integers above
+        query += ` LIMIT ${limitNum} OFFSET ${offsetNum}`;
+        
+        console.log('Pagination params:', { pageNum, limitNum, offsetNum });
+        console.log('Query params:', params);
 
         const [users] = await pool.execute(query, params);
         
@@ -137,9 +149,13 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         `;
         const countParams = [];
         
-        if (branch_id && branch_id !== '0') {
+        // Admin can only see users from their own branch
+        if (req.user.role === 'admin') {
             countQuery += ' AND u.branch_id = ?';
-            countParams.push(branch_id);
+            countParams.push(req.user.branch_id);
+        } else if (branch_id && branch_id !== '0') {
+            countQuery += ' AND u.branch_id = ?';
+            countParams.push(parseInt(branch_id, 10));
         }
         
         if (role && SECURITY_PATTERNS.ROLE.test(role)) {
@@ -161,10 +177,10 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         res.json({ 
             users,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: pageNum,
+                limit: limitNum,
                 total,
-                totalPages: Math.ceil(total / parseInt(limit))
+                totalPages: Math.ceil(total / limitNum)
             }
         });
 
@@ -172,6 +188,7 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         console.error('Get users error:', error);
         res.status(500).json({ error: 'Failed to fetch users' });
     }
+
 });
 
 // Get user by ID (admin/superadmin only)
@@ -198,7 +215,7 @@ router.get('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
     }
 });
 
-// Create new user (admin/superadmin only)
+// Create new user (admin/superadmin only, with branch restrictions)
 router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     try {
         const { name, username, password, role, branch_id } = req.body;
@@ -214,6 +231,12 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         const sanitizedName = sanitizeInput(name);
         const sanitizedUsername = sanitizeInput(username);
         const sanitizedRole = role || 'karyawan';
+
+        // Admin can only create users for their own branch
+        let userBranchId = branch_id;
+        if (req.user.role === 'admin') {
+            userBranchId = req.user.branch_id;
+        }
 
         // Validate inputs against malicious patterns
         if (!validateInput(sanitizedName) || !validateInput(sanitizedUsername)) {
@@ -238,6 +261,13 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         if (!SECURITY_PATTERNS.ROLE.test(sanitizedRole)) {
             return res.status(400).json({ 
                 error: 'Invalid role specified' 
+            });
+        }
+
+        // Admin cannot create superadmin or admin users
+        if (req.user.role === 'admin' && (sanitizedRole === 'superadmin' || sanitizedRole === 'admin')) {
+            return res.status(403).json({ 
+                error: 'You do not have permission to create admin or superadmin users' 
             });
         }
 
@@ -268,7 +298,7 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
 
         const [result] = await pool.execute(
             'INSERT INTO users (name, username, password, role, branch_id) VALUES (?, ?, ?, ?, ?)',
-            [sanitizedName, sanitizedUsername, hashedPassword, sanitizedRole, branch_id]
+            [sanitizedName, sanitizedUsername, hashedPassword, sanitizedRole, userBranchId]
         );
 
         res.status(201).json({ 
@@ -282,7 +312,7 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     }
 });
 
-// Update user (admin/superadmin only)
+// Update user (admin/superadmin only, with branch restrictions)
 router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
@@ -294,12 +324,24 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
 
         // Check if user exists
         const [existingUsers] = await pool.execute(
-            'SELECT id FROM users WHERE id = ?',
+            'SELECT id, role, branch_id FROM users WHERE id = ?',
             [userId]
         );
 
         if (existingUsers.length === 0) {
             return res.status(404).json({ error: 'User not found' });
+        }
+
+        const existingUser = existingUsers[0];
+
+        // Admin can only update users from their own branch
+        if (req.user.role === 'admin' && existingUser.branch_id !== req.user.branch_id) {
+            return res.status(403).json({ error: 'You can only update users from your own branch' });
+        }
+
+        // Admin cannot update superadmin or admin users
+        if (req.user.role === 'admin' && (existingUser.role === 'superadmin' || existingUser.role === 'admin')) {
+            return res.status(403).json({ error: 'You do not have permission to update admin or superadmin users' });
         }
 
         const updates = [];
@@ -365,12 +407,25 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
                     error: 'Invalid role specified' 
                 });
             }
+            
+            // Admin cannot change role to superadmin or admin
+            if (req.user.role === 'admin' && (role === 'superadmin' || role === 'admin')) {
+                return res.status(403).json({ 
+                    error: 'You do not have permission to assign admin or superadmin roles' 
+                });
+            }
+            
             updates.push('role = ?');
             params.push(role);
         }
 
-        // Update branch_id
+        // Update branch_id (admin cannot change branch)
         if (branch_id !== undefined) {
+            if (req.user.role === 'admin') {
+                return res.status(403).json({ 
+                    error: 'You do not have permission to change user branch' 
+                });
+            }
             updates.push('branch_id = ?');
             params.push(branch_id);
         }
@@ -393,7 +448,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
     }
 });
 
-// Delete user (admin/superadmin only)
+// Delete user (admin/superadmin only, with branch restrictions)
 router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
@@ -409,7 +464,7 @@ router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => 
 
         // Check if user exists
         const [existingUsers] = await pool.execute(
-            'SELECT id, role FROM users WHERE id = ?',
+            'SELECT id, role, branch_id FROM users WHERE id = ?',
             [userId]
         );
 
@@ -417,9 +472,16 @@ router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => 
             return res.status(404).json({ error: 'User not found' });
         }
 
+        const existingUser = existingUsers[0];
+
+        // Admin can only delete users from their own branch
+        if (req.user.role === 'admin' && existingUser.branch_id !== req.user.branch_id) {
+            return res.status(403).json({ error: 'You can only delete users from your own branch' });
+        }
+
         // Prevent deletion of superadmin by admin
-        if (req.user.role === 'admin' && existingUsers[0].role === 'superadmin') {
-            return res.status(403).json({ error: 'Cannot delete superadmin account' });
+        if (req.user.role === 'admin' && (existingUser.role === 'superadmin' || existingUser.role === 'admin')) {
+            return res.status(403).json({ error: 'Cannot delete admin or superadmin account' });
         }
 
         await pool.execute('DELETE FROM users WHERE id = ?', [userId]);

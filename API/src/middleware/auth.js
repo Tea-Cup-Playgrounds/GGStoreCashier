@@ -47,7 +47,43 @@ const requireRole = (roles) => {
     };
 };
 
+// Middleware to filter data by user's branch
+// Admin can only see/modify data from their branch
+// Superadmin can see/modify all branches
+const filterByBranch = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Superadmin can access all branches
+    if (req.user.role === 'superadmin') {
+        return next();
+    }
+
+    // Admin and karyawan can only access their own branch
+    if (req.user.role === 'admin' || req.user.role === 'karyawan') {
+        // Add branch_id to query params for GET requests
+        if (req.method === 'GET') {
+            req.query.branch_id = req.user.branch_id;
+        }
+        
+        // For POST/PUT requests, ensure branch_id matches user's branch
+        if (req.method === 'POST' || req.method === 'PUT') {
+            if (req.body.branch_id && req.body.branch_id != req.user.branch_id) {
+                return res.status(403).json({ 
+                    error: 'You can only manage data for your own branch' 
+                });
+            }
+            // Force branch_id to user's branch
+            req.body.branch_id = req.user.branch_id;
+        }
+    }
+
+    next();
+};
+
 module.exports = {
     authenticateToken,
-    requireRole
+    requireRole,
+    filterByBranch
 };

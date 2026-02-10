@@ -1,11 +1,15 @@
 require('dotenv').config();
 
 const express = require('express');
+const http = require('http');
+const socketIO = require('socket.io');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
+const path = require('path');
+const { ensureUploadDirs } = require('./utils/upload');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -17,16 +21,70 @@ const branchRoutes = require('./routes/branches');
 const transactionRoutes = require('./routes/transactions');
 
 const app = express();
+const server = http.createServer(app);
 
-// Middleware
-app.use(helmet({
-    crossOriginEmbedderPolicy: false,
-}));
+// Ensure upload directories exist
+ensureUploadDirs();
 
 // CORS configuration for Flutter web
 const corsOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
   : ['http://localhost:3000'];
+
+// Socket.IO setup with CORS
+const io = socketIO(server, {
+    cors: {
+        origin: function (origin, callback) {
+            // Allow requests with no origin (like mobile apps)
+            if (!origin) return callback(null, true);
+            
+            // In development, allow all localhost and 127.0.0.1 origins
+            if (process.env.NODE_ENV === 'development') {
+                if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+                    return callback(null, true);
+                }
+            }
+            
+            // Check against configured origins
+            if (corsOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+            
+            return callback(null, false);
+        },
+        credentials: true,
+        methods: ['GET', 'POST']
+    }
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    // Join branch-specific room
+    socket.on('join-branch', (branchId) => {
+        socket.join(`branch-${branchId}`);
+        console.log(`Socket ${socket.id} joined branch-${branchId}`);
+    });
+
+    // Leave branch room
+    socket.on('leave-branch', (branchId) => {
+        socket.leave(`branch-${branchId}`);
+        console.log(`Socket ${socket.id} left branch-${branchId}`);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+    });
+});
+
+// Make io accessible to routes
+app.set('io', io);
+
+// Middleware
+app.use(helmet({
+    crossOriginEmbedderPolicy: false,
+}));
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -58,6 +116,9 @@ app.use(express.json({
 }));
 app.use(cookieParser());
 app.use(morgan('dev'));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -103,6 +164,7 @@ const errorHandler = (err, req, res, next) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Socket.IO enabled for real-time updates`);
 });

@@ -14,10 +14,8 @@ class BottomNavigation extends StatelessWidget {
     return LayoutBuilder(builder: (context, constraints) {
       double fontSize;
 
-      if (constraints.maxWidth <= Breakpoints.compactStandart) {
+      if (constraints.maxWidth <= Breakpoints.phone) {
         fontSize = 10;
-      } else if (constraints.maxWidth <= Breakpoints.medium) {
-        fontSize = 12;
       } else {
         fontSize = 14;
       }

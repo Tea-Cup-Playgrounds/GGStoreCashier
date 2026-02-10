@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart';
+import 'package:gg_store_cashier/core/helper/screen_type_utils.dart';
+import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
+import 'package:gg_store_cashier/core/provider/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/inventory_header.dart';
 
-class InventoryPage extends StatefulWidget {
+class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
 
   @override
-  State<InventoryPage> createState() => _InventoryPageState();
+  ConsumerState<InventoryPage> createState() => _InventoryPageState();
 }
 
-class _InventoryPageState extends State<InventoryPage> {
+class _InventoryPageState extends ConsumerState<InventoryPage> {
   late final TextEditingController searchController;
   InventoryFilter selectedFilter = InventoryFilter.all;
   InventoryFilter _currentFilter = InventoryFilter.all;
@@ -41,20 +45,19 @@ class _InventoryPageState extends State<InventoryPage> {
       _currentFilter = filter;
     });
 
-    // ============================
-    // TODO: FETCH KE API
-    // ============================
-    // fetchInventory(
-    //   filter: filter,
-    //   search: searchController.text,
-    // );
-
     debugPrint('Filter changed to: $filter');
   }
 
   @override
   Widget build(BuildContext context) {
-    // Data dummy untuk daftar produk
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isKaryawan = user?.isEmployee ?? false;
+    
+    final screenType = getScreenType(context);
+    final orientation = getOrientation(context);
+    final horizontalPadding = Breakpoints.getHorizontalPadding(screenType, orientation);
+    
     final List<Map<String, dynamic>> dummyProducts = [
       {
         'image': "https://picsum.photos/200",
@@ -107,82 +110,91 @@ class _InventoryPageState extends State<InventoryPage> {
     ];
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // 1. App Bar
-          SliverAppBar(
-            title: const Text('Inventory'),
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            elevation: 0,
-            centerTitle: false,
-            pinned: true, // Membuat AppBar tetap di atas
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    context.push(AppRouter.inventoryAddItem);
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Item'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.gold,
-                    foregroundColor: AppTheme.background,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                title: Text(
+                  'Inventory',
+                  style: TextStyle(fontSize: screenType == ScreenType.tablet ? 24 : null),
+                ),
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                elevation: 0,
+                centerTitle: false,
+                pinned: true,
+                actions: [
+                  // Hide "Add Item" button for karyawan
+                  if (!isKaryawan)
+                    Padding(
+                      padding: EdgeInsets.only(right: horizontalPadding),
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          context.push(AppRouter.inventoryAddItem);
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Item'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.gold,
+                          foregroundColor: AppTheme.background,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: screenType == ScreenType.tablet ? 24 : 16,
+                            vertical: screenType == ScreenType.tablet ? 16 : 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+                scrolledUnderElevation: 0,
+              ),
+
+              SliverPersistentHeader(
+                delegate: _InventoryHeaderDelegate(
+                  child: InventoryHeader(
+                    searchController: searchController,
+                    onSearchChanged: _onSearchChanged,
+                    currentFilter: _currentFilter,
+                    onFilterChanged: _onFilterChanged,
+                  ),
+                ),
+                pinned: true,
+              ),
+              
+              SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final product = dummyProducts[index];
+                      return _ProductListTile(
+                        image: product['image'],
+                        name: product['name'],
+                        sku: product['sku'],
+                        inStock: product['inStock'],
+                        price: product['price'],
+                        isLowStock: product['isLowStock'],
+                        isTablet: screenType == ScreenType.tablet,
+                      );
+                    },
+                    childCount: dummyProducts.length,
                   ),
                 ),
               ),
+
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: MediaQuery.of(context).padding.bottom + 80,
+                ),
+              )
             ],
-            scrolledUnderElevation: 0,
           ),
-
-          // 2. STICKY HEADER untuk Search, Filter, dan Summary
-          SliverPersistentHeader(
-            delegate: _InventoryHeaderDelegate(
-              child: InventoryHeader(
-                searchController: searchController,
-                onSearchChanged: _onSearchChanged,
-                currentFilter: _currentFilter,
-                onFilterChanged: _onFilterChanged,
-              ),
-            ),
-            pinned: true,
-          ),
-          // Items
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final product = dummyProducts[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: _ProductListTile(
-                    image: product['image'],
-                    name: product['name'],
-                    sku: product['sku'],
-                    inStock: product['inStock'],
-                    price: product['price'],
-                    isLowStock: product['isLowStock'],
-                  ),
-                );
-              },
-              childCount: dummyProducts.length,
-            ),
-          ),
-
-          // Padding di bagian bawah agar BottomNav tidak menutupi item terakhir
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height:
-                  // Tambahkan padding standar + tinggi Bottom Navigation Bar (sekitar 60-80)
-                  MediaQuery.of(context).padding.bottom + 80,
-            ),
-          )
-        ],
+        ),
       ),
     );
   }
 }
 
-// Delegate untuk membuat InventoryHeader menjadi Sticky
 class _InventoryHeaderDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
 
@@ -195,12 +207,10 @@ class _InventoryHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent =>
-      280.0; // Sesuaikan tinggi maksimum yang dibutuhkan header
+  double get maxExtent => 280.0;
 
   @override
-  double get minExtent =>
-      280.0; // Atur min dan maxExtent sama agar tidak bisa diciutkan
+  double get minExtent => 280.0;
 
   @override
   bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
@@ -215,6 +225,7 @@ class _ProductListTile extends StatelessWidget {
   final double price;
   final bool isLowStock;
   final String image;
+  final bool isTablet;
 
   const _ProductListTile({
     required this.name,
@@ -223,6 +234,7 @@ class _ProductListTile extends StatelessWidget {
     required this.price,
     required this.isLowStock,
     required this.image,
+    this.isTablet = false,
   });
 
   @override
@@ -235,6 +247,7 @@ class _ProductListTile extends StatelessWidget {
             : AppTheme.success;
 
     final Color tileBackgroundColor = Theme.of(context).colorScheme.secondary;
+    final imageSize = isTablet ? 64.0 : 48.0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -244,35 +257,33 @@ class _ProductListTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: ListTile(
-          // ===============================================
-          // LOGIKA NAVIGASI: Mengarahkan ke InventoryDetailPage
-          // ===============================================
           onTap: () {
             context.pushNamed('inventoryDetail', pathParameters: {'id': sku});
           },
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-
-          // ... (Bagian Leading, Title, Subtitle, Trailing tetap sama)
-          // ...
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isTablet ? 20 : 16, 
+            vertical: isTablet ? 12 : 8
+          ),
 
           leading: Container(
-            width: 48,
-            height: 48, // ✅ FIXED SQUARE
+            width: imageSize,
+            height: imageSize,
             decoration: BoxDecoration(
               color: AppTheme.card,
               borderRadius: BorderRadius.circular(4),
             ),
-            clipBehavior: Clip.antiAlias, // 🔥 WAJIB agar image ikut rounded
+            clipBehavior: Clip.antiAlias,
             child: Image.network(
               image,
-              fit: BoxFit.cover, // ✅ isi kotak tanpa gepeng
+              fit: BoxFit.cover,
             ),
           ),
 
           title: Text(
             name,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: isTablet ? 18 : null,
+            ),
           ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,7 +294,10 @@ class _ProductListTile extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall!
-                    .copyWith(color: AppTheme.mutedForeground),
+                    .copyWith(
+                      color: AppTheme.mutedForeground,
+                      fontSize: isTablet ? 14 : null,
+                    ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -291,6 +305,7 @@ class _ProductListTile extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall!.copyWith(
                       color: stockColor,
                       fontWeight: FontWeight.w500,
+                      fontSize: isTablet ? 14 : null,
                     ),
               ),
             ],
@@ -300,16 +315,17 @@ class _ProductListTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '\$${price.toStringAsFixed(2)}',
+                '\${price.toStringAsFixed(2)}',
                 style: Theme.of(context).textTheme.titleLarge!.copyWith(
                       color: AppTheme.gold,
                       fontWeight: FontWeight.bold,
+                      fontSize: isTablet ? 22 : null,
                     ),
               ),
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios_rounded,
-                size: 16,
+                size: isTablet ? 18 : 16,
                 color: AppTheme.mutedForeground,
               ),
             ],
