@@ -4,6 +4,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/text_input.dart';
 import '../../../../shared/widgets/password_strength_indicator.dart';
+import '../../../../shared/widgets/branch_autocomplete.dart';
 import '../../../../shared/utils/snackbar_service.dart';
 import '../providers/user_management_provider.dart';
 
@@ -32,6 +33,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
   String _selectedRole = 'karyawan';
   String _selectedBranch = '1';
+  String _selectedBranchName = '';
+  int? _selectedBranchId;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
@@ -46,9 +49,12 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
       _usernameController.text = widget.user!['username']?.toString() ?? '';
       _selectedRole = widget.user!['role']?.toString() ?? 'karyawan';
       _selectedBranch = widget.user!['branch_id']?.toString() ?? '1';
+      _selectedBranchId = widget.user!['branch_id'];
+      _selectedBranchName = widget.user!['branch_name']?.toString() ?? '';
     } else if (widget.restrictedBranchId != null) {
       // For admin, set their branch as default
       _selectedBranch = widget.restrictedBranchId.toString();
+      _selectedBranchId = widget.restrictedBranchId;
     }
   }
 
@@ -67,12 +73,18 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final userData = {
+      final userData = <String, dynamic>{
         'name': _nameController.text.trim(),
         'username': _usernameController.text.trim(),
         'role': _selectedRole,
-        'branch_id': int.tryParse(_selectedBranch),
       };
+
+      // Add branch_id if it's an existing branch, or branch_name if it's a new branch
+      if (_selectedBranchId != null) {
+        userData['branch_id'] = _selectedBranchId as dynamic;
+      } else if (_selectedBranchName.isNotEmpty) {
+        userData['branch_name'] = _selectedBranchName;
+      }
 
       // Only include password if it's provided (for editing) or if creating new user
       if (_passwordController.text.isNotEmpty || !_isEditing) {
@@ -265,57 +277,26 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Branch Dropdown
-                      Text(
-                        'Branch',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.foreground,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: widget.restrictedBranchId != null 
-                              ? AppTheme.muted 
-                              : AppTheme.surface,
-                          border: Border.all(color: AppTheme.border),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedBranch,
-                            isExpanded: true,
-                            dropdownColor: AppTheme.surface,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.foreground,
-                            ),
-                            items: widget.isSuperAdmin
-                                ? const [
-                                    DropdownMenuItem(value: '0', child: Text('All Branches (Global)')),
-                                    DropdownMenuItem(value: '1', child: Text('Cabang Satu')),
-                                    DropdownMenuItem(value: '2', child: Text('Cabang Dua')),
-                                    DropdownMenuItem(value: '3', child: Text('Cabang Tiga')),
-                                    DropdownMenuItem(value: '4', child: Text('Cabang Empat')),
-                                    DropdownMenuItem(value: '5', child: Text('Cabang Lima')),
-                                  ]
-                                : [
-                                    DropdownMenuItem(
-                                      value: widget.restrictedBranchId?.toString() ?? '1',
-                                      child: Text('Branch ${widget.restrictedBranchId ?? 1}'),
-                                    ),
-                                  ],
-                            onChanged: widget.restrictedBranchId != null
-                                ? null // Disable for admin
-                                : (value) {
-                                    setState(() {
-                                      _selectedBranch = value!;
-                                    });
-                                  },
-                          ),
-                        ),
+                      // Branch Autocomplete
+                      BranchAutocomplete(
+                        initialValue: _selectedBranch,
+                        initialBranchName: _selectedBranchName,
+                        enabled: widget.restrictedBranchId == null,
+                        onChanged: (branchId, branchName) {
+                          setState(() {
+                            _selectedBranchId = branchId;
+                            _selectedBranchName = branchName;
+                            if (branchId != null) {
+                              _selectedBranch = branchId.toString();
+                            }
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Branch is required';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 20),
                       // Password Field

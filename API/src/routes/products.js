@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole, filterByBranch } = require('../middleware/auth');
-const { uploadProduct, deleteFile } = require('../utils/upload');
+const { uploadProduct, deleteFile, validateUploadedImage } = require('../utils/upload');
 
 const router = express.Router();
 
@@ -89,11 +89,23 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
         if (!name || !sell_price) {
             // Delete uploaded file if validation fails
             if (req.file) {
-                deleteFile(`uploads/products/${req.file.filename}`);
+                deleteFile(`API/uploads/products/${req.file.filename}`);
             }
             return res.status(400).json({ 
                 error: 'Name and sell price are required' 
             });
+        }
+
+        // Validate uploaded image (magic number check)
+        if (req.file) {
+            try {
+                const filePath = `API/uploads/products/${req.file.filename}`;
+                validateUploadedImage(filePath, req.file.mimetype);
+            } catch (error) {
+                return res.status(400).json({ 
+                    error: error.message || 'Invalid image file' 
+                });
+            }
         }
 
         // Generate random barcode if not provided
@@ -164,7 +176,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
 
         if (oldProducts.length === 0) {
             if (req.file) {
-                deleteFile(`uploads/products/${req.file.filename}`);
+                deleteFile(`API/uploads/products/${req.file.filename}`);
             }
             return res.status(404).json({ error: 'Product not found' });
         }
@@ -173,10 +185,22 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
         if (req.user.role !== 'superadmin') {
             if (oldProducts[0].branch_id !== req.user.branch_id) {
                 if (req.file) {
-                    deleteFile(`uploads/products/${req.file.filename}`);
+                    deleteFile(`API/uploads/products/${req.file.filename}`);
                 }
                 return res.status(403).json({ 
                     error: 'You can only update products from your own branch' 
+                });
+            }
+        }
+
+        // Validate uploaded image (magic number check)
+        if (req.file) {
+            try {
+                const filePath = `API/uploads/products/${req.file.filename}`;
+                validateUploadedImage(filePath, req.file.mimetype);
+            } catch (error) {
+                return res.status(400).json({ 
+                    error: error.message || 'Invalid image file' 
                 });
             }
         }

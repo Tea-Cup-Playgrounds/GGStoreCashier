@@ -5,6 +5,9 @@ import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart
 import 'package:gg_store_cashier/core/helper/screen_type_utils.dart';
 import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
+import 'package:gg_store_cashier/core/services/product_service.dart';
+import 'package:gg_store_cashier/core/models/product.dart';
+import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/inventory_header.dart';
@@ -22,9 +25,15 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   late TabController _tabController;
   InventoryFilter selectedFilter = InventoryFilter.all;
   InventoryFilter _currentFilter = InventoryFilter.all;
+  
+  // Products state
+  List<Product> _products = [];
+  bool _isLoadingProducts = true;
+  String? _productsError;
 
   void _onSearchChanged(String value) {
     debugPrint('Search: $value');
+    setState(() {}); // Trigger rebuild to filter products
   }
 
   @override
@@ -32,6 +41,27 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     super.initState();
     searchController = TextEditingController();
     _tabController = TabController(length: 2, vsync: this);
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() {
+      _isLoadingProducts = true;
+      _productsError = null;
+    });
+
+    try {
+      final products = await ProductService.getProducts();
+      setState(() {
+        _products = products;
+        _isLoadingProducts = false;
+      });
+    } catch (e) {
+      setState(() {
+        _productsError = e.toString();
+        _isLoadingProducts = false;
+      });
+    }
   }
 
   @override
@@ -152,56 +182,32 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   }
 
   Widget _buildProductsTab(ScreenType screenType, double horizontalPadding) {
-    final List<Map<String, dynamic>> dummyProducts = [
-      {
-        'image': "https://picsum.photos/200",
-        'name': 'Premium Sunglasses',
-        'sku': 'SUN-003',
-        'inStock': 4,
-        'price': 149.99,
-        'isLowStock': true,
-      },
-      {
-        'image': "https://picsum.photos/200",
-        'name': 'Gold Bracelet',
-        'sku': 'BRC-004',
-        'inStock': 12,
-        'price': 199.99,
-        'isLowStock': false,
-      },
-      {
-        'image': "https://picsum.photos/200/300",
-        'name': 'Silk Scarf',
-        'sku': 'SCF-005',
-        'inStock': 22,
-        'price': 79.99,
-        'isLowStock': false,
-      },
-      {
-        'image': "https://picsum.photos/200",
-        'name': 'Diamond Earrings',
-        'sku': 'EAR-006',
-        'inStock': 0,
-        'price': 449.99,
-        'isLowStock': true,
-      },
-      {
-        'image': "https://picsum.photos/200",
-        'name': 'Cashmere Sweater',
-        'sku': 'SWT-007',
-        'inStock': 3,
-        'price': 259.99,
-        'isLowStock': true,
-      },
-      {
-        'image': "https://picsum.photos/200",
-        'name': 'Pearl Necklace',
-        'sku': 'NCK-008',
-        'inStock': 7,
-        'price': 349.99,
-        'isLowStock': false,
-      },
-    ];
+    // Filter products based on search and filter
+    List<Product> filteredProducts = _products;
+    
+    // Apply search filter
+    final searchQuery = searchController.text.toLowerCase();
+    if (searchQuery.isNotEmpty) {
+      filteredProducts = filteredProducts.where((product) {
+        return product.name.toLowerCase().contains(searchQuery) ||
+               (product.barcode?.toLowerCase().contains(searchQuery) ?? false) ||
+               (product.category?.toLowerCase().contains(searchQuery) ?? false);
+      }).toList();
+    }
+    
+    // Apply stock filter
+    switch (_currentFilter) {
+      case InventoryFilter.low:
+        filteredProducts = filteredProducts.where((p) => p.isLowStock && !p.isOutOfStock).toList();
+        break;
+      case InventoryFilter.out:
+        filteredProducts = filteredProducts.where((p) => p.isOutOfStock).toList();
+        break;
+      case InventoryFilter.all:
+      case InventoryFilter.other1:
+      case InventoryFilter.other2:
+        break;
+    }
 
     return CustomScrollView(
       slivers: [
@@ -217,26 +223,89 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
           pinned: true,
         ),
         
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final product = dummyProducts[index];
-                return _ProductListTile(
-                  image: product['image'],
-                  name: product['name'],
-                  sku: product['sku'],
-                  inStock: product['inStock'],
-                  price: product['price'],
-                  isLowStock: product['isLowStock'],
-                  isTablet: screenType == ScreenType.tablet,
-                );
-              },
-              childCount: dummyProducts.length,
+        if (_isLoadingProducts)
+          const SliverFillRemaining(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: AppTheme.gold),
+                  SizedBox(height: 16),
+                  Text('Loading products...'),
+                ],
+              ),
+            ),
+          )
+        else if (_productsError != null)
+          SliverFillRemaining(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppTheme.destructive,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Failed to load products'),
+                  const SizedBox(height: 8),
+                  Text(
+                    _productsError!,
+                    style: const TextStyle(color: AppTheme.mutedForeground),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _loadProducts,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (filteredProducts.isEmpty)
+          SliverFillRemaining(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 64,
+                    color: AppTheme.mutedForeground.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    searchQuery.isNotEmpty
+                        ? 'No products found'
+                        : 'No products available',
+                    style: const TextStyle(
+                      color: AppTheme.mutedForeground,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final product = filteredProducts[index];
+                  return _ProductListTile(
+                    product: product,
+                    isTablet: screenType == ScreenType.tablet,
+                  );
+                },
+                childCount: filteredProducts.length,
+              ),
             ),
           ),
-        ),
 
         SliverToBoxAdapter(
           child: SizedBox(
@@ -272,27 +341,18 @@ class _InventoryHeaderDelegate extends SliverPersistentHeaderDelegate {
 }
 
 class _ProductListTile extends StatelessWidget {
-  final String name;
-  final String sku;
-  final int inStock;
-  final double price;
-  final bool isLowStock;
-  final String image;
+  final Product product;
   final bool isTablet;
 
   const _ProductListTile({
-    required this.name,
-    required this.sku,
-    required this.inStock,
-    required this.price,
-    required this.isLowStock,
-    required this.image,
+    required this.product,
     this.isTablet = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool isOutOfStock = inStock == 0;
+    final bool isOutOfStock = product.isOutOfStock;
+    final bool isLowStock = product.isLowStock;
     final Color stockColor = isOutOfStock
         ? AppTheme.destructive
         : isLowStock
@@ -311,7 +371,7 @@ class _ProductListTile extends StatelessWidget {
         ),
         child: ListTile(
           onTap: () {
-            context.pushNamed('inventoryDetail', pathParameters: {'id': sku});
+            context.pushNamed('inventoryDetail', pathParameters: {'id': product.id});
           },
           contentPadding: EdgeInsets.symmetric(
             horizontal: isTablet ? 20 : 16, 
@@ -326,35 +386,49 @@ class _ProductListTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Image.network(
-              image,
-              fit: BoxFit.cover,
-            ),
+            child: product.image != null && product.image!.isNotEmpty
+                ? Image.network(
+                    ProductService.getProductImageUrl(product.image),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.asset(
+                        ProductService.getPlaceholderImage(),
+                        fit: BoxFit.cover,
+                      );
+                    },
+                  )
+                : Image.asset(
+                    ProductService.getPlaceholderImage(),
+                    fit: BoxFit.cover,
+                  ),
           ),
 
           title: Text(
-            name,
+            product.name,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontSize: isTablet ? 18 : null,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 2),
-              Text(
-                'SKU: $sku',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall!
-                    .copyWith(
-                      color: AppTheme.mutedForeground,
-                      fontSize: isTablet ? 14 : null,
-                    ),
-              ),
+              if (product.barcode != null)
+                Text(
+                  'SKU: ${product.barcode}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall!
+                      .copyWith(
+                        color: AppTheme.mutedForeground,
+                        fontSize: isTablet ? 14 : null,
+                      ),
+                ),
               const SizedBox(height: 2),
               Text(
-                '$inStock in stock',
+                '${product.stock} in stock',
                 style: Theme.of(context).textTheme.bodySmall!.copyWith(
                       color: stockColor,
                       fontWeight: FontWeight.w500,
@@ -367,13 +441,16 @@ class _ProductListTile extends StatelessWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                '\$${price.toStringAsFixed(2)}',
-                style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                      color: AppTheme.gold,
-                      fontWeight: FontWeight.bold,
-                      fontSize: isTablet ? 22 : null,
-                    ),
+              Flexible(
+                child: Text(
+                  CurrencyFormatter.formatToRupiah(product.sellPrice),
+                  style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                        color: AppTheme.gold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: isTablet ? 22 : 18,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const SizedBox(width: 8),
               Icon(

@@ -318,53 +318,177 @@ class _CategoryDialogState extends State<_CategoryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.category == null ? 'Add Category' : 'Edit Category'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ImageInput(
-                file: _categoryImage,
-                label: 'Category Image',
-                onChanged: (img) => setState(() => _categoryImage = img),
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 768;
+    
+    return Dialog(
+      backgroundColor: AppTheme.background,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 40 : 16,
+        vertical: isDesktop ? 40 : 24,
+      ),
+      child: Container(
+        width: isDesktop ? 600 : double.infinity,
+        constraints: BoxConstraints(
+          maxWidth: 600,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+                border: Border(
+                  bottom: BorderSide(color: AppTheme.border),
+                ),
               ),
-              const SizedBox(height: 16),
-              TextInput(
-                label: 'Category Name',
-                hintText: 'Enter category name',
-                controller: _nameController,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Category name is required';
-                  }
-                  return null;
-                },
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.gold.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      widget.category == null ? Icons.add_circle_outline : Icons.edit_outlined,
+                      color: AppTheme.gold,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.category == null ? 'Add New Category' : 'Edit Category',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.foreground,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.category == null 
+                              ? 'Create a new product category'
+                              : 'Update category information',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: AppTheme.mutedForeground),
+                    tooltip: 'Close',
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextInput(
-                label: 'Description (Optional)',
-                hintText: 'Enter description',
-                controller: _descriptionController,
-                maxLines: 3,
+            ),
+            
+            // Form Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Image Upload Section
+                      ImageInput(
+                        file: _categoryImage,
+                        label: 'Category Image',
+                        onChanged: (img) => setState(() => _categoryImage = img),
+                        height: 200,
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Category Name
+                      TextInput(
+                        label: 'Category Name',
+                        hintText: 'Enter category name',
+                        controller: _nameController,
+                        prefixIcon: Icons.category_outlined,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Category name is required';
+                          }
+                          if (value.trim().length < 2) {
+                            return 'Category name must be at least 2 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Description
+                      TextInput(
+                        label: 'Description (Optional)',
+                        hintText: 'Enter category description',
+                        controller: _descriptionController,
+                        prefixIcon: Icons.description_outlined,
+                        maxLines: 4,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
+            ),
+            
+            // Footer Actions
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+                border: Border(
+                  top: BorderSide(color: AppTheme.border),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CustomButton(
+                      text: 'Cancel',
+                      variant: ButtonVariant.outline,
+                      fullWidth: true,
+                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: isDesktop ? 1 : 2,
+                    child: CustomButton(
+                      text: widget.category == null ? 'Create Category' : 'Update Category',
+                      icon: widget.category == null ? Icons.add : Icons.check,
+                      fullWidth: true,
+                      isLoading: _isLoading,
+                      onPressed: _submit,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        CustomButton(
-          text: widget.category == null ? 'Add' : 'Update',
-          onPressed: _isLoading ? null : _submit,
-          isLoading: _isLoading,
-        ),
-      ],
     );
   }
 }

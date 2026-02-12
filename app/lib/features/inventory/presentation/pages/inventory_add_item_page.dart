@@ -6,9 +6,11 @@ import 'package:dio/dio.dart';
 import 'package:gg_store_cashier/core/config/api_config.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
 import 'package:gg_store_cashier/core/services/auth_service.dart';
+import 'package:gg_store_cashier/core/helper/rupiah_input_formatter.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
+import 'package:gg_store_cashier/shared/widgets/searchable_dropdown.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gg_store_cashier/shared/widgets/image_input.dart';
 
@@ -110,7 +112,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
         'name': _productNameController.text.trim(),
         'barcode': _barcodeController.text.trim(),
         'category_id': _selectedCategoryId,
-        'sell_price': double.parse(_priceController.text.trim()),
+        'sell_price': RupiahInputFormatter.parseRupiahAsDouble(_priceController.text) ?? 0,
         'stock': int.parse(_stockController.text.trim()),
         'branch_id': _selectedBranchId,
       });
@@ -217,21 +219,22 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                     const SizedBox(height: 16),
 
                     // Branch Dropdown (disabled for admin/karyawan)
-                    DropdownButtonFormField<int>(
+                    SearchableDropdown<int>(
+                      label: 'Branch',
+                      hintText: 'Select branch',
                       value: _selectedBranchId,
-                      decoration: const InputDecoration(
-                        labelText: 'Branch',
-                        hintText: 'Select branch',
-                      ),
                       items: _branches.map((branch) {
-                        return DropdownMenuItem<int>(
+                        return DropdownItem<int>(
                           value: branch['id'],
-                          child: Text(branch['name']),
+                          label: branch['name'],
+                          icon: Icons.store,
                         );
                       }).toList(),
                       onChanged: isSuperAdmin
                           ? (value) => setState(() => _selectedBranchId = value)
-                          : null, // Disabled for non-superadmin
+                          : (value) {}, // Disabled for non-superadmin
+                      enabled: isSuperAdmin,
+                      prefixIcon: Icons.store,
                       validator: (value) {
                         if (value == null) {
                           return 'Please select a branch';
@@ -242,19 +245,19 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                     const SizedBox(height: 16),
 
                     // Category Dropdown
-                    DropdownButtonFormField<int>(
+                    SearchableDropdown<int>(
+                      label: 'Category (Optional)',
+                      hintText: 'Select category',
                       value: _selectedCategoryId,
-                      decoration: const InputDecoration(
-                        labelText: 'Category (Optional)',
-                        hintText: 'Select category',
-                      ),
                       items: _categories.map((category) {
-                        return DropdownMenuItem<int>(
+                        return DropdownItem<int>(
                           value: category['id'],
-                          child: Text(category['name']),
+                          label: category['name'],
+                          icon: Icons.category,
                         );
                       }).toList(),
                       onChanged: (value) => setState(() => _selectedCategoryId = value),
+                      prefixIcon: Icons.category,
                     ),
                     const SizedBox(height: 16),
 
@@ -282,14 +285,16 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                         Expanded(
                           child: TextInput(
                             label: 'Sell Price',
-                            hintText: "Enter price",
+                            hintText: "Rp0",
                             controller: _priceController,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [RupiahInputFormatter()],
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Price is required';
                               }
-                              if (double.tryParse(value) == null) {
+                              final price = RupiahInputFormatter.parseRupiahAsDouble(value);
+                              if (price == null || price <= 0) {
                                 return 'Invalid price';
                               }
                               return null;

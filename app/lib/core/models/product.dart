@@ -30,20 +30,28 @@ class Product {
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    // Helper function to parse price (handles both string and number)
+    double parsePrice(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
     return Product(
       id: json['id'].toString(),
       name: json['name'] as String,
       barcode: json['barcode'] as String?,
       categoryId: json['category_id'] as int?,
-      costPrice: (json['cost_price'] as num).toDouble(),
-      sellPrice: (json['sell_price'] as num).toDouble(),
+      costPrice: parsePrice(json['cost_price']),
+      sellPrice: parsePrice(json['sell_price']),
       stock: json['stock'] as int,
       branchId: json['branch_id'] as int?,
       supplierId: json['supplier_id'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      image: json['image'] as String?,
-      category: json['category'] as String?,
+      image: json['product_image'] as String?,
+      category: json['category_name'] as String?,
     );
   }
 

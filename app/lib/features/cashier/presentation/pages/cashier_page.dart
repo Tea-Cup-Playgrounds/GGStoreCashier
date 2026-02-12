@@ -4,6 +4,8 @@ import '../../../../core/models/product.dart';
 import '../../../../core/models/cart_item.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
+import '../../../../core/helper/currency_formatter.dart';
+import '../../../../core/services/product_service.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../widgets/product_card.dart';
 import '../widgets/cart_item_widget.dart';
@@ -29,6 +31,11 @@ class _CashierPageState extends State<CashierPage>
   Map<String, dynamic>? _appliedCoupon;
   bool _isApplyingCoupon = false;
   String _selectedPaymentMethod = 'cash';
+  
+  // Products state
+  List<Product> _products = [];
+  bool _isLoadingProducts = true;
+  String? _productsError;
 
   late AnimationController _viewAnimationController;
   // late Animation<Offset> _slideAnimation;
@@ -41,80 +48,40 @@ class _CashierPageState extends State<CashierPage>
     {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet},
   ];
 
-  // Sample products
-  final List<Product> _products = [
-    Product(
-      id: '1',
-      name: 'Signature Watch',
-      sellPrice: 100.99,
-      costPrice: 200.00,
-      stock: 15,
-      category: 'Accessories',
-      image: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    ),
-    Product(
-      id: '2',
-      name: 'Leather Wallet',
-      sellPrice: 89.99,
-      costPrice: 60.00,
-      stock: 28,
-      category: 'Accessories',
-      image: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    ),
-    Product(
-      id: '3',
-      name: 'Premium Sunglasses',
-      sellPrice: 149.99,
-      costPrice: 100.00,
-      stock: 4,
-      category: 'Eyewear',
-      image: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    ),
-    Product(
-      id: '4',
-      name: 'Gold Bracelet',
-      sellPrice: 199.99,
-      costPrice: 150.00,
-      stock: 12,
-      category: 'Jewelry',
-      image: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    ),
-    Product(
-      id: '5',
-      name: 'Silk Scarf',
-      sellPrice: 79.99,
-      costPrice: 50.00,
-      stock: 22,
-      category: 'Apparel',
-      image: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    ),
-    Product(
-      id: '6',
-      name: 'Diamond Earrings',
-      sellPrice: 449.99,
-      costPrice: 300.00,
-      stock: 8,
-      category: 'Jewelry',
-      image: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
     _setupAnimations();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() {
+      _isLoadingProducts = true;
+      _productsError = null;
+    });
+
+    try {
+      final products = await ProductService.getProducts();
+      setState(() {
+        _products = products;
+        _isLoadingProducts = false;
+      });
+    } catch (e) {
+      setState(() {
+        _productsError = e.toString();
+        _isLoadingProducts = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load products: $e'),
+            backgroundColor: AppTheme.destructive,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _setupAnimations() {
@@ -360,23 +327,78 @@ class _CashierPageState extends State<CashierPage>
                   ),
                   // Products Grid
                   Expanded(
-                    child: GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: isLandscape ? 3 : 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.8,
-                      ),
-                      itemCount: _filteredProducts.length,
-                      itemBuilder: (context, index) {
-                        final product = _filteredProducts[index];
-                        return ProductCard(
-                          product: product,
-                          onAdd: () => _addToCart(product),
-                        );
-                      },
-                    ),
+                    child: _isLoadingProducts
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(color: AppTheme.gold),
+                                SizedBox(height: 16),
+                                Text('Loading products...'),
+                              ],
+                            ),
+                          )
+                        : _productsError != null
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline,
+                                      size: 64,
+                                      color: AppTheme.destructive,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text('Failed to load products'),
+                                    const SizedBox(height: 16),
+                                    CustomButton(
+                                      text: 'Retry',
+                                      icon: Icons.refresh,
+                                      onPressed: _loadProducts,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : _filteredProducts.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.inventory_2_outlined,
+                                          size: 64,
+                                          color: AppTheme.mutedForeground.withOpacity(0.5),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          _searchController.text.isNotEmpty
+                                              ? 'No products found'
+                                              : 'No products available',
+                                          style: const TextStyle(
+                                            color: AppTheme.mutedForeground,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : GridView.builder(
+                                    padding: const EdgeInsets.all(16),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: isLandscape ? 3 : 2,
+                                      crossAxisSpacing: 12,
+                                      mainAxisSpacing: 12,
+                                      childAspectRatio: 0.8,
+                                    ),
+                                    itemCount: _filteredProducts.length,
+                                    itemBuilder: (context, index) {
+                                      final product = _filteredProducts[index];
+                                      return ProductCard(
+                                        product: product,
+                                        onAdd: () => _addToCart(product),
+                                      );
+                                    },
+                                  ),
                   ),
                 ],
               ),
@@ -510,7 +532,7 @@ class _CashierPageState extends State<CashierPage>
                                     children: [
                                       const Text('Subtotal'),
                                       Text(
-                                        '\$${_subtotal.toStringAsFixed(2)}',
+                                        CurrencyFormatter.formatToRupiah(_subtotal),
                                         style: const TextStyle(fontWeight: FontWeight.w500),
                                       ),
                                     ],
@@ -525,7 +547,7 @@ class _CashierPageState extends State<CashierPage>
                                           style: TextStyle(color: AppTheme.success),
                                         ),
                                         Text(
-                                          '-\$${_discount.toStringAsFixed(2)}',
+                                          CurrencyFormatter.formatToRupiah(_discount),
                                           style: const TextStyle(
                                             color: AppTheme.success,
                                             fontWeight: FontWeight.w500,
@@ -547,7 +569,7 @@ class _CashierPageState extends State<CashierPage>
                                         ),
                                       ),
                                       Text(
-                                        '\$${_total.toStringAsFixed(2)}',
+                                        CurrencyFormatter.formatToRupiah(_total),
                                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: AppTheme.gold,
@@ -668,6 +690,76 @@ class _CashierPageState extends State<CashierPage>
   }
 
   Widget _buildProductsView() {
+    if (_isLoadingProducts) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppTheme.gold),
+            SizedBox(height: 16),
+            Text('Loading products...'),
+          ],
+        ),
+      );
+    }
+
+    if (_productsError != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppTheme.destructive,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load products',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _productsError!,
+              style: const TextStyle(color: AppTheme.mutedForeground),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            CustomButton(
+              text: 'Retry',
+              icon: Icons.refresh,
+              onPressed: _loadProducts,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_filteredProducts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 64,
+              color: AppTheme.mutedForeground.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _searchController.text.isNotEmpty
+                  ? 'No products found'
+                  : 'No products available',
+              style: TextStyle(
+                color: AppTheme.mutedForeground,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: GridView.builder(
@@ -779,7 +871,7 @@ class _CashierPageState extends State<CashierPage>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Subtotal'),
-                    Text('\$${_subtotal.toStringAsFixed(2)}'),
+                    Text(CurrencyFormatter.formatToRupiah(_subtotal)),
                   ],
                 ),
                 if (_discount > 0) ...[
@@ -790,7 +882,7 @@ class _CashierPageState extends State<CashierPage>
                       const Text('Discount',
                           style: TextStyle(color: AppTheme.success)),
                       Text(
-                        '-\$${_discount.toStringAsFixed(2)}',
+                        CurrencyFormatter.formatToRupiah(_discount),
                         style: const TextStyle(color: AppTheme.success),
                       ),
                     ],
@@ -809,7 +901,7 @@ class _CashierPageState extends State<CashierPage>
                           ),
                     ),
                     Text(
-                      '\$${_total.toStringAsFixed(2)}',
+                      CurrencyFormatter.formatToRupiah(_total),
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppTheme.gold,

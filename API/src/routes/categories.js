@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const { uploadCategory, deleteFile } = require('../utils/upload');
+const { uploadCategory, deleteFile, validateUploadedImage } = require('../utils/upload');
 
 const router = express.Router();
 
@@ -49,11 +49,23 @@ router.post('/', requireRole(['admin', 'superadmin']), uploadCategory.single('ca
 
         if (!name) {
             if (req.file) {
-                deleteFile(`uploads/categories/${req.file.filename}`);
+                deleteFile(`API/uploads/categories/${req.file.filename}`);
             }
             return res.status(400).json({ 
                 error: 'Category name is required' 
             });
+        }
+
+        // Validate uploaded image (magic number check)
+        if (req.file) {
+            try {
+                const filePath = `API/uploads/categories/${req.file.filename}`;
+                validateUploadedImage(filePath, req.file.mimetype);
+            } catch (error) {
+                return res.status(400).json({ 
+                    error: error.message || 'Invalid image file' 
+                });
+            }
         }
 
         const categoryImage = req.file ? req.file.filename : null;
@@ -77,7 +89,7 @@ router.post('/', requireRole(['admin', 'superadmin']), uploadCategory.single('ca
 
     } catch (error) {
         if (req.file) {
-            deleteFile(`uploads/categories/${req.file.filename}`);
+            deleteFile(`API/uploads/categories/${req.file.filename}`);
         }
         console.error('Create category error:', error);
         res.status(500).json({ error: 'Failed to create category' });
@@ -91,7 +103,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
 
         if (!name) {
             if (req.file) {
-                deleteFile(`uploads/categories/${req.file.filename}`);
+                deleteFile(`API/uploads/categories/${req.file.filename}`);
             }
             return res.status(400).json({ 
                 error: 'Category name is required' 
@@ -106,9 +118,21 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
 
         if (oldCategories.length === 0) {
             if (req.file) {
-                deleteFile(`uploads/categories/${req.file.filename}`);
+                deleteFile(`API/uploads/categories/${req.file.filename}`);
             }
             return res.status(404).json({ error: 'Category not found' });
+        }
+
+        // Validate uploaded image (magic number check)
+        if (req.file) {
+            try {
+                const filePath = `API/uploads/categories/${req.file.filename}`;
+                validateUploadedImage(filePath, req.file.mimetype);
+            } catch (error) {
+                return res.status(400).json({ 
+                    error: error.message || 'Invalid image file' 
+                });
+            }
         }
 
         const categoryImage = req.file ? req.file.filename : oldCategories[0].category_image;
@@ -120,14 +144,14 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
 
         if (result.affectedRows === 0) {
             if (req.file) {
-                deleteFile(`uploads/categories/${req.file.filename}`);
+                deleteFile(`API/uploads/categories/${req.file.filename}`);
             }
             return res.status(404).json({ error: 'Category not found' });
         }
 
         // Delete old image if new one was uploaded
         if (req.file && oldCategories[0].category_image) {
-            deleteFile(`uploads/categories/${oldCategories[0].category_image}`);
+            deleteFile(`API/uploads/categories/${oldCategories[0].category_image}`);
         }
 
         // Get updated category
@@ -143,7 +167,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
 
     } catch (error) {
         if (req.file) {
-            deleteFile(`uploads/categories/${req.file.filename}`);
+            deleteFile(`API/uploads/categories/${req.file.filename}`);
         }
         console.error('Update category error:', error);
         res.status(500).json({ error: 'Failed to update category' });
@@ -186,7 +210,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
 
         // Delete category image if exists
         if (categories[0].category_image) {
-            deleteFile(`uploads/categories/${categories[0].category_image}`);
+            deleteFile(`API/uploads/categories/${categories[0].category_image}`);
         }
 
         res.json({ message: 'Category deleted successfully' });

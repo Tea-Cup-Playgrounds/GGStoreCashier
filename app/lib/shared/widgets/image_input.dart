@@ -36,15 +36,46 @@ class ImageInputState extends State<ImageInput> {
   // ================= IMAGE PICK =================
 
   Future<void> _pickImage(ImageSource source) async {
-    final XFile? picked = await _picker.pickImage(
-      source: source,
-      imageQuality: 80,
-    );
+    try {
+      final XFile? picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 2048,
+        maxHeight: 2048,
+      );
 
-    if (picked != null) {
+      if (picked != null) {
+        // Validate file extension
+        final String extension = picked.path.toLowerCase().split('.').last;
+        final List<String> allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        
+        if (!allowedExtensions.contains(extension)) {
+          setState(() {
+            _errorText = 'Invalid file type. Only JPG, PNG, GIF, and WebP are allowed.';
+          });
+          return;
+        }
+
+        // Validate file size (5MB max)
+        final File file = File(picked.path);
+        final int fileSize = await file.length();
+        const int maxSize = 5 * 1024 * 1024; // 5MB
+        
+        if (fileSize > maxSize) {
+          setState(() {
+            _errorText = 'File size exceeds 5MB limit.';
+          });
+          return;
+        }
+
+        setState(() {
+          _errorText = null;
+          widget.onChanged(file);
+        });
+      }
+    } catch (e) {
       setState(() {
-        _errorText = null;
-        widget.onChanged(File(picked.path));
+        _errorText = 'Failed to pick image. Please try again.';
       });
     }
   }

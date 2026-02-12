@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/cart_item.dart';
+import '../../../../core/helper/currency_formatter.dart';
 
 class CartItemWidget extends StatelessWidget {
   final CartItem cartItem;
@@ -41,7 +42,7 @@ class CartItemWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '\$${cartItem.subtotal.toStringAsFixed(2)}',
+                  CurrencyFormatter.formatToRupiah(cartItem.subtotal),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: AppTheme.gold,
                         fontWeight: FontWeight.bold,

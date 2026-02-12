@@ -117,7 +117,7 @@ app.use(express.json({
 app.use(cookieParser());
 app.use(morgan('dev'));
 
-// Serve static files from uploads directory
+// Serve static files from uploads directory (inside API folder)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 const limiter = rateLimit({

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
+import '../../../../core/helper/currency_formatter.dart';
 // import '../../../../shared/widgets/bottom_navigation.dart';
 
 class PaymentSuccessView extends StatefulWidget {
@@ -186,7 +187,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '\$${widget.total.toStringAsFixed(2)}',
+                          CurrencyFormatter.formatToRupiah(widget.total),
                           style: Theme.of(context)
                               .textTheme
                               .displayMedium

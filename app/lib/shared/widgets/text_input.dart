@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class TextInput extends StatelessWidget {
   final String label;
@@ -13,6 +14,7 @@ class TextInput extends StatelessWidget {
   final Widget? suffixIcon;
   final bool obscureText;
   final void Function(String)? onChanged;
+  final List<TextInputFormatter>? inputFormatters;
 
   const TextInput({
     super.key,
@@ -28,6 +30,7 @@ class TextInput extends StatelessWidget {
     this.suffixIcon,
     this.obscureText = false,
     this.onChanged,
+    this.inputFormatters,
   });
 
   @override
@@ -53,6 +56,7 @@ class TextInput extends StatelessWidget {
           readOnly: readOnly,
           obscureText: obscureText,
           validator: validator,
+          inputFormatters: inputFormatters,
           style: Theme.of(context).textTheme.bodyMedium,
           decoration: InputDecoration(
             hintText: hintText,

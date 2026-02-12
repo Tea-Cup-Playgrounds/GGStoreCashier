@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Feb 10, 2026 at 01:16 PM
+-- Generation Time: Feb 12, 2026 at 11:53 AM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -79,6 +79,13 @@ CREATE TABLE `categories` (
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+--
+-- Dumping data for table `categories`
+--
+
+INSERT INTO `categories` (`id`, `name`, `description`, `category_image`, `created_at`, `updated_at`) VALUES
+(1, 'Kategori 1', 'Kategori 1', NULL, '2026-02-11 22:14:32', '2026-02-11 22:14:32');
+
 -- --------------------------------------------------------
 
 --
@@ -111,6 +118,13 @@ CREATE TABLE `products` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `products`
+--
+
+INSERT INTO `products` (`id`, `name`, `barcode`, `category_id`, `sell_price`, `stock`, `product_image`, `branch_id`, `created_at`, `updated_at`) VALUES
+(1, 'Udin Din Din Dun Udin', 'GG1770897114723129', 1, 150000.00, 500, NULL, 3, '2026-02-12 19:51:54', '2026-02-12 19:51:54');
 
 -- --------------------------------------------------------
 
@@ -323,7 +337,7 @@ ALTER TABLE `branches`
 -- AUTO_INCREMENT for table `categories`
 --
 ALTER TABLE `categories`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `payments`
@@ -335,7 +349,7 @@ ALTER TABLE `payments`
 -- AUTO_INCREMENT for table `products`
 --
 ALTER TABLE `products`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `returns`

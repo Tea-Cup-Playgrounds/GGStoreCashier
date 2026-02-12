@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
+import '../../../../core/helper/currency_formatter.dart';
+import '../../../../core/services/product_service.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -37,11 +40,40 @@ class ProductCard extends StatelessWidget {
               ),
               child: Stack(
                 children: [
-                  Image.asset(
-                    'assets/products/example.jpg',
-                    width: 500,
-                    height: 500,
-                    fit: BoxFit.cover,
+                  // Product Image with network support
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                    child: product.image != null && product.image!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: ProductService.getProductImageUrl(product.image),
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: AppTheme.muted.withOpacity(0.3),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppTheme.gold,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Image.asset(
+                              ProductService.getPlaceholderImage(),
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Image.asset(
+                            ProductService.getPlaceholderImage(),
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
                   ),
 
                   // Stock status badge
@@ -116,10 +148,9 @@ class ProductCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      SizedBox(
-                        width: 120,
+                      Expanded(
                         child: Text(
-                          '\$${product.sellPrice.toStringAsFixed(2)}',
+                          CurrencyFormatter.formatToRupiah(product.sellPrice),
                           overflow: TextOverflow.ellipsis,
                           style:
                               Theme.of(context).textTheme.titleMedium?.copyWith(

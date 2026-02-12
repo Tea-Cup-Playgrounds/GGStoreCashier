@@ -218,7 +218,7 @@ router.get('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
 // Create new user (admin/superadmin only, with branch restrictions)
 router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     try {
-        const { name, username, password, role, branch_id } = req.body;
+        const { name, username, password, role, branch_id, branch_name } = req.body;
 
         // Input validation
         if (!name || !username || !password) {
@@ -232,8 +232,38 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         const sanitizedUsername = sanitizeInput(username);
         const sanitizedRole = role || 'karyawan';
 
-        // Admin can only create users for their own branch
+        // Handle branch - either use existing branch_id or create new branch from branch_name
         let userBranchId = branch_id;
+        
+        // If branch_name is provided and no branch_id, create new branch (superadmin only)
+        if (branch_name && !branch_id) {
+            if (req.user.role !== 'superadmin') {
+                return res.status(403).json({ 
+                    error: 'Only superadmin can create new branches' 
+                });
+            }
+
+            const sanitizedBranchName = sanitizeInput(branch_name);
+            
+            // Check if branch with this name already exists
+            const [existingBranches] = await pool.execute(
+                'SELECT id FROM branches WHERE name = ?',
+                [sanitizedBranchName]
+            );
+
+            if (existingBranches.length > 0) {
+                userBranchId = existingBranches[0].id;
+            } else {
+                // Create new branch
+                const [branchResult] = await pool.execute(
+                    'INSERT INTO branches (name) VALUES (?)',
+                    [sanitizedBranchName]
+                );
+                userBranchId = branchResult.insertId;
+            }
+        }
+
+        // Admin can only create users for their own branch
         if (req.user.role === 'admin') {
             userBranchId = req.user.branch_id;
         }
@@ -316,7 +346,7 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
 router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
-        const { name, username, password, role, branch_id } = req.body;
+        const { name, username, password, role, branch_id, branch_name } = req.body;
 
         if (!userId || isNaN(userId)) {
             return res.status(400).json({ error: 'Valid user ID is required' });
@@ -346,6 +376,37 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
 
         const updates = [];
         const params = [];
+
+        // Handle branch - either use existing branch_id or create new branch from branch_name
+        let userBranchId = branch_id;
+        
+        // If branch_name is provided and no branch_id, create new branch (superadmin only)
+        if (branch_name && !branch_id) {
+            if (req.user.role !== 'superadmin') {
+                return res.status(403).json({ 
+                    error: 'Only superadmin can create new branches' 
+                });
+            }
+
+            const sanitizedBranchName = sanitizeInput(branch_name);
+            
+            // Check if branch with this name already exists
+            const [existingBranches] = await pool.execute(
+                'SELECT id FROM branches WHERE name = ?',
+                [sanitizedBranchName]
+            );
+
+            if (existingBranches.length > 0) {
+                userBranchId = existingBranches[0].id;
+            } else {
+                // Create new branch
+                const [branchResult] = await pool.execute(
+                    'INSERT INTO branches (name) VALUES (?)',
+                    [sanitizedBranchName]
+                );
+                userBranchId = branchResult.insertId;
+            }
+        }
 
         // Validate and update name
         if (name !== undefined) {
@@ -420,14 +481,14 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         }
 
         // Update branch_id (admin cannot change branch)
-        if (branch_id !== undefined) {
+        if (userBranchId !== undefined || branch_id !== undefined) {
             if (req.user.role === 'admin') {
                 return res.status(403).json({ 
                     error: 'You do not have permission to change user branch' 
                 });
             }
             updates.push('branch_id = ?');
-            params.push(branch_id);
+            params.push(userBranchId || branch_id);
         }
 
         if (updates.length === 0) {
