@@ -89,6 +89,8 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
   }
 
   Future<void> _submitForm() async {
+    FocusScope.of(context).unfocus();
+    
     if (!_formKey.currentState!.validate()) {
       return;
     }
