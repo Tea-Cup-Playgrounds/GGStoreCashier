@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flutter (Mobile App via FVM)",
+            "cwd": "app",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart"
+        },
+        {
+            "name": "Express API",
+            "request": "launch",
+            "type": "node",
+            "program": "API/src/server.js", 
+            "console": "integratedTerminal"
+        }
+    ]
+}
