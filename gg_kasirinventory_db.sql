@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.2
+-- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Feb 12, 2026 at 11:53 AM
--- Server version: 8.0.30
--- PHP Version: 8.1.10
+-- Waktu pembuatan: 05 Mar 2026 pada 18.44
+-- Versi server: 8.0.30
+-- Versi PHP: 8.2.27
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,13 +18,13 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `gg_kasir_db`
+-- Database: `gg_kasirinventory_db`
 --
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `absensi`
+-- Struktur dari tabel `absensi`
 --
 
 CREATE TABLE `absensi` (
@@ -40,7 +40,7 @@ CREATE TABLE `absensi` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `branches`
+-- Struktur dari tabel `branches`
 --
 
 CREATE TABLE `branches` (
@@ -53,7 +53,7 @@ CREATE TABLE `branches` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Dumping data for table `branches`
+-- Dumping data untuk tabel `branches`
 --
 
 INSERT INTO `branches` (`id`, `name`, `address`, `phone`, `created_at`, `updated_at`) VALUES
@@ -67,29 +67,30 @@ INSERT INTO `branches` (`id`, `name`, `address`, `phone`, `created_at`, `updated
 -- --------------------------------------------------------
 
 --
--- Table structure for table `categories`
+-- Struktur dari tabel `categories`
 --
 
 CREATE TABLE `categories` (
   `id` int NOT NULL,
   `name` varchar(100) NOT NULL,
   `description` text,
-  `category_image` varchar(30) DEFAULT NULL,
+  `category_image` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Dumping data for table `categories`
+-- Dumping data untuk tabel `categories`
 --
 
 INSERT INTO `categories` (`id`, `name`, `description`, `category_image`, `created_at`, `updated_at`) VALUES
-(1, 'Kategori 1', 'Kategori 1', NULL, '2026-02-11 22:14:32', '2026-02-11 22:14:32');
+(1, 'Kategori 1', 'Kategori 1', NULL, '2026-02-11 22:14:32', '2026-02-11 22:14:32'),
+(2, 'Jarum suntik', 'Suntik jarum', 'category-1772631598528-915163963.jpg', '2026-03-04 21:39:58', '2026-03-04 21:39:58');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `payments`
+-- Struktur dari tabel `payments`
 --
 
 CREATE TABLE `payments` (
@@ -103,7 +104,7 @@ CREATE TABLE `payments` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `products`
+-- Struktur dari tabel `products`
 --
 
 CREATE TABLE `products` (
@@ -113,23 +114,27 @@ CREATE TABLE `products` (
   `category_id` int DEFAULT NULL,
   `sell_price` decimal(12,2) NOT NULL,
   `stock` int DEFAULT '0',
-  `product_image` varchar(30) DEFAULT NULL,
+  `product_image` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `branch_id` int DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Dumping data for table `products`
+-- Dumping data untuk tabel `products`
 --
 
 INSERT INTO `products` (`id`, `name`, `barcode`, `category_id`, `sell_price`, `stock`, `product_image`, `branch_id`, `created_at`, `updated_at`) VALUES
-(1, 'Udin Din Din Dun Udin', 'GG1770897114723129', 1, 150000.00, 500, NULL, 3, '2026-02-12 19:51:54', '2026-02-12 19:51:54');
+(1, 'Udin Din Din Dun Udin', 'GG1770897114723129', 1, 150000.00, 500, NULL, 3, '2026-02-12 19:51:54', '2026-02-12 19:51:54'),
+(2, 'Kondum', 'GG1772631460711745', 1, 200000.00, 20, 'product-1772631460697-173452688.jpeg', 2, '2026-03-04 21:37:40', '2026-03-04 21:37:40'),
+(3, 'Kundum', 'GG1772631693324519', 2, 200000.00, 200, 'product-1772631693267-272071632.png', 2, '2026-03-04 21:41:33', '2026-03-04 21:41:33'),
+(4, 'HP', 'GG1772679164077506', NULL, 20000.00, 2000, 'product-1772679164052-907495323.jpg', 2, '2026-03-05 10:52:44', '2026-03-05 10:52:44'),
+(5, 'HP', 'GG1772689681487861', 2, 20000.00, 20000, 'product-1772689681438-434182536.jpg', 2, '2026-03-05 13:48:01', '2026-03-05 13:48:01');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `returns`
+-- Struktur dari tabel `returns`
 --
 
 CREATE TABLE `returns` (
@@ -144,7 +149,7 @@ CREATE TABLE `returns` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `stock_movements`
+-- Struktur dari tabel `stock_movements`
 --
 
 CREATE TABLE `stock_movements` (
@@ -161,7 +166,7 @@ CREATE TABLE `stock_movements` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `transactions`
+-- Struktur dari tabel `transactions`
 --
 
 CREATE TABLE `transactions` (
@@ -179,7 +184,7 @@ CREATE TABLE `transactions` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `transaction_items`
+-- Struktur dari tabel `transaction_items`
 --
 
 CREATE TABLE `transaction_items` (
@@ -194,7 +199,7 @@ CREATE TABLE `transaction_items` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `users`
+-- Struktur dari tabel `users`
 --
 
 CREATE TABLE `users` (
@@ -209,7 +214,7 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Dumping data for table `users`
+-- Dumping data untuk tabel `users`
 --
 
 INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `branch_id`, `created_at`, `updated_at`) VALUES
@@ -223,7 +228,7 @@ INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `branch_id`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `vouchers`
+-- Struktur dari tabel `vouchers`
 --
 
 CREATE TABLE `vouchers` (
@@ -242,7 +247,7 @@ CREATE TABLE `vouchers` (
 --
 
 --
--- Indexes for table `absensi`
+-- Indeks untuk tabel `absensi`
 --
 ALTER TABLE `absensi`
   ADD PRIMARY KEY (`id`),
@@ -250,26 +255,26 @@ ALTER TABLE `absensi`
   ADD KEY `idx_branches_id` (`branches_id`) USING BTREE;
 
 --
--- Indexes for table `branches`
+-- Indeks untuk tabel `branches`
 --
 ALTER TABLE `branches`
   ADD PRIMARY KEY (`id`);
 
 --
--- Indexes for table `categories`
+-- Indeks untuk tabel `categories`
 --
 ALTER TABLE `categories`
   ADD PRIMARY KEY (`id`);
 
 --
--- Indexes for table `payments`
+-- Indeks untuk tabel `payments`
 --
 ALTER TABLE `payments`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_payment_transaction` (`transaction_id`);
 
 --
--- Indexes for table `products`
+-- Indeks untuk tabel `products`
 --
 ALTER TABLE `products`
   ADD PRIMARY KEY (`id`),
@@ -278,7 +283,7 @@ ALTER TABLE `products`
   ADD KEY `idx_products_branch` (`branch_id`);
 
 --
--- Indexes for table `returns`
+-- Indeks untuk tabel `returns`
 --
 ALTER TABLE `returns`
   ADD PRIMARY KEY (`id`),
@@ -286,7 +291,7 @@ ALTER TABLE `returns`
   ADD KEY `idx_returns_product` (`product_id`);
 
 --
--- Indexes for table `stock_movements`
+-- Indeks untuk tabel `stock_movements`
 --
 ALTER TABLE `stock_movements`
   ADD PRIMARY KEY (`id`),
@@ -294,7 +299,7 @@ ALTER TABLE `stock_movements`
   ADD KEY `idx_stock_product_branch` (`product_id`,`branch_id`);
 
 --
--- Indexes for table `transactions`
+-- Indeks untuk tabel `transactions`
 --
 ALTER TABLE `transactions`
   ADD PRIMARY KEY (`id`),
@@ -302,7 +307,7 @@ ALTER TABLE `transactions`
   ADD KEY `idx_transactions_branch` (`branch_id`);
 
 --
--- Indexes for table `transaction_items`
+-- Indeks untuk tabel `transaction_items`
 --
 ALTER TABLE `transaction_items`
   ADD PRIMARY KEY (`id`),
@@ -310,130 +315,130 @@ ALTER TABLE `transaction_items`
   ADD KEY `idx_ti_product` (`product_id`);
 
 --
--- Indexes for table `users`
+-- Indeks untuk tabel `users`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_users_branch` (`branch_id`);
 
 --
--- Indexes for table `vouchers`
+-- Indeks untuk tabel `vouchers`
 --
 ALTER TABLE `vouchers`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `code` (`code`);
 
 --
--- AUTO_INCREMENT for dumped tables
+-- AUTO_INCREMENT untuk tabel yang dibuang
 --
 
 --
--- AUTO_INCREMENT for table `branches`
+-- AUTO_INCREMENT untuk tabel `branches`
 --
 ALTER TABLE `branches`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
--- AUTO_INCREMENT for table `categories`
+-- AUTO_INCREMENT untuk tabel `categories`
 --
 ALTER TABLE `categories`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
--- AUTO_INCREMENT for table `payments`
+-- AUTO_INCREMENT untuk tabel `payments`
 --
 ALTER TABLE `payments`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `products`
+-- AUTO_INCREMENT untuk tabel `products`
 --
 ALTER TABLE `products`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
--- AUTO_INCREMENT for table `returns`
+-- AUTO_INCREMENT untuk tabel `returns`
 --
 ALTER TABLE `returns`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `stock_movements`
+-- AUTO_INCREMENT untuk tabel `stock_movements`
 --
 ALTER TABLE `stock_movements`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `transactions`
+-- AUTO_INCREMENT untuk tabel `transactions`
 --
 ALTER TABLE `transactions`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `transaction_items`
+-- AUTO_INCREMENT untuk tabel `transaction_items`
 --
 ALTER TABLE `transaction_items`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `users`
+-- AUTO_INCREMENT untuk tabel `users`
 --
 ALTER TABLE `users`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
--- AUTO_INCREMENT for table `vouchers`
+-- AUTO_INCREMENT untuk tabel `vouchers`
 --
 ALTER TABLE `vouchers`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
--- Constraints for dumped tables
+-- Ketidakleluasaan untuk tabel pelimpahan (Dumped Tables)
 --
 
 --
--- Constraints for table `payments`
+-- Ketidakleluasaan untuk tabel `payments`
 --
 ALTER TABLE `payments`
   ADD CONSTRAINT `fk_payments_transaction` FOREIGN KEY (`transaction_id`) REFERENCES `transactions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `products`
+-- Ketidakleluasaan untuk tabel `products`
 --
 ALTER TABLE `products`
   ADD CONSTRAINT `fk_products_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
--- Constraints for table `returns`
+-- Ketidakleluasaan untuk tabel `returns`
 --
 ALTER TABLE `returns`
   ADD CONSTRAINT `fk_returns_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_returns_transaction` FOREIGN KEY (`transaction_id`) REFERENCES `transactions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `stock_movements`
+-- Ketidakleluasaan untuk tabel `stock_movements`
 --
 ALTER TABLE `stock_movements`
   ADD CONSTRAINT `fk_stock_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_stock_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `transactions`
+-- Ketidakleluasaan untuk tabel `transactions`
 --
 ALTER TABLE `transactions`
   ADD CONSTRAINT `fk_transactions_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_transactions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 --
--- Constraints for table `transaction_items`
+-- Ketidakleluasaan untuk tabel `transaction_items`
 --
 ALTER TABLE `transaction_items`
   ADD CONSTRAINT `fk_ti_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_ti_transaction` FOREIGN KEY (`transaction_id`) REFERENCES `transactions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `users`
+-- Ketidakleluasaan untuk tabel `users`
 --
 ALTER TABLE `users`
   ADD CONSTRAINT `fk_users_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
