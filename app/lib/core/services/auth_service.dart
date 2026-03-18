@@ -44,7 +44,6 @@ class AuthService {
         print('Username: $username');
         print('API URL: ${ApiConfig.apiUrl}');
         print('Login Endpoint: ${ApiConfig.loginEndpoint}');
-        print('Current Environment: ${ApiConfig.currentEnvironment}');
       }
       
       final response = await _dio.post(

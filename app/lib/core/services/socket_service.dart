@@ -19,7 +19,7 @@ class SocketService {
       return;
     }
 
-    final baseUrl = ApiConfig.baseUrl.replaceAll('/api', '');
+    final baseUrl = ApiConfig.apiUrl.replaceAll('/api', '');
     
     debugPrint('Connecting to Socket.IO at: $baseUrl');
     

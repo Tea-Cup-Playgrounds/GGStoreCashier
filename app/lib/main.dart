@@ -6,8 +6,9 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/constants/app_constants.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await SystemChrome.setPreferredOrientations([
@@ -23,6 +24,8 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
+
+  await dotenv.load(fileName: ".env");
 
   runApp(
     const ProviderScope(

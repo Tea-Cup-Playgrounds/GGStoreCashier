@@ -12,6 +12,7 @@ class Product {
   final DateTime updatedAt;
   final String? image;
   final String? category;
+  final String? description; // 1. Tambahan Baru
 
   const Product({
     required this.id,
@@ -27,10 +28,10 @@ class Product {
     required this.updatedAt,
     this.image,
     this.category,
+    this.description, // 2. Tambahan Baru
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
-    // Helper function to parse price (handles both string and number)
     double parsePrice(dynamic value) {
       if (value == null) return 0.0;
       if (value is num) return value.toDouble();
@@ -52,6 +53,7 @@ class Product {
       updatedAt: DateTime.parse(json['updated_at'] as String),
       image: json['product_image'] as String?,
       category: json['category_name'] as String?,
+      description: json['description'] as String?, // 3. Tambahan Baru
     );
   }
 
@@ -70,6 +72,7 @@ class Product {
       'updated_at': updatedAt.toIso8601String(),
       'image': image,
       'category': category,
+      'description': description, // 4. Tambahan Baru
     };
   }
 
@@ -87,6 +90,7 @@ class Product {
     DateTime? updatedAt,
     String? image,
     String? category,
+    String? description, // 5. Tambahan Baru
   }) {
     return Product(
       id: id ?? this.id,
@@ -102,12 +106,13 @@ class Product {
       updatedAt: updatedAt ?? this.updatedAt,
       image: image ?? this.image,
       category: category ?? this.category,
+      description: description ?? this.description, // 6. Tambahan Baru
     );
   }
 
   bool get isLowStock => stock <= 5;
   bool get isOutOfStock => stock <= 0;
-  
+
   double get profitMargin => sellPrice - costPrice;
   double get profitPercentage => (profitMargin / costPrice) * 100;
 }

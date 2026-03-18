@@ -13,8 +13,6 @@ class ConnectivityTest {
       if (ApiConfig.enableLogging) {
         print('=== CONNECTIVITY TEST ===');
         print('Testing connection to: ${ApiConfig.testEndpoint}');
-        print('Current environment: ${ApiConfig.currentEnvironment}');
-        print('Available environments: ${ApiConfig.environments.keys.join(', ')}');
       }
       
       final response = await _dio.get(
@@ -38,7 +36,6 @@ class ConnectivityTest {
         print('Error: $e');
         print('Current API URL: ${ApiConfig.apiUrl}');
         print('Try changing the environment in ApiConfig.currentEnvironment');
-        print('Available options: ${ApiConfig.environments.keys.join(', ')}');
       }
       
       if (e is DioException) {

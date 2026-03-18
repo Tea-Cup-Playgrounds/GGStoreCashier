@@ -1,5 +1,6 @@
-import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/product.dart';
@@ -34,7 +35,17 @@ class ProductService {
     return prefs.getString('auth_token');
   }
 
-  /// Fetch all products with optional filters
+  static String getProductImageUrl(String? imageName) {
+    if (imageName == null || imageName.isEmpty) {
+      return '';
+    }
+    return '${ApiConfig.apiUrl}/uploads/products/$imageName';
+  }
+
+  static String getPlaceholderImage() {
+    return 'assets/products/example.jpg';
+  }
+
   static Future<List<Product>> getProducts({
     int? branchId,
     int? categoryId,
@@ -69,29 +80,82 @@ class ProductService {
         throw Exception('Failed to load products: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      if (ApiConfig.enableLogging) {
-        print('DioException in getProducts: ${e.message}');
-        print('Response: ${e.response?.data}');
-      }
       throw Exception('Network error: ${e.message}');
     } catch (e) {
-      if (ApiConfig.enableLogging) {
-        print('Error in getProducts: $e');
-      }
       rethrow;
     }
   }
 
-  /// Get product image URL
-  static String getProductImageUrl(String? imageName) {
-    if (imageName == null || imageName.isEmpty) {
-      return '';
-    }
-    return '${ApiConfig.apiUrl}/uploads/products/$imageName';
-  }
+  static Future<Product> getProductDetail(int productId) async {
+    _initializeDio();
 
-  /// Get a default placeholder image path
-  static String getPlaceholderImage() {
-    return 'assets/products/example.jpg';
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        throw Exception('No authentication token found');
+      }
+
+      final response = await _dio.get(
+        '/api/products/$productId',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['product'] ?? response.data;
+        return Product.fromJson(data);
+      } else {
+        throw Exception(
+            'Failed to load product detail: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw Exception('Network error: ${e.message}');
+    } catch (e) {
+      rethrow;
+    }
+  }
+static Future<Product> updateProduct({
+    required Product product, // Ubah parameter jadi objek Product utuh
+    required String name,
+    String? barcode,
+    required int stock,
+    required double sellPrice,
+    String? description,
+    File? imageFile,
+  }) async {
+    _initializeDio();
+    try {
+      final token = await _getToken();
+
+      final formData = FormData.fromMap({
+        'name': name,
+        'barcode': barcode ?? product.barcode,
+        'category_id': product.categoryId, // Kirim ID, bukan nama
+        'stock': stock,
+        'sell_price': sellPrice,
+        'branch_id': product.branchId, // WAJIB DIKIRIM agar tidak error 500
+        'description': description ?? '',
+        if (imageFile != null)
+          'product_image': await MultipartFile.fromFile(
+            imageFile.path,
+            filename: imageFile.path.split('/').last,
+            contentType: MediaType('image', 'jpeg'),
+          ),
+      });
+
+      final response = await _dio.put(
+        '/api/products/${product.id}',
+        data: formData,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          contentType: 'multipart/form-data',
+        ),
+      );
+
+      return Product.fromJson(response.data['product'] ?? response.data);
+    } catch (e) {
+      throw Exception('Network error updating product: $e');
+    }
   }
 }

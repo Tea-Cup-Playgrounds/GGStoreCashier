@@ -165,7 +165,7 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.network(
-                                  '${ApiConfig.baseUrl}/uploads/categories/${category['category_image']}',
+                                  '${ApiConfig.apiUrl}/uploads/categories/${category['category_image']}',
                                   width: 50,
                                   height: 50,
                                   fit: BoxFit.cover,

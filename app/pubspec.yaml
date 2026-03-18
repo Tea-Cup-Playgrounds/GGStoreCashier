@@ -47,6 +47,8 @@ dependencies:
   
   # Fonts
   google_fonts: ^6.2.1
+  flutter_dotenv: ^6.0.0
+  http_parser: ^4.1.2
 
 dev_dependencies:
   flutter_test:
@@ -60,5 +62,5 @@ flutter:
   
   assets:
     - assets/images/
-    # - assets/icons/
+    - .env
     - assets/products/

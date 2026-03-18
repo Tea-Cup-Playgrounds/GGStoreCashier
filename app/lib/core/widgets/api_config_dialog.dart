@@ -11,7 +11,7 @@ class ApiConfigDialog extends StatefulWidget {
 }
 
 class _ApiConfigDialogState extends State<ApiConfigDialog> {
-  String _selectedEnvironment = ApiConfig.currentEnvironment;
+  // String _selectedEnvironment = ApiConfig.currentEnvironment;
   bool _isTestingConnection = false;
   String? _connectionResult;
 
@@ -22,11 +22,11 @@ class _ApiConfigDialogState extends State<ApiConfigDialog> {
     });
 
     final isConnected = await ConnectivityTest.testConnection();
-    
+
     setState(() {
       _isTestingConnection = false;
-      _connectionResult = isConnected 
-          ? 'Connection successful!' 
+      _connectionResult = isConnected
+          ? 'Connection successful!'
           : 'Connection failed. Check console for details.';
     });
   }
@@ -48,9 +48,9 @@ class _ApiConfigDialogState extends State<ApiConfigDialog> {
             Text(
               'Current API URL:',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.foreground,
-                fontWeight: FontWeight.w600,
-              ),
+                    color: AppTheme.foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 8),
             Container(
@@ -64,69 +64,69 @@ class _ApiConfigDialogState extends State<ApiConfigDialog> {
               child: Text(
                 ApiConfig.apiUrl,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.gold,
-                  fontFamily: 'monospace',
-                ),
+                      color: AppTheme.gold,
+                      fontFamily: 'monospace',
+                    ),
               ),
             ),
             const SizedBox(height: 20),
             Text(
               'Available Environments:',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.foreground,
-                fontWeight: FontWeight.w600,
-              ),
+                    color: AppTheme.foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 8),
-            ...ApiConfig.environments.entries.map((entry) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: entry.key == _selectedEnvironment 
-                      ? AppTheme.gold.withOpacity(0.1)
-                      : AppTheme.muted,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: entry.key == _selectedEnvironment 
-                        ? AppTheme.gold
-                        : AppTheme.border,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entry.key,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.foreground,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            entry.value,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.mutedForeground,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (entry.key == _selectedEnvironment)
-                      const Icon(
-                        Icons.check_circle,
-                        color: AppTheme.gold,
-                        size: 20,
-                      ),
-                  ],
-                ),
-              );
-            }).toList(),
-            const SizedBox(height: 20),
+            // ...ApiConfig.environments.entries.map((entry) {
+            //   return Container(
+            //     margin: const EdgeInsets.only(bottom: 8),
+            //     padding: const EdgeInsets.all(12),
+            //     decoration: BoxDecoration(
+            //       color: entry.key == _selectedEnvironment
+            //           ? AppTheme.gold.withOpacity(0.1)
+            //           : AppTheme.muted,
+            //       borderRadius: BorderRadius.circular(8),
+            //       border: Border.all(
+            //         color: entry.key == _selectedEnvironment
+            //             ? AppTheme.gold
+            //             : AppTheme.border,
+            //       ),
+            //     ),
+            //     child: Row(
+            //       children: [
+            //         Expanded(
+            //           child: Column(
+            //             crossAxisAlignment: CrossAxisAlignment.start,
+            //             children: [
+            //               Text(
+            //                 entry.key,
+            //                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            //                   color: AppTheme.foreground,
+            //                   fontWeight: FontWeight.w600,
+            //                 ),
+            //               ),
+            //               Text(
+            //                 entry.value,
+            //                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            //                   color: AppTheme.mutedForeground,
+            //                   fontFamily: 'monospace',
+            //                 ),
+            //               ),
+            //             ],
+            //           ),
+            //         ),
+            //         if (entry.key == _selectedEnvironment)
+            //           const Icon(
+            //             Icons.check_circle,
+            //             color: AppTheme.gold,
+            //             size: 20,
+            //           ),
+            //       ],
+            //     ),
+            //   );
+            // }).toList(),
+            // const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -173,10 +173,10 @@ class _ApiConfigDialogState extends State<ApiConfigDialog> {
                 child: Text(
                   _connectionResult!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: _connectionResult!.contains('successful')
-                        ? AppTheme.success
-                        : AppTheme.destructive,
-                  ),
+                        color: _connectionResult!.contains('successful')
+                            ? AppTheme.success
+                            : AppTheme.destructive,
+                      ),
                 ),
               ),
             ],

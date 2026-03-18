@@ -1,56 +1,105 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/image_input.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
-import '../../../../core/theme/app_theme.dart';
-// import '../../../../shared/widgets/bottom_navigation.dart'; // Halaman Detail biasanya tidak memiliki BottomNav
+import 'package:gg_store_cashier/core/services/product_service.dart';
+import 'package:gg_store_cashier/core/models/product.dart';
 
 class InventoryDetailPage extends StatefulWidget {
   final String productId;
-  final bool image;
-  const InventoryDetailPage(
-      {super.key, required this.productId, this.image = false});
+  final bool isNewItem;
+
+  const InventoryDetailPage({
+    super.key,
+    required this.productId,
+    this.isNewItem = false,
+  });
 
   @override
   State<InventoryDetailPage> createState() => _InventoryDetailPageState();
 }
 
 class _InventoryDetailPageState extends State<InventoryDetailPage> {
-  final Map<String, dynamic> product = {
-    "id": 1,
-    "productName": "Signature Watch",
-    "category": 'Accessories',
-    "sku": "WAT-001",
-    "price": "299,99",
-    "stock": "29",
-    "description": "Premium stainless steel watch with gold accents",
-  };
-
   File? _pickedImage;
-  // final _imageKey = GlobalKey<ImageInputState>();
+  String? _imageUrl;
+  bool _isLoading = true;
+  bool _isSaving = false;
+  Product? _currentProduct;
+
   late TextEditingController _productNameController;
   late TextEditingController _skuController;
   late TextEditingController _categoryController;
   late TextEditingController _stockController;
   late TextEditingController _priceController;
   late TextEditingController _descriptionController;
-  String? imageUrl = "https://picsum.photos/seed/picsum/200/300";
 
   @override
   void initState() {
     super.initState();
+    _productNameController = TextEditingController();
+    _skuController = TextEditingController();
+    _categoryController = TextEditingController();
+    _stockController = TextEditingController();
+    _priceController = TextEditingController();
+    _descriptionController = TextEditingController();
 
-    _productNameController =
-        TextEditingController(text: product["productName"]);
-    _skuController = TextEditingController(text: product["sku"]);
-    _categoryController = TextEditingController(text: product["category"]);
-    _stockController = TextEditingController(text: product["stock"]);
-    _priceController = TextEditingController(text: product["price"]);
-    _descriptionController =
-        TextEditingController(text: product["description"]);
+    if (!widget.isNewItem) {
+      _loadProductData();
+    } else {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadProductData() async {
+    try {
+      setState(() => _isLoading = true);
+
+      final product =
+          await ProductService.getProductDetail(int.parse(widget.productId));
+
+      setState(() {
+        _currentProduct = product;
+        _productNameController.text = product.name;
+        _skuController.text = product.barcode ?? '';
+        _categoryController.text = product.category ?? '';
+        _stockController.text = product.stock.toString();
+        _priceController.text = product.sellPrice.toString();
+        _descriptionController.text = product.description ?? '';
+        _imageUrl = ProductService.getProductImageUrl(product.image);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      SnackBarService.error("Gagal memuat detail produk: $e");
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    if (_currentProduct == null) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await ProductService.updateProduct(
+        product: _currentProduct!,
+        name: _productNameController.text.trim(),
+        barcode: _skuController.text.trim(),
+        stock: int.tryParse(_stockController.text.trim()) ?? 0,
+        sellPrice: double.tryParse(_priceController.text.trim()) ?? 0.0,
+        description: _descriptionController.text.trim(),
+        imageFile: _pickedImage,
+      );
+
+      SnackBarService.success("Berhasil disimpan!");
+      Navigator.pop(context, true);
+    } catch (e) {
+      SnackBarService.error("Gagal: $e");
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -69,180 +118,118 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        // Tombol kembali otomatis
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // Judul dan Subtitle Kustom
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Edit Item',
+              widget.isNewItem ? 'Add Item' : 'Edit Item',
               style: Theme.of(context).textTheme.headlineMedium!.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
             ),
             Text(
-              widget
-                  .productId, // Menggunakan productId (WAT-001) sebagai subtitle
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(),
+              "ID: ${widget.productId}",
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
-          // Tombol Hapus (Warna Destructive)
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppTheme.destructive),
-            onPressed: () {
-              // TODO: Aksi Hapus Item
-            },
-          ),
+          if (!widget.isNewItem)
+            IconButton(
+              icon:
+                  const Icon(Icons.delete_outline, color: AppTheme.destructive),
+              onPressed: () {
+                // TODO: Implementasi Delete
+              },
+            ),
           const SizedBox(width: 8.0),
         ],
       ),
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Gambar Produk
-            // const Icon(Icons.photo_album_rounded),
-            widget.image
-                ? ImageInput(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ImageInput(
                     file: _pickedImage,
+                    imageUrl: _imageUrl,
                     onChanged: (file) {
                       setState(() => _pickedImage = file);
                     },
+                  ),
+                  const SizedBox(height: 32),
+                  TextInput(
+                    label: 'Product Name',
+                    hintText: "Masukkan nama product",
+                    controller: _productNameController,
+                  ),
+                  const SizedBox(height: 16.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextInput(
+                          label: 'SKU',
+                          hintText: "Masukkan SKU",
+                          controller: _skuController,
+                        ),
+                      ),
+                      const SizedBox(width: 16.0),
+                      Expanded(
+                        child: TextInput(
+                          label: 'Category',
+                          hintText: "Masukkan Category",
+                          controller: _categoryController,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextInput(
+                          label: 'Stock Quantity',
+                          hintText: "Masukkan Quantity",
+                          keyboardType: TextInputType.number,
+                          controller: _stockController,
+                        ),
+                      ),
+                      const SizedBox(width: 16.0),
+                      Expanded(
+                        child: TextInput(
+                          label: 'Price',
+                          hintText: "Masukkan Price",
+                          keyboardType: TextInputType.number,
+                          controller: _priceController,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16.0),
+                  TextInput(
+                    label: 'Description',
+                    hintText: "Masukkan Description",
+                    controller: _descriptionController,
+                    maxLines: 5,
+                  ),
+                  const SizedBox(height: 30),
+                  CustomButton(
+                    text: _isSaving ? "Saving..." : "Save Changes",
+                    size: ButtonSize.large,
+                    onPressed: _isSaving ? null : _saveChanges,
+                    fullWidth: true,
                   )
-                : ImageInput(
-                    file: _pickedImage,
-                    imageUrl: imageUrl,
-                    onChanged: (file) {
-                      setState(() => _pickedImage = file);
-                    },
-                  ),
-            // 2. Form Input
-            // Product Name
-            const SizedBox(height: 32),
-            TextInput(
-              label: 'Product Name',
-              hintText: "Masukkan nama product",
-              controller: _productNameController,
+                ],
+              ),
             ),
-            const SizedBox(
-              height: 16.0,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextInput(
-                    label: 'SKU',
-                    hintText: "Masukkan SKU",
-                    controller: _skuController,
-                  ),
-                ),
-                const SizedBox(
-                  width: 16.0,
-                ),
-                Expanded(
-                  child: TextInput(
-                    label: 'Category',
-                    hintText: "Masukkan Category",
-                    controller: _categoryController,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(
-              height: 16.0,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextInput(
-                    label: 'Stock Quantity',
-                    hintText: "Masukkan Quatity",
-                    controller: _stockController,
-                  ),
-                ),
-                const SizedBox(
-                  width: 16.0,
-                ),
-                Expanded(
-                  child: TextInput(
-                    label: 'Price',
-                    hintText: "Masukkan Price",
-                    controller: _priceController,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(
-              height: 16.0,
-            ),
-            TextInput(
-              label: 'Description',
-              hintText: "Masukkan Description",
-              controller: _descriptionController,
-              maxLines: 5,
-            ),
-            const SizedBox(
-              height: 32,
-            ),
-            // Tombol Save (Contoh Aksi)
-            CustomButton(
-              text: "Saves Changes",
-              size: ButtonSize.large,
-              onPressed: () {
-                SnackBarService.success("Saves changed!");
-              },
-              fullWidth: true,
-            )
-          ],
-        ),
-      ),
-      // Halaman detail tidak menggunakan BottomNavigation
-      // bottomNavigationBar: const BottomNavigation(),
-    );
-  }
-
-  // Helper Widget untuk Label Form
-  Widget _buildLabel(BuildContext context, String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.titleMedium!.copyWith(
-              color: AppTheme.foreground,
-              fontWeight: FontWeight.w500,
-            ),
-      ),
-    );
-  }
-
-  // Helper Widget untuk TextFormField
-  Widget _buildTextField(
-    BuildContext context, {
-    required String initialValue,
-    int maxLines = 1,
-    TextInputType keyboardType = TextInputType.text,
-    bool readOnly = false,
-  }) {
-    // Menggunakan TextFormField untuk mendapatkan styling dari ThemeData
-    return TextFormField(
-      initialValue: initialValue,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      readOnly: readOnly,
-      style: Theme.of(context).textTheme.bodyMedium,
-      decoration: const InputDecoration(
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      ),
     );
   }
 }
