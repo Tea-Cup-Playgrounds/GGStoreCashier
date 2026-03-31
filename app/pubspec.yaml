@@ -44,11 +44,13 @@ dependencies:
   # Utils
   intl: ^0.19.0
   uuid: ^4.5.1
-  
+
   # Fonts
   google_fonts: ^6.2.1
   flutter_dotenv: ^6.0.0
   http_parser: ^4.1.2
+  image_cropper: ^12.1.1
+  audioplayers: ^6.6.0
 
 dev_dependencies:
   flutter_test:
@@ -62,5 +64,6 @@ flutter:
   
   assets:
     - assets/images/
-    - .env
     - assets/products/
+    - assets/payment_success.mp3
+    - .env

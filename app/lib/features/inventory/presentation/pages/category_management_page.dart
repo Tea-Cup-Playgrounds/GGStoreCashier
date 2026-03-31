@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart' as http_parser;
 import '../../../../core/config/api_config.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/provider/auth_provider.dart';
@@ -35,7 +36,7 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
       ));
 
       final response = await dio.get('/api/categories');
@@ -91,7 +92,7 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
       ));
 
       await dio.delete('/api/categories/$id');
@@ -270,7 +271,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
       ));
 
       final formData = FormData.fromMap({
@@ -279,11 +280,15 @@ class _CategoryDialogState extends State<_CategoryDialog> {
       });
 
       if (_categoryImage != null) {
+        final filename = _categoryImage!.path.split('/').last;
+        final ext = filename.split('.').last.toLowerCase();
+        final mimeType = ext == 'png' ? 'image/png' : 'image/jpeg';
         formData.files.add(MapEntry(
           'category_image',
           await MultipartFile.fromFile(
             _categoryImage!.path,
-            filename: _categoryImage!.path.split('/').last,
+            filename: filename,
+            contentType: http_parser.MediaType.parse(mimeType),
           ),
         ));
       }

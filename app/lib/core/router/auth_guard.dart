@@ -7,50 +7,41 @@ import '../models/user.dart';
 import 'role_guard.dart';
 
 class AuthGuard {
-  /// Main redirect logic with session validation
+  /// Main redirect logic — uses local token check only, no network call
   static Future<String?> redirectLogic(BuildContext context, GoRouterState state) async {
-    // Check if user is authenticated
-    final isAuthenticated = await AuthService.isAuthenticated();
-    
+    // Use local token check only — avoids network call on every navigation
+    final token = await AuthService.getToken();
+    final isAuthenticated = token != null;
+
     final isLoginRoute = state.matchedLocation == '/';
-    
+
     if (!isAuthenticated && !isLoginRoute) {
-      // User is not authenticated and trying to access protected route
-      // Clear any stale session data
-      await AuthService.logout();
       return '/';
     }
-    
+
     if (isAuthenticated && isLoginRoute) {
-      // User is authenticated but on login page, redirect to home
       return '/home';
     }
-    
-    // Validate session and check role-based access
+
     if (isAuthenticated && !isLoginRoute) {
       try {
         final user = await AuthService.getCurrentUser();
-        
-        // Validate user session is still valid
+
         if (user == null) {
           await AuthService.logout();
           return '/';
         }
-        
-        // Check role-based access for specific routes
+
         final hasAccess = await _checkRouteAccess(state.matchedLocation, user);
         if (!hasAccess) {
-          // Redirect to home if user doesn't have access
           return '/home';
         }
       } catch (e) {
-        // Session validation failed, logout and redirect to login
         await AuthService.logout();
         return '/';
       }
     }
-    
-    // No redirect needed
+
     return null;
   }
 

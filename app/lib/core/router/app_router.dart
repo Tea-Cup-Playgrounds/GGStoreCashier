@@ -40,6 +40,23 @@ mixin AppRouter {
     navigatorKey: _rootNavigatorkey,
     initialLocation: login,
     redirect: AuthGuard.redirectLogic,
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Page not found', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => router.go(login),
+              child: const Text('Go to Login'),
+            ),
+          ],
+        ),
+      ),
+    ),
     routes: <RouteBase>[
       //  YG GK KENAK LAYOUT BOTTOM NAVBAR TARUH SINI ATAU DILUAR SHELL
       GoRoute(

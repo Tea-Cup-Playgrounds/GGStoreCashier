@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 
@@ -33,9 +34,10 @@ class ImageInputState extends State<ImageInput> {
 
   bool get _hasImage => widget.file != null || widget.imageUrl != null;
 
-  // ================= IMAGE PICK =================
+  // ================= IMAGE PICK + CROP =================
 
   Future<void> _pickImage(ImageSource source) async {
+    debugPrint('[ImageInput] _pickImage called, source: $source');
     try {
       final XFile? picked = await _picker.pickImage(
         source: source,
@@ -44,39 +46,72 @@ class ImageInputState extends State<ImageInput> {
         maxHeight: 2048,
       );
 
-      if (picked != null) {
-        // Validate file extension
-        final String extension = picked.path.toLowerCase().split('.').last;
-        final List<String> allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-        
-        if (!allowedExtensions.contains(extension)) {
-          setState(() {
-            _errorText = 'Invalid file type. Only JPG, PNG, GIF, and WebP are allowed.';
-          });
+      debugPrint('[ImageInput] picker result: ${picked?.path ?? 'null'}');
+      if (picked == null) return;
+
+      // Validate extension — be lenient on Android where camera paths vary
+      final String extension = picked.path.toLowerCase().split('.').last;
+      final bool hasKnownExtension = ['jpg', 'jpeg', 'png'].contains(extension);
+      // Only reject if there's a clear non-image extension (not just an unknown temp path)
+      if (!hasKnownExtension && extension.length <= 5 && extension.isNotEmpty) {
+        // Check MIME type from XFile as fallback
+        final String? mime = picked.mimeType;
+        if (mime != null && !mime.startsWith('image/')) {
+          setState(() => _errorText = 'Invalid file type. Only JPG and PNG are allowed.');
           return;
         }
-
-        // Validate file size (5MB max)
-        final File file = File(picked.path);
-        final int fileSize = await file.length();
-        const int maxSize = 5 * 1024 * 1024; // 5MB
-        
-        if (fileSize > maxSize) {
-          setState(() {
-            _errorText = 'File size exceeds 5MB limit.';
-          });
-          return;
-        }
-
-        setState(() {
-          _errorText = null;
-          widget.onChanged(file);
-        });
       }
-    } catch (e) {
+
+      // Crop the image
+      final CroppedFile? cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Image',
+            toolbarColor: AppTheme.gold,
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: AppTheme.gold,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: 'Crop Image',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+          ),
+          WebUiSettings(
+            context: context,
+            presentStyle: WebPresentStyle.dialog,
+          ),
+        ],
+      );
+
+      if (cropped == null) {
+        debugPrint('[ImageInput] crop cancelled');
+        return;
+      }
+
+      final File file = File(cropped.path);
+
+      // Validate file size (5MB max)
+      final int fileSize = await file.length();
+      const int maxSize = 5 * 1024 * 1024;
+      debugPrint('[ImageInput] file size: ${(fileSize / 1024).toStringAsFixed(1)} KB');
+
+      if (fileSize > maxSize) {
+        setState(() => _errorText = 'File size exceeds 5MB limit.');
+        return;
+      }
+
+      debugPrint('[ImageInput] image accepted, calling onChanged');
       setState(() {
-        _errorText = 'Failed to pick image. Please try again.';
+        _errorText = null;
+        widget.onChanged(file);
       });
+    } catch (e, stack) {
+      debugPrint('[ImageInput] ERROR picking image: $e');
+      debugPrint('[ImageInput] stack: $stack');
+      setState(() => _errorText = 'Failed to pick image: $e');
     }
   }
 
@@ -155,8 +190,6 @@ class ImageInputState extends State<ImageInput> {
             dashPattern: const [6, 4],
             borderType: BorderType.RRect,
             radius: const Radius.circular(20),
-
-            /// 🔑 IMPORTANT FIX (ANTI WHITE ARTIFACT)
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Container(
@@ -166,8 +199,6 @@ class ImageInputState extends State<ImageInput> {
                 child: Stack(
                   children: [
                     _buildImage(),
-
-                    /// REMOVE BUTTON
                     if (_hasImage)
                       Positioned(
                         top: 12,
@@ -228,9 +259,7 @@ class ImageInputState extends State<ImageInput> {
         fit: BoxFit.cover,
         loadingBuilder: (_, child, progress) {
           if (progress == null) return child;
-          return const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
         },
         errorBuilder: (_, __, ___) {
           return const Center(
@@ -244,7 +273,6 @@ class ImageInputState extends State<ImageInput> {
       );
     }
 
-    /// EMPTY STATE
     return const Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,

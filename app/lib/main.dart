@@ -25,7 +25,9 @@ Future<void> main() async {
     ),
   );
 
-  await dotenv.load(fileName: ".env");
+  await dotenv.load(fileName: ".env").catchError((_) {
+    // .env not found — app will use fallback values from ApiConfig
+  });
 
   runApp(
     const ProviderScope(

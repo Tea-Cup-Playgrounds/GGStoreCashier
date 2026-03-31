@@ -57,6 +57,7 @@ class TextInput extends StatelessWidget {
           obscureText: obscureText,
           validator: validator,
           inputFormatters: inputFormatters,
+          scrollPadding: const EdgeInsets.only(bottom: 120),
           style: Theme.of(context).textTheme.bodyMedium,
           decoration: InputDecoration(
             hintText: hintText,

@@ -48,5 +48,10 @@ app.*.map.json
 # Local machine-specific properties (should not be committed)
 **/android/local.properties
 
+# Environment variables (use .env.example as template)
+.env
+
 # FVM Version Cache
 .fvm/
+
+API\uploads\products

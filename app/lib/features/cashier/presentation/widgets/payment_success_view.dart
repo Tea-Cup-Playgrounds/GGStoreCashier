@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../core/helper/currency_formatter.dart';
-// import '../../../../shared/widgets/bottom_navigation.dart';
 
 class PaymentSuccessView extends StatefulWidget {
   final double total;
   final Map<String, dynamic>? appliedCoupon;
+  final int? transactionId;
   final VoidCallback onNewTransaction;
 
   const PaymentSuccessView({
     super.key,
     required this.total,
     this.appliedCoupon,
+    this.transactionId,
     required this.onNewTransaction,
   });
 
@@ -27,6 +30,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
   late Animation<double> _scaleAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -76,12 +80,14 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
     Future.delayed(const Duration(milliseconds: 200), () {
       _slideController.forward();
     });
+    _audioPlayer.play(AssetSource('payment_success.mp3'));
   }
 
   @override
   void dispose() {
     _scaleController.dispose();
     _slideController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -217,6 +223,15 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                             ),
                           ),
                         ],
+                        if (widget.transactionId != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Transaction #${widget.transactionId}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.mutedForeground,
+                                ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -230,11 +245,24 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                 position: _slideAnimation,
                 child: FadeTransition(
                   opacity: _fadeAnimation,
-                  child: CustomButton(
-                    text: 'New Transaction',
-                    onPressed: widget.onNewTransaction,
-                    fullWidth: true,
-                    size: ButtonSize.extraLarge,
+                  child: Column(
+                    children: [
+                      CustomButton(
+                        text: 'New Transaction',
+                        onPressed: widget.onNewTransaction,
+                        fullWidth: true,
+                        size: ButtonSize.extraLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      CustomButton(
+                        text: 'Back to Home',
+                        variant: ButtonVariant.outline,
+                        icon: Icons.home_outlined,
+                        onPressed: () => context.go('/home'),
+                        fullWidth: true,
+                        size: ButtonSize.large,
+                      ),
+                    ],
                   ),
                 ),
               ),

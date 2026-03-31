@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node API/src/server.js",
-    "dev": "nodemon API/src/server.js",
+    "sync-env": "node API/scripts/sync-env.js",
+    "dev": "npm run sync-env && concurrently \"nodemon API/src/server.js\" \"npm run ngrok\"",
     "hash-passwords": "node API/scripts/hash_passwords.js",
     "create-test-user": "node API/scripts/create_test_user.js",
     "test-server": "node API/scripts/test_server.js",
@@ -15,7 +16,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@ngrok/ngrok": "^1.7.0",
     "bcrypt": "^6.0.0",
+    "concurrently": "^9.2.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",

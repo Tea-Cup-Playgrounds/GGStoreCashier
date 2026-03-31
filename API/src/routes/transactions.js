@@ -1,22 +1,21 @@
 const express = require('express');
 const pool = require('../db');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, filterByBranch } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Apply authentication to all routes
 router.use(authenticateToken);
 
-// Get all transactions
-router.get('/', async (req, res) => {
+// GET /api/transactions — branch-enforced via filterByBranch middleware
+router.get('/', filterByBranch, async (req, res) => {
     try {
         const { branch_id, user_id, payment_status, start_date, end_date } = req.query;
-        
+
         let query = `
             SELECT t.*, u.name as user_name, b.name as branch_name
-            FROM transactions t 
-            LEFT JOIN users u ON t.user_id = u.id 
-            LEFT JOIN branches b ON t.branch_id = b.id 
+            FROM transactions t
+            LEFT JOIN users u ON t.user_id = u.id
+            LEFT JOIN branches b ON t.branch_id = b.id
             WHERE 1=1
         `;
         const params = [];
@@ -57,15 +56,14 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get transaction by ID with items
+// GET /api/transactions/:id
 router.get('/:id', async (req, res) => {
     try {
-        // Get transaction details
         const [transactions] = await pool.execute(
             `SELECT t.*, u.name as user_name, b.name as branch_name
-             FROM transactions t 
-             LEFT JOIN users u ON t.user_id = u.id 
-             LEFT JOIN branches b ON t.branch_id = b.id 
+             FROM transactions t
+             LEFT JOIN users u ON t.user_id = u.id
+             LEFT JOIN branches b ON t.branch_id = b.id
              WHERE t.id = ?`,
             [req.params.id]
         );
@@ -74,26 +72,26 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Transaction not found' });
         }
 
-        // Get transaction items
+        // Enforce branch access for non-superadmin
+        if (req.user.role !== 'superadmin' &&
+            transactions[0].branch_id !== req.user.branch_id) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
         const [items] = await pool.execute(
             `SELECT ti.*, p.name as product_name, p.barcode
-             FROM transaction_items ti 
-             LEFT JOIN products p ON ti.product_id = p.id 
+             FROM transaction_items ti
+             LEFT JOIN products p ON ti.product_id = p.id
              WHERE ti.transaction_id = ?`,
             [req.params.id]
         );
 
-        // Get payments
         const [payments] = await pool.execute(
             'SELECT * FROM payments WHERE transaction_id = ?',
             [req.params.id]
         );
 
-        res.json({ 
-            transaction: transactions[0],
-            items,
-            payments
-        });
+        res.json({ transaction: transactions[0], items, payments });
 
     } catch (error) {
         console.error('Get transaction error:', error);
@@ -101,77 +99,105 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create new transaction
+// POST /api/transactions
 router.post('/', async (req, res) => {
+    // Superadmin must supply a real branch_id in the body
+    const branchId = req.user.role === 'superadmin'
+        ? req.body.branch_id
+        : req.user.branch_id;
+
+    if (!branchId || branchId === 0) {
+        return res.status(400).json({
+            error: 'branch_id is required for this transaction'
+        });
+    }
+
     const connection = await pool.getConnection();
-    
+
     try {
         await connection.beginTransaction();
 
         const { items, discount = 0, payment_method, payment_amount } = req.body;
 
         if (!items || items.length === 0) {
-            return res.status(400).json({ 
-                error: 'Transaction items are required' 
-            });
+            return res.status(400).json({ error: 'Transaction items are required' });
         }
 
-        // Calculate total amount
+        // Validate all product_ids are positive integers
+        for (const item of items) {
+            if (!item.product_id || item.product_id <= 0) {
+                return res.status(400).json({ error: `Invalid product_id: ${item.product_id}` });
+            }
+            if (!item.qty || item.qty <= 0) {
+                return res.status(400).json({ error: `Invalid qty for product ${item.product_id}` });
+            }
+        }
+
+        // Check stock availability for all items before touching anything
+        for (const item of items) {
+            const [rows] = await connection.execute(
+                'SELECT stock, name FROM products WHERE id = ?',
+                [item.product_id]
+            );
+            if (rows.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ error: `Product ${item.product_id} not found` });
+            }
+            if (rows[0].stock < item.qty) {
+                await connection.rollback();
+                return res.status(400).json({
+                    error: `Insufficient stock for "${rows[0].name}". Available: ${rows[0].stock}, requested: ${item.qty}`
+                });
+            }
+        }
+
+        // Calculate totals
         let total_amount = 0;
         for (const item of items) {
             total_amount += item.qty * item.price;
         }
-
         const final_amount = total_amount - discount;
 
-        // Create transaction
+        // Insert transaction
         const [transactionResult] = await connection.execute(
-            `INSERT INTO transactions (user_id, branch_id, total_amount, discount, final_amount, payment_status) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [req.user.id, req.user.branch_id, total_amount, discount, final_amount, 'paid']
+            `INSERT INTO transactions (user_id, branch_id, total_amount, discount, final_amount, payment_status)
+             VALUES (?, ?, ?, ?, ?, 'paid')`,
+            [req.user.id, branchId, total_amount, discount, final_amount]
         );
-
         const transactionId = transactionResult.insertId;
 
-        // Add transaction items and update stock
+        // Insert items, deduct stock, record movements
         const updatedProducts = [];
         for (const item of items) {
-            // Add transaction item
             await connection.execute(
-                `INSERT INTO transaction_items (transaction_id, product_id, qty, price, subtotal) 
+                `INSERT INTO transaction_items (transaction_id, product_id, qty, price, subtotal)
                  VALUES (?, ?, ?, ?, ?)`,
                 [transactionId, item.product_id, item.qty, item.price, item.qty * item.price]
             );
 
-            // Update product stock
             await connection.execute(
                 'UPDATE products SET stock = stock - ? WHERE id = ?',
                 [item.qty, item.product_id]
             );
 
-            // Get updated product info
             const [products] = await connection.execute(
-                `SELECT p.*, c.name as category_name, b.name as branch_name 
-                 FROM products p 
-                 LEFT JOIN categories c ON p.category_id = c.id 
-                 LEFT JOIN branches b ON p.branch_id = b.id 
+                `SELECT p.*, c.name as category_name, b.name as branch_name
+                 FROM products p
+                 LEFT JOIN categories c ON p.category_id = c.id
+                 LEFT JOIN branches b ON p.branch_id = b.id
                  WHERE p.id = ?`,
                 [item.product_id]
             );
-            
-            if (products.length > 0) {
-                updatedProducts.push(products[0]);
-            }
+            if (products.length > 0) updatedProducts.push(products[0]);
 
-            // Add stock movement record
             await connection.execute(
-                `INSERT INTO stock_movements (product_id, branch_id, type, qty, note) 
+                `INSERT INTO stock_movements (product_id, branch_id, type, qty, note)
                  VALUES (?, ?, 'out', ?, ?)`,
-                [item.product_id, req.user.branch_id, item.qty, `Sale - Transaction #${transactionId}`]
+                [item.product_id, branchId, item.qty, `Sale - Transaction #${transactionId}`]
             );
         }
 
-        // Add payment record
+        // Insert payment record
         if (payment_method && payment_amount) {
             await connection.execute(
                 'INSERT INTO payments (transaction_id, method, amount) VALUES (?, ?, ?)',
@@ -179,12 +205,12 @@ router.post('/', async (req, res) => {
             );
         }
 
-        // Get complete transaction data
+        // Fetch completed transaction for response + socket
         const [transactions] = await connection.execute(
             `SELECT t.*, u.name as user_name, b.name as branch_name
-             FROM transactions t 
-             LEFT JOIN users u ON t.user_id = u.id 
-             LEFT JOIN branches b ON t.branch_id = b.id 
+             FROM transactions t
+             LEFT JOIN users u ON t.user_id = u.id
+             LEFT JOIN branches b ON t.branch_id = b.id
              WHERE t.id = ?`,
             [transactionId]
         );
@@ -194,32 +220,23 @@ router.post('/', async (req, res) => {
         // Emit real-time events
         const io = req.app.get('io');
         if (io) {
-            // Emit transaction created event
-            io.to(`branch-${req.user.branch_id}`).emit('transaction-created', transactions[0]);
+            io.to(`branch-${branchId}`).emit('transaction-created', transactions[0]);
             io.to('branch-0').emit('transaction-created', transactions[0]);
 
-            // Emit stock updates for each product
             updatedProducts.forEach(product => {
                 io.to(`branch-${product.branch_id}`).emit('product-updated', product);
                 io.to('branch-0').emit('product-updated', product);
             });
 
-            // Emit payment event
-            io.to(`branch-${req.user.branch_id}`).emit('payment-completed', {
-                transactionId,
-                method: payment_method,
-                amount: payment_amount,
-                branchId: req.user.branch_id
+            io.to(`branch-${branchId}`).emit('payment-completed', {
+                transactionId, method: payment_method, amount: payment_amount, branchId
             });
             io.to('branch-0').emit('payment-completed', {
-                transactionId,
-                method: payment_method,
-                amount: payment_amount,
-                branchId: req.user.branch_id
+                transactionId, method: payment_method, amount: payment_amount, branchId
             });
         }
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: 'Transaction created successfully',
             transactionId,
             transaction: transactions[0]

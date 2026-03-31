@@ -26,13 +26,13 @@ class SocketService {
     _socket = IO.io(
       baseUrl,
       IO.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .enableAutoConnect()
           .enableReconnection()
-          .setReconnectionDelay(1000)
-          .setReconnectionDelayMax(5000)
-          .setReconnectionAttempts(5)
-          .setExtraHeaders({'Authorization': 'Bearer $token'})
+          .setReconnectionDelay(2000)
+          .setReconnectionDelayMax(10000)
+          .setReconnectionAttempts(3)
+          .setExtraHeaders({'Authorization': 'Bearer $token', 'ngrok-skip-browser-warning': 'true'})
           .build(),
     );
 

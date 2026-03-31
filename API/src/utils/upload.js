@@ -14,14 +14,12 @@ const UPLOAD_DIRS = {
 // Allowed image MIME types
 const ALLOWED_IMAGE_MIMES = [
     'image/jpeg',
-    'image/jpg', 
-    'image/png', 
-    'image/gif', 
-    'image/webp'
+    'image/jpg',
+    'image/png',
 ];
 
 // Allowed file extensions
-const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png'];
 
 // Magic numbers (file signatures) for image validation
 const IMAGE_SIGNATURES = {
@@ -33,11 +31,6 @@ const IMAGE_SIGNATURES = {
         [0xFF, 0xD8, 0xFF, 0xDB], // JPEG
     ],
     'image/png': [[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]],
-    'image/gif': [
-        [0x47, 0x49, 0x46, 0x38, 0x37, 0x61], // GIF87a
-        [0x47, 0x49, 0x46, 0x38, 0x39, 0x61], // GIF89a
-    ],
-    'image/webp': [[0x52, 0x49, 0x46, 0x46]], // RIFF (WebP container)
 };
 
 // Validate file signature (magic numbers)
@@ -110,39 +103,39 @@ const absensiStorage = multer.diskStorage({
 
 // Enhanced file filter for images only with multiple security checks
 const imageFileFilter = (req, file, cb) => {
-    // Check 1: MIME type validation
+    // Check 1: MIME type — only jpeg/png
     if (!ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
-        return cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'), false);
+        return cb(new Error('Invalid file type. Only JPG and PNG images are allowed.'), false);
     }
 
-    // Check 2: File extension validation
+    // Check 2: Extension — only .jpg, .jpeg, .png
     const ext = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
-        return cb(new Error('Invalid file extension. Only .jpg, .jpeg, .png, .gif, and .webp are allowed.'), false);
+        return cb(new Error('Invalid file extension. Only .jpg, .jpeg, and .png are allowed.'), false);
     }
 
-    // Check 3: Filename validation (prevent path traversal)
+    // Check 3: Prevent path traversal
     const filename = path.basename(file.originalname);
     if (filename !== file.originalname || filename.includes('..')) {
         return cb(new Error('Invalid filename detected.'), false);
-    }
-
-    // Check 4: Prevent executable extensions disguised as images
-    const dangerousExtensions = ['.exe', '.sh', '.bat', '.cmd', '.com', '.pif', '.scr', '.vbs', '.js', '.jar', '.php', '.asp', '.aspx'];
-    const fullFilename = file.originalname.toLowerCase();
-    if (dangerousExtensions.some(ext => fullFilename.includes(ext))) {
-        return cb(new Error('Suspicious file detected.'), false);
     }
 
     cb(null, true);
 };
 
 // Post-upload validation (validates actual file content)
+// filePath should be the absolute path as provided by multer's req.file.path
 const validateUploadedImage = (filePath, mimeType) => {
     try {
+        console.log('[validateUploadedImage] checking path:', filePath, '| mime:', mimeType);
+
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`File not found at path: ${filePath}`);
+        }
+
         // Validate file signature
         if (!validateFileSignature(filePath, mimeType)) {
-            fs.unlinkSync(filePath); // Delete invalid file
+            fs.unlinkSync(filePath);
             throw new Error('File content does not match image format. File has been rejected for security reasons.');
         }
 
@@ -158,6 +151,7 @@ const validateUploadedImage = (filePath, mimeType) => {
             throw new Error('File size exceeds 5MB limit.');
         }
 
+        console.log('[validateUploadedImage] passed, size:', stats.size);
         return true;
     } catch (error) {
         throw error;

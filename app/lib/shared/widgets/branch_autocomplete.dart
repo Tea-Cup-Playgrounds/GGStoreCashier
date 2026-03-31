@@ -51,7 +51,7 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
       ));
 
       final response = await dio.get('/api/branches');

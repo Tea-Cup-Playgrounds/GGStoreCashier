@@ -6,6 +6,7 @@ class ConnectivityTest {
     baseUrl: ApiConfig.apiUrl,
     connectTimeout: ApiConfig.connectTimeout,
     receiveTimeout: ApiConfig.receiveTimeout,
+    headers: ApiConfig.defaultHeaders,
   ));
 
   static Future<bool> testConnection() async {

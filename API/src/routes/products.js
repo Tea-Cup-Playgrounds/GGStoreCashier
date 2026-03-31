@@ -84,6 +84,16 @@ router.get('/:id', async (req, res) => {
 // Create new product (admin/superadmin only, with branch filtering)
 router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadProduct.single('product_image'), async (req, res) => {
     try {
+        console.log('[POST /api/products] body:', req.body);
+        console.log('[POST /api/products] file:', req.file ? {
+            fieldname: req.file.fieldname,
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            path: req.file.path,
+            filename: req.file.filename,
+        } : 'no file');
+
         const { name, barcode, category_id, sell_price, stock, branch_id } = req.body;
 
         if (!name || !sell_price) {
@@ -99,9 +109,12 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
         // Validate uploaded image (magic number check)
         if (req.file) {
             try {
-                const filePath = `API/uploads/products/${req.file.filename}`;
+                const filePath = req.file.path;
+                console.log('[POST /api/products] validating image at path:', filePath);
                 validateUploadedImage(filePath, req.file.mimetype);
+                console.log('[POST /api/products] image validation passed');
             } catch (error) {
+                console.error('[POST /api/products] image validation failed:', error.message);
                 return res.status(400).json({ 
                     error: error.message || 'Invalid image file' 
                 });

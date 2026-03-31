@@ -26,162 +26,159 @@ class ProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Product Image
-          Expanded(
-            flex: 3,
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.only(
+      // Product Image — 1:1 ratio
+      AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+            ),
+          ),
+          child: Stack(
+            children: [
+              // Product Image with network support
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
                 ),
-              ),
-              child: Stack(
-                children: [
-                  // Product Image with network support
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                    child: product.image != null && product.image!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: ProductService.getProductImageUrl(product.image),
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: AppTheme.muted.withOpacity(0.3),
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.gold,
-                                ),
-                              ),
+                child: product.image != null && product.image!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: ProductService.getProductImageUrl(product.image),
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: AppTheme.muted.withOpacity(0.3),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.gold,
                             ),
-                            errorWidget: (context, url, error) => Image.asset(
-                              ProductService.getPlaceholderImage(),
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : Image.asset(
-                            ProductService.getPlaceholderImage(),
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
                           ),
+                        ),
+                        errorWidget: (context, url, error) => Image.asset(
+                          ProductService.getPlaceholderImage(),
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Image.asset(
+                        ProductService.getPlaceholderImage(),
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+              ),
+
+              // Stock status badge
+              if (product.isLowStock)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: product.isOutOfStock
+                          ? AppTheme.destructive
+                          : AppTheme.warning,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      product.isOutOfStock ? 'Out of Stock' : 'Low Stock',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
+                ),
 
-                  // Stock status badge
-                  if (product.isLowStock)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: product.isOutOfStock
-                              ? AppTheme.destructive
-                              : AppTheme.warning,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          product.isOutOfStock ? 'Out of Stock' : 'Low Stock',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+              // Category badge
+              if (product.category != null)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.card.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      product.category!,
+                      style: const TextStyle(
+                        color: AppTheme.mutedForeground,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-
-                  // Category badge
-                  if (product.category != null)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.card.withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          product.category!,
-                          style: const TextStyle(
-                            color: AppTheme.mutedForeground,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                  ),
+                ),
+            ],
           ),
+        ),
+      ),
 
           // Product Info
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        CurrencyFormatter.formatToRupiah(product.sellPrice),
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: AppTheme.gold,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: product.isOutOfStock ? null : onAdd,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: product.isOutOfStock
+                              ? AppTheme.mutedForeground
+                              : AppTheme.gold,
+                          shape: BoxShape.circle,
                         ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const Spacer(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          CurrencyFormatter.formatToRupiah(product.sellPrice),
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: AppTheme.gold,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                        child: Icon(
+                          Icons.add,
+                          size: 16,
+                          color: product.isOutOfStock
+                              ? AppTheme.surface
+                              : AppTheme.background,
                         ),
                       ),
-                      GestureDetector(
-                        onTap: product.isOutOfStock ? null : onAdd,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: product.isOutOfStock
-                                ? AppTheme.mutedForeground
-                                : AppTheme.gold,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.add,
-                            size: 16,
-                            color: product.isOutOfStock
-                                ? AppTheme.surface
-                                : AppTheme.background,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],

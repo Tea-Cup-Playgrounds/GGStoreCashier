@@ -5,6 +5,7 @@ import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart
 import 'package:gg_store_cashier/core/helper/screen_type_utils.dart';
 import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
+import 'package:gg_store_cashier/core/provider/realtime_provider.dart';
 import 'package:gg_store_cashier/core/services/product_service.dart';
 import 'package:gg_store_cashier/core/models/product.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
@@ -31,6 +32,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   bool _isLoadingProducts = true;
   String? _productsError;
 
+  ProviderSubscription<RealtimeProductState>? _realtimeSub;
+
   void _onSearchChanged(String value) {
     debugPrint('Search: $value');
     setState(() {}); // Trigger rebuild to filter products
@@ -42,6 +45,16 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     searchController = TextEditingController();
     _tabController = TabController(length: 2, vsync: this);
     _loadProducts();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _realtimeSub ??= ref.listenManual(realtimeProductProvider, (previous, next) {
+      if (next.lastUpdateTime != previous?.lastUpdateTime) {
+        _loadProducts();
+      }
+    });
   }
 
   Future<void> _loadProducts() async {
@@ -66,6 +79,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
 
   @override
   void dispose() {
+    _realtimeSub?.close();
     searchController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -87,7 +101,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final isKaryawan = user?.isEmployee ?? false;
-    
+
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
     final horizontalPadding = Breakpoints.getHorizontalPadding(screenType, orientation);

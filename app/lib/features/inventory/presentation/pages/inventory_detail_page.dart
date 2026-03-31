@@ -131,10 +131,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                     fontWeight: FontWeight.w600,
                   ),
             ),
-            Text(
-              "ID: ${widget.productId}",
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
           ],
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,

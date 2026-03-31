@@ -59,8 +59,7 @@ router.post('/', requireRole(['admin', 'superadmin']), uploadCategory.single('ca
         // Validate uploaded image (magic number check)
         if (req.file) {
             try {
-                const filePath = `API/uploads/categories/${req.file.filename}`;
-                validateUploadedImage(filePath, req.file.mimetype);
+                validateUploadedImage(req.file.path, req.file.mimetype);
             } catch (error) {
                 return res.status(400).json({ 
                     error: error.message || 'Invalid image file' 
@@ -126,8 +125,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
         // Validate uploaded image (magic number check)
         if (req.file) {
             try {
-                const filePath = `API/uploads/categories/${req.file.filename}`;
-                validateUploadedImage(filePath, req.file.mimetype);
+                validateUploadedImage(req.file.path, req.file.mimetype);
             } catch (error) {
                 return res.status(400).json({ 
                     error: error.message || 'Invalid image file' 

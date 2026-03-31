@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/provider/auth_provider.dart';
-import '../../../../core/services/connectivity_test.dart';
 import '../../../../core/widgets/api_config_dialog.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
@@ -83,23 +82,6 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // First test connectivity
-    print('Testing server connectivity...');
-    final isConnected = await ConnectivityTest.testConnection();
-    
-    if (!isConnected) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cannot connect to server. Please check your connection.'),
-            backgroundColor: AppTheme.destructive,
-          ),
-        );
-      }
-      return;
-    }
-
-    print('Server connectivity OK, attempting login...');
     final authNotifier = ref.read(authProvider.notifier);
     final success = await authNotifier.login(
       _usernameController.text.trim(),
@@ -109,7 +91,6 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
     if (success && mounted) {
       context.go(AppRouter.home);
     }
-    // Error handling is done through the provider state
   }
 
   String? _validateUsername(String? value) {
@@ -145,7 +126,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
     final spacing = screenType == ScreenType.tablet ? 40.0 : 32.0;
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Center(

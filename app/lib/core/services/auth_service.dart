@@ -11,6 +11,9 @@ class AuthService {
     connectTimeout: ApiConfig.connectTimeout,
     receiveTimeout: ApiConfig.receiveTimeout,
     sendTimeout: ApiConfig.sendTimeout,
+    headers: {
+      'ngrok-skip-browser-warning': 'true',
+    },
   ));
 
   static const String _tokenKey = 'auth_token';

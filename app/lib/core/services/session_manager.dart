@@ -34,32 +34,22 @@ class SessionManager {
   /// Check if session is still valid
   static Future<void> _checkSession(WidgetRef ref) async {
     try {
-      // Check if user is authenticated
-      final isAuth = await AuthService.isAuthenticated();
-      
-      if (!isAuth) {
-        await _handleSessionExpired(ref);
-        return;
-      }
-
-      // Check session timeout
+      // Check session timeout first (local, no network)
       if (_lastActivity != null) {
         final inactiveDuration = DateTime.now().difference(_lastActivity!);
-        
         if (inactiveDuration > _sessionTimeout) {
           await _handleSessionTimeout(ref);
           return;
         }
       }
 
-      // Validate user session with backend
-      final user = await AuthService.getCurrentUser();
-      if (user == null) {
+      // Use local token check only — avoids network call every 5 minutes
+      final token = await AuthService.getToken();
+      if (token == null) {
         await _handleSessionExpired(ref);
       }
     } catch (e) {
       print('Session check error: $e');
-      await _handleSessionExpired(ref);
     }
   }
 

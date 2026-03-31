@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
 import '../../../../core/models/cart_item.dart';
@@ -6,22 +7,27 @@ import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/services/product_service.dart';
+import '../../../../core/config/api_config.dart';
+import '../../../../core/services/auth_service.dart';
+import '../../../../core/provider/auth_provider.dart';
+import '../../../../core/provider/realtime_provider.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../widgets/product_card.dart';
 import '../widgets/cart_item_widget.dart';
 import '../widgets/coupon_card.dart';
 import '../widgets/payment_success_view.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum CashierView { products, cart, coupon, success }
 
-class CashierPage extends StatefulWidget {
+class CashierPage extends ConsumerStatefulWidget {
   const CashierPage({super.key});
 
   @override
-  State<CashierPage> createState() => _CashierPageState();
+  ConsumerState<CashierPage> createState() => _CashierPageState();
 }
 
-class _CashierPageState extends State<CashierPage>
+class _CashierPageState extends ConsumerState<CashierPage>
     with TickerProviderStateMixin {
   CashierView _currentView = CashierView.products;
   final List<CartItem> _cart = [];
@@ -30,22 +36,24 @@ class _CashierPageState extends State<CashierPage>
 
   Map<String, dynamic>? _appliedCoupon;
   bool _isApplyingCoupon = false;
+  bool _isProcessingPayment = false;
+  int? _lastTransactionId;
   String _selectedPaymentMethod = 'cash';
-  
+
   // Products state
   List<Product> _products = [];
   bool _isLoadingProducts = true;
   String? _productsError;
 
   late AnimationController _viewAnimationController;
-  // late Animation<Offset> _slideAnimation;
+  ProviderSubscription<RealtimeProductState>? _realtimeSub;
 
-  // Payment methods from database
+  // Payment methods — only cash is active for now
   final List<Map<String, dynamic>> _paymentMethods = [
-    {'value': 'cash', 'label': 'Cash', 'icon': Icons.payments_outlined},
-    {'value': 'card', 'label': 'Card', 'icon': Icons.credit_card},
-    {'value': 'transfer', 'label': 'Bank Transfer', 'icon': Icons.account_balance},
-    {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet},
+    {'value': 'cash', 'label': 'Cash', 'icon': Icons.payments_outlined, 'enabled': true},
+    {'value': 'card', 'label': 'Card', 'icon': Icons.credit_card, 'enabled': false},
+    {'value': 'transfer', 'label': 'Bank Transfer', 'icon': Icons.account_balance, 'enabled': false},
+    {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet, 'enabled': false},
   ];
 
   @override
@@ -53,6 +61,17 @@ class _CashierPageState extends State<CashierPage>
     super.initState();
     _setupAnimations();
     _loadProducts();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Guard: only register once
+    _realtimeSub ??= ref.listenManual(realtimeProductProvider, (previous, next) {
+      if (next.lastUpdateTime != previous?.lastUpdateTime) {
+        _loadProducts();
+      }
+    });
   }
 
   Future<void> _loadProducts() async {
@@ -101,6 +120,7 @@ class _CashierPageState extends State<CashierPage>
 
   @override
   void dispose() {
+    _realtimeSub?.close();
     _viewAnimationController.dispose();
     _searchController.dispose();
     _couponController.dispose();
@@ -182,20 +202,79 @@ class _CashierPageState extends State<CashierPage>
   }
 
   Future<void> _processPayment(String method) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Processing payment via $method...'),
-        backgroundColor: AppTheme.gold,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
+    if (_cart.isEmpty) return;
 
-    await Future.delayed(const Duration(milliseconds: 1500));
+    // Validate all product IDs are parseable before sending
+    for (final item in _cart) {
+      final pid = int.tryParse(item.product.id);
+      if (pid == null || pid <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Invalid product ID for "${item.product.name}"'),
+          backgroundColor: AppTheme.destructive,
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
+    }
 
-    setState(() {
-      _currentView = CashierView.success;
-    });
+    setState(() => _isProcessingPayment = true);
+
+    try {
+      final token = await AuthService.getToken();
+      final user = ref.read(authProvider).user;
+
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.apiUrl,
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
+        connectTimeout: ApiConfig.connectTimeout,
+        receiveTimeout: ApiConfig.receiveTimeout,
+      ));
+
+      final items = _cart.map((item) => {
+        'product_id': int.parse(item.product.id),
+        'qty': item.quantity,
+        'price': item.price,
+      }).toList();
+
+      final body = <String, dynamic>{
+        'items': items,
+        'discount': _discount,
+        'payment_method': method,
+        'payment_amount': _total,
+      };
+
+      // Superadmin has branch_id = 0 in DB — must send the product's branch
+      // Use the first cart item's branch as the transaction branch
+      if (user != null && user.isSuperAdmin) {
+        final firstBranchId = _cart.first.product.branchId;
+        if (firstBranchId != null && firstBranchId > 0) {
+          body['branch_id'] = firstBranchId;
+        }
+      }
+
+      final response = await dio.post('/api/transactions', data: body);
+
+      if (mounted) {
+        setState(() {
+          _lastTransactionId = response.data['transactionId'];
+          _isProcessingPayment = false;
+          _currentView = CashierView.success;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessingPayment = false);
+        String msg = 'Payment failed';
+        if (e is DioException && e.response?.data != null) {
+          msg = e.response!.data['error'] ?? msg;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
+          backgroundColor: AppTheme.destructive,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
   }
 
   void _resetTransaction() {
@@ -230,11 +309,12 @@ class _CashierPageState extends State<CashierPage>
   Widget build(BuildContext context) {
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
-    
+
     if (_currentView == CashierView.success) {
       return PaymentSuccessView(
         total: _total,
         appliedCoupon: _appliedCoupon,
+        transactionId: _lastTransactionId,
         onNewTransaction: _resetTransaction,
       );
     }
@@ -388,7 +468,7 @@ class _CashierPageState extends State<CashierPage>
                                       crossAxisCount: isLandscape ? 3 : 2,
                                       crossAxisSpacing: 12,
                                       mainAxisSpacing: 12,
-                                      childAspectRatio: 0.8,
+                                      childAspectRatio: 0.72,
                                     ),
                                     itemCount: _filteredProducts.length,
                                     itemBuilder: (context, index) {
@@ -597,13 +677,31 @@ class _CashierPageState extends State<CashierPage>
                                   isExpanded: true,
                                   icon: const Icon(Icons.arrow_drop_down),
                                   items: _paymentMethods.map((method) {
+                                    final enabled = method['enabled'] as bool;
                                     return DropdownMenuItem<String>(
                                       value: method['value'],
+                                      enabled: enabled,
                                       child: Row(
                                         children: [
-                                          Icon(method['icon'] as IconData, size: 20),
+                                          Icon(method['icon'] as IconData,
+                                              size: 20,
+                                              color: enabled ? null : AppTheme.mutedForeground),
                                           const SizedBox(width: 12),
-                                          Text(method['label'] as String),
+                                          Text(method['label'] as String,
+                                              style: TextStyle(
+                                                  color: enabled ? null : AppTheme.mutedForeground)),
+                                          if (!enabled) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.muted.withOpacity(0.4),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Text('Soon',
+                                                  style: TextStyle(fontSize: 10, color: AppTheme.mutedForeground)),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     );
@@ -622,7 +720,8 @@ class _CashierPageState extends State<CashierPage>
                             CustomButton(
                               text: 'Process Payment',
                               icon: Icons.check_circle_outline,
-                              onPressed: () => _processPayment(_selectedPaymentMethod),
+                              onPressed: _isProcessingPayment ? null : () => _processPayment(_selectedPaymentMethod),
+                              isLoading: _isProcessingPayment,
                               fullWidth: true,
                               size: ButtonSize.large,
                             ),
@@ -767,7 +866,7 @@ class _CashierPageState extends State<CashierPage>
           crossAxisCount: 2,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: 0.8,
+          childAspectRatio: 0.72,
         ),
         itemCount: _filteredProducts.length,
         itemBuilder: (context, index) {
@@ -928,13 +1027,31 @@ class _CashierPageState extends State<CashierPage>
                 isExpanded: true,
                 icon: const Icon(Icons.arrow_drop_down),
                 items: _paymentMethods.map((method) {
+                  final enabled = method['enabled'] as bool;
                   return DropdownMenuItem<String>(
                     value: method['value'],
+                    enabled: enabled,
                     child: Row(
                       children: [
-                        Icon(method['icon'] as IconData, size: 20),
+                        Icon(method['icon'] as IconData,
+                            size: 20,
+                            color: enabled ? null : AppTheme.mutedForeground),
                         const SizedBox(width: 12),
-                        Text(method['label'] as String),
+                        Text(method['label'] as String,
+                            style: TextStyle(
+                                color: enabled ? null : AppTheme.mutedForeground)),
+                        if (!enabled) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.muted.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('Soon',
+                                style: TextStyle(fontSize: 10, color: AppTheme.mutedForeground)),
+                          ),
+                        ],
                       ],
                     ),
                   );
@@ -953,7 +1070,8 @@ class _CashierPageState extends State<CashierPage>
           CustomButton(
             text: 'Process Payment',
             icon: Icons.check_circle_outline,
-            onPressed: () => _processPayment(_selectedPaymentMethod),
+            onPressed: _isProcessingPayment ? null : () => _processPayment(_selectedPaymentMethod),
+            isLoading: _isProcessingPayment,
             fullWidth: true,
             size: ButtonSize.large,
           ),

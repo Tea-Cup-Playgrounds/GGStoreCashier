@@ -11,6 +11,7 @@ class ProductService {
     connectTimeout: ApiConfig.connectTimeout,
     receiveTimeout: ApiConfig.receiveTimeout,
     sendTimeout: ApiConfig.sendTimeout,
+    headers: ApiConfig.defaultHeaders,
   ));
 
   static void _initializeDio() {

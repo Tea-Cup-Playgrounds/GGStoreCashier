@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:gg_store_cashier/core/config/api_config.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
 import 'package:gg_store_cashier/core/services/auth_service.dart';
@@ -50,7 +51,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
       ));
 
       // Load branches
@@ -92,6 +93,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
     FocusScope.of(context).unfocus();
     
     if (!_formKey.currentState!.validate()) {
+      debugPrint('[AddProduct] form validation failed');
       return;
     }
 
@@ -100,13 +102,38 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
       return;
     }
 
+    debugPrint('[AddProduct] submitting form...');
+    debugPrint('[AddProduct] name: ${_productNameController.text.trim()}');
+    debugPrint('[AddProduct] branch_id: $_selectedBranchId');
+    debugPrint('[AddProduct] category_id: $_selectedCategoryId');
+    debugPrint('[AddProduct] has image: ${_productImage != null}');
+    if (_productImage != null) {
+      debugPrint('[AddProduct] image path: ${_productImage!.path}');
+      debugPrint('[AddProduct] image exists: ${await _productImage!.exists()}');
+      debugPrint('[AddProduct] image size: ${await _productImage!.length()} bytes');
+    }
+
     setState(() => _isLoading = true);
 
     try {
       final token = await AuthService.getToken();
+      debugPrint('[AddProduct] token present: ${token != null}');
+      debugPrint('[AddProduct] API URL: ${ApiConfig.apiUrl}');
+
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
+        connectTimeout: ApiConfig.connectTimeout,
+        receiveTimeout: ApiConfig.receiveTimeout,
+      ));
+
+      // Add logging interceptor
+      dio.interceptors.add(LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+        requestHeader: true,
+        error: true,
+        logPrint: (o) => debugPrint('[AddProduct][DIO] $o'),
       ));
 
       // Prepare form data
@@ -121,16 +148,25 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
       // Add image if selected
       if (_productImage != null) {
+        final filename = _productImage!.path.split('/').last;
+        final ext = filename.split('.').last.toLowerCase();
+        final mimeType = ext == 'png' ? 'image/png' : 'image/jpeg';
+
+        debugPrint('[AddProduct] attaching image: $filename, mime: $mimeType');
         formData.files.add(MapEntry(
           'product_image',
           await MultipartFile.fromFile(
             _productImage!.path,
-            filename: _productImage!.path.split('/').last,
+            filename: filename,
+            contentType: http_parser.MediaType.parse(mimeType),
           ),
         ));
       }
 
+      debugPrint('[AddProduct] sending POST /api/products');
       final response = await dio.post('/api/products', data: formData);
+      debugPrint('[AddProduct] response status: ${response.statusCode}');
+      debugPrint('[AddProduct] response data: ${response.data}');
 
       if (response.statusCode == 201) {
         if (mounted) {
@@ -139,6 +175,13 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
         }
       }
     } catch (e) {
+      debugPrint('[AddProduct] ERROR: $e');
+      if (e is DioException) {
+        debugPrint('[AddProduct] DioException type: ${e.type}');
+        debugPrint('[AddProduct] DioException message: ${e.message}');
+        debugPrint('[AddProduct] response status: ${e.response?.statusCode}');
+        debugPrint('[AddProduct] response data: ${e.response?.data}');
+      }
       if (mounted) {
         String errorMessage = 'Failed to add product';
         if (e is DioException && e.response?.data != null) {
@@ -184,7 +227,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
       body: _isLoadingData
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 24),
               child: Form(
                 key: _formKey,
                 child: Column(

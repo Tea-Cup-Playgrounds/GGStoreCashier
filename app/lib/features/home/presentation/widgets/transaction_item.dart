@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/helper/currency_formatter.dart';
 
 class TransactionItem extends StatelessWidget {
   final String id;
@@ -55,7 +56,7 @@ class TransactionItem extends StatelessWidget {
                           ),
                     ),
                     Text(
-                      '\$${total.toStringAsFixed(2)}',
+                      CurrencyFormatter.formatToRupiah(total),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppTheme.gold,

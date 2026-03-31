@@ -6,6 +6,10 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../core/provider/auth_provider.dart';
+import '../../../../core/provider/realtime_provider.dart';
+import '../../../../core/models/dashboard_stats.dart';
+import '../../../../core/services/dashboard_service.dart';
+import '../../../../core/helper/currency_formatter.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/quick_action_card.dart';
 import '../widgets/transaction_item.dart';
@@ -17,46 +21,35 @@ class HomePage extends ConsumerStatefulWidget {
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends ConsumerState<HomePage>
+    with TickerProviderStateMixin {
   late AnimationController _animationController;
   late List<Animation<Offset>> _slideAnimations;
   late List<Animation<double>> _fadeAnimations;
 
-  final List<Map<String, dynamic>> _recentTransactions = [
-    {
-      'id': '1',
-      'time': '2 min ago',
-      'items': 3,
-      'total': 125.50,
-      'payment': 'Card'
-    },
-    {
-      'id': '2',
-      'time': '15 min ago',
-      'items': 1,
-      'total': 45.00,
-      'payment': 'Cash'
-    },
-    {
-      'id': '3',
-      'time': '32 min ago',
-      'items': 5,
-      'total': 289.99,
-      'payment': 'Card'
-    },
-    {
-      'id': '4',
-      'time': '1 hr ago',
-      'items': 2,
-      'total': 78.25,
-      'payment': 'Cash'
-    },
-  ];
+  DashboardStats? _stats;
+  bool _isLoading = true;
+  String? _error;
+
+  ProviderSubscription<RealtimeTransactionState>? _txSub;
+  ProviderSubscription<RealtimeProductState>? _productSub;
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
+    _loadDashboard();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _txSub ??= ref.listenManual(realtimeTransactionProvider, (prev, next) {
+      if (next.lastUpdateTime != prev?.lastUpdateTime) _loadDashboard();
+    });
+    _productSub ??= ref.listenManual(realtimeProductProvider, (prev, next) {
+      if (next.lastUpdateTime != prev?.lastUpdateTime) _loadDashboard();
+    });
   }
 
   void _setupAnimations() {
@@ -92,12 +85,36 @@ class _HomePageState extends ConsumerState<HomePage> with TickerProviderStateMix
         ),
       ));
     });
+  }
 
-    _animationController.forward();
+  Future<void> _loadDashboard() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final stats = await DashboardService.getStats();
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+          _isLoading = false;
+        });
+        _animationController.forward(from: 0);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    _txSub?.close();
+    _productSub?.close();
     _animationController.dispose();
     super.dispose();
   }
@@ -114,12 +131,14 @@ class _HomePageState extends ConsumerState<HomePage> with TickerProviderStateMix
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final isKaryawan = user?.isEmployee ?? false;
-    
+
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
-    final horizontalPadding = Breakpoints.getHorizontalPadding(screenType, orientation);
-    final statsColumns = Breakpoints.getGridColumns(screenType, orientation);
-    final quickActionsColumns = screenType == ScreenType.tablet 
+    final horizontalPadding =
+        Breakpoints.getHorizontalPadding(screenType, orientation);
+    final statsColumns =
+        Breakpoints.getGridColumns(screenType, orientation);
+    final quickActionsColumns = screenType == ScreenType.tablet
         ? (orientation == OrientationType.landscape ? 5 : 4)
         : 3;
 
@@ -129,258 +148,332 @@ class _HomePageState extends ConsumerState<HomePage> with TickerProviderStateMix
           Expanded(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      SlideTransition(
-                        position: _slideAnimations[0],
-                        child: FadeTransition(
-                          opacity: _fadeAnimations[0],
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  AppTheme.gold.withOpacity(0.05),
-                                  Colors.transparent,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _getGreeting(),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
-                                      ?.copyWith(
-                                        color: AppTheme.mutedForeground,
-                                        fontSize: screenType == ScreenType.tablet ? 18 : null,
-                                      ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Flagship Store',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: screenType == ScreenType.tablet ? 36 : null,
-                                      ),
-                                ),
-                              ],
-                            ),
+                constraints: const BoxConstraints(
+                    maxWidth: Breakpoints.maxContentWidth),
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: AppTheme.gold))
+                    : _error != null
+                        ? _buildError()
+                        : _buildContent(
+                            screenType,
+                            orientation,
+                            horizontalPadding,
+                            statsColumns,
+                            quickActionsColumns,
+                            isKaryawan,
+                            user?.name ?? 'User',
                           ),
-                        ),
-                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                      const SizedBox(height: 24),
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline,
+              size: 48, color: AppTheme.destructive),
+          const SizedBox(height: 16),
+          const Text('Failed to load dashboard'),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _loadDashboard,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold),
+          ),
+        ],
+      ),
+    );
+  }
 
-                      // Stats Grid
-                      SlideTransition(
-                        position: _slideAnimations[1],
-                        child: FadeTransition(
-                          opacity: _fadeAnimations[1],
-                          child: GridView(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: statsColumns,
-                                    crossAxisSpacing: 16,
-                                    mainAxisSpacing: 16,
-                                    mainAxisExtent: screenType == ScreenType.tablet ? 160 : 140),
-                            children: const [
-                              StatCard(
-                                icon: Icons.attach_money,
-                                label: "Transaksi Hari Ini",
-                                value: '32144',
-                                trend: 123.5,
-                                isPositive: true,
-                                isHighlighted: true,
-                              ),
-                              StatCard(
-                                icon: Icons.shopping_bag_outlined,
-                                label: 'Transaksi Bulan Ini',
-                                value: '580',
-                                trend: 80.2,
-                                isPositive: true,
-                              ),
-                              StatCard(
-                                icon: Icons.trending_up,
-                                label: 'Jumlah Pelanggan',
-                                value: '59',
-                              ),
-                              StatCard(
-                                icon: Icons.inventory_2_outlined,
-                                label: 'Stock Krisis',
-                                value: '0',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+  Widget _buildContent(
+    ScreenType screenType,
+    OrientationType orientation,
+    double horizontalPadding,
+    int statsColumns,
+    int quickActionsColumns,
+    bool isKaryawan,
+    String userName,
+  ) {
+    final stats = _stats!;
 
-                      const SizedBox(height: 32),
-
-                      // Quick Actions
-                      SlideTransition(
-                        position: _slideAnimations[2],
-                        child: FadeTransition(
-                          opacity: _fadeAnimations[2],
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Quick Actions',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: screenType == ScreenType.tablet ? 26 : null,
-                                    ),
-                              ),
-                              const SizedBox(height: 16),
-                              GridView(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: quickActionsColumns,
-                                        mainAxisSpacing: 16,
-                                        crossAxisSpacing: 16,
-                                        mainAxisExtent: screenType == ScreenType.tablet ? 150 : 130),
-                                children: [
-                                  QuickActionCard(
-                                    icon: Icons.shopping_cart_outlined,
-                                    label: 'New Sale',
-                                    onTap: () => context.go(AppRouter.cashier),
-                                  ),
-                                  QuickActionCard(
-                                    icon: Icons.shopping_cart_outlined,
-                                    label: 'Pasang Kupon',
-                                    onTap: () => context.go(AppRouter.cashier),
-                                  ),
-                                  QuickActionCard(
-                                    icon: Icons.inventory_2_outlined,
-                                    label: 'Check Stock',
-                                    onTap: () => context.go(AppRouter.inventory),
-                                  ),
-                                  QuickActionCard(
-                                    icon: Icons.bluetooth,
-                                    label: 'Kontrol Devices',
-                                    onTap: () => context.go(AppRouter.cashier),
-                                  ),
-                                  // Hide "Tambah Stock" for karyawan
-                                  if (!isKaryawan)
-                                    QuickActionCard(
-                                      icon: Icons.add,
-                                      label: 'Tambah Stock',
-                                      onTap: () => context.go(AppRouter.inventory),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      // Recent Transactions
-                      SlideTransition(
-                        position: _slideAnimations[3],
-                        child: FadeTransition(
-                          opacity: _fadeAnimations[3],
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Recent Transactions',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineSmall
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: screenType == ScreenType.tablet ? 26 : null,
-                                        ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () {
-                                      // TODO: Navigate to transactions page
-                                    },
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'View All',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelLarge
-                                              ?.copyWith(
-                                                color: AppTheme.gold,
-                                              ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        const Icon(
-                                          Icons.chevron_right,
-                                          size: 16,
-                                          color: AppTheme.gold,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              ListView.separated(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: _recentTransactions.length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 12),
-                                itemBuilder: (context, index) {
-                                  final transaction = _recentTransactions[index];
-                                  return SlideTransition(
-                                    position: _slideAnimations[4],
-                                    child: FadeTransition(
-                                      opacity: _fadeAnimations[4],
-                                      child: TransactionItem(
-                                        id: transaction['id'],
-                                        time: transaction['time'],
-                                        items: transaction['items'],
-                                        total: transaction['total'],
-                                        paymentMethod: transaction['payment'],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 100), // Bottom padding for navigation
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(
+          horizontal: horizontalPadding, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          SlideTransition(
+            position: _slideAnimations[0],
+            child: FadeTransition(
+              opacity: _fadeAnimations[0],
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppTheme.gold.withOpacity(0.05),
+                      Colors.transparent,
                     ],
                   ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getGreeting(),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(
+                                color: AppTheme.mutedForeground,
+                                fontSize: screenType == ScreenType.tablet
+                                    ? 18
+                                    : null,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          userName,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: screenType == ScreenType.tablet
+                                    ? 36
+                                    : null,
+                              ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      onPressed: _loadDashboard,
+                      icon: const Icon(Icons.refresh,
+                          color: AppTheme.mutedForeground),
+                      tooltip: 'Refresh',
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+
+          const SizedBox(height: 24),
+
+          // Stats Grid
+          SlideTransition(
+            position: _slideAnimations[1],
+            child: FadeTransition(
+              opacity: _fadeAnimations[1],
+              child: GridView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: statsColumns,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  mainAxisExtent:
+                      screenType == ScreenType.tablet ? 160 : 140,
+                ),
+                children: [
+                  StatCard(
+                    icon: Icons.attach_money,
+                    label: 'Pendapatan Hari Ini',
+                    value: CurrencyFormatter.formatToCompactRupiah(
+                        stats.todayRevenue),
+                    isHighlighted: true,
+                  ),
+                  StatCard(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Transaksi Hari Ini',
+                    value: stats.todayTransactions.toString(),
+                  ),
+                  StatCard(
+                    icon: Icons.shopping_bag_outlined,
+                    label: 'Transaksi Bulan Ini',
+                    value: stats.monthlyTransactions.toString(),
+                  ),
+                  StatCard(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'Stok Kritis',
+                    value: (stats.lowStockCount + stats.outOfStockCount)
+                        .toString(),
+                    isPositive: stats.lowStockCount + stats.outOfStockCount == 0,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Quick Actions
+          SlideTransition(
+            position: _slideAnimations[2],
+            child: FadeTransition(
+              opacity: _fadeAnimations[2],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quick Actions',
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize:
+                              screenType == ScreenType.tablet ? 26 : null,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  GridView(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: quickActionsColumns,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                      mainAxisExtent:
+                          screenType == ScreenType.tablet ? 150 : 130,
+                    ),
+                    children: [
+                      QuickActionCard(
+                        icon: Icons.shopping_cart_outlined,
+                        label: 'New Sale',
+                        onTap: () => context.go(AppRouter.cashier),
+                      ),
+                      QuickActionCard(
+                        icon: Icons.local_offer_outlined,
+                        label: 'Pasang Kupon',
+                        onTap: () => context.go(AppRouter.cashier),
+                      ),
+                      QuickActionCard(
+                        icon: Icons.inventory_2_outlined,
+                        label: 'Check Stock',
+                        onTap: () => context.go(AppRouter.inventory),
+                      ),
+                      QuickActionCard(
+                        icon: Icons.bluetooth,
+                        label: 'Kontrol Devices',
+                        onTap: () => context.go(AppRouter.cashier),
+                      ),
+                      if (!isKaryawan)
+                        QuickActionCard(
+                          icon: Icons.add,
+                          label: 'Tambah Stock',
+                          onTap: () => context.go(AppRouter.inventory),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Recent Transactions
+          SlideTransition(
+            position: _slideAnimations[3],
+            child: FadeTransition(
+              opacity: _fadeAnimations[3],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Recent Transactions',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: screenType == ScreenType.tablet
+                                  ? 26
+                                  : null,
+                            ),
+                      ),
+                      TextButton(
+                        onPressed: () {},
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'View All',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelLarge
+                                  ?.copyWith(color: AppTheme.gold),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right,
+                                size: 16, color: AppTheme.gold),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (stats.recentTransactions.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Text(
+                          'No transactions yet today',
+                          style: TextStyle(color: AppTheme.mutedForeground),
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: stats.recentTransactions.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final tx = stats.recentTransactions[index];
+                        return SlideTransition(
+                          position: _slideAnimations[4],
+                          child: FadeTransition(
+                            opacity: _fadeAnimations[4],
+                            child: TransactionItem(
+                              id: tx.id.toString(),
+                              time: tx.relativeTime,
+                              items: tx.itemCount,
+                              total: tx.finalAmount,
+                              paymentMethod:
+                                  tx.paymentMethod ?? 'cash',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 100),
         ],
       ),
     );
