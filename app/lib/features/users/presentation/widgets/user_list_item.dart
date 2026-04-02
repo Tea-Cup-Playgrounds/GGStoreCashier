@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/helper/date_formatter.dart';
 import '../../../../shared/widgets/custom_button.dart';
 
 class UserListItem extends StatelessWidget {
@@ -41,12 +42,7 @@ class UserListItem extends StatelessWidget {
   }
 
   String _formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (_) {
-      return dateString;
-    }
+    return DateFormatter.format(dateString);
   }
 
   @override

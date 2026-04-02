@@ -14,6 +14,7 @@ import '../widgets/stat_card.dart';
 import '../widgets/quick_action_card.dart';
 import '../widgets/transaction_item.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
+import 'superadmin_dashboard_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -131,6 +132,12 @@ class _HomePageState extends ConsumerState<HomePage>
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+
+    // SuperAdmin gets the full analytics dashboard
+    if (user?.isSuperAdmin == true) {
+      return const SuperAdminDashboardPage();
+    }
+
     final isKaryawan = user?.isEmployee ?? false;
 
     final screenType = getScreenType(context);

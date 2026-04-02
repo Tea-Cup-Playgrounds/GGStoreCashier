@@ -17,8 +17,6 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Info section height: name (2 lines ~36px) + gap (8) + price row (28) + padding (24) = ~96px
-    // Keep it fixed so image gets the remaining space.
     const double infoHeight = 96.0;
 
     return Container(

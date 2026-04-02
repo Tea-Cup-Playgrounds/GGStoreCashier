@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/helper/date_formatter.dart';
 
 class CouponCard extends StatelessWidget {
   final String code;
@@ -92,7 +93,7 @@ class CouponCard extends StatelessWidget {
                   if (expiresAt != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Expires: $expiresAt',
+                      'Expires: ${DateFormatter.format(expiresAt)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             fontSize: 10,
                           ),

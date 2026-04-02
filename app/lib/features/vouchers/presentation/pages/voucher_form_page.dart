@@ -7,6 +7,7 @@ import '../../../../core/services/product_service.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/helper/date_formatter.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/text_input.dart' as w;
 import '../../../../shared/widgets/searchable_dropdown.dart';
@@ -28,8 +29,11 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   final _codeCtrl    = TextEditingController();
   final _descCtrl    = TextEditingController();
   final _valueCtrl   = TextEditingController();
+  // Display controllers show dd-MM-yy; _fromApi/_toApi hold yyyy-MM-dd for the API
   final _fromCtrl    = TextEditingController();
   final _toCtrl      = TextEditingController();
+  String? _fromApi;
+  String? _toApi;
 
   String  _discountType = 'percent';
   bool    _isActive     = true;
@@ -55,8 +59,10 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       _discountType   = v.discountType;
       _valueCtrl.text = v.discountValue
           .toStringAsFixed(v.discountType == 'percent' ? 0 : 2);
-      _fromCtrl.text  = v.validFrom ?? '';
-      _toCtrl.text    = v.validTo   ?? '';
+      _fromCtrl.text  = DateFormatter.format(v.validFrom);
+      _fromApi        = v.validFrom;
+      _toCtrl.text    = DateFormatter.format(v.validTo);
+      _toApi          = v.validTo;
       _isActive       = v.isActive;
       _targetType     = v.targetType;
       _selectedTargetId = v.targetId;
@@ -132,7 +138,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     }
   }
 
-  Future<void> _pickDate(TextEditingController ctrl) async {
+  Future<void> _pickDate(TextEditingController displayCtrl, bool isFrom) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -140,7 +146,14 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       lastDate: DateTime(2035),
     );
     if (picked != null) {
-      ctrl.text = picked.toIso8601String().substring(0, 10);
+      final apiVal = DateFormatter.toApiDate(picked);
+      final display = DateFormatter.format(picked);
+      displayCtrl.text = display;
+      if (isFrom) {
+        _fromApi = apiVal;
+      } else {
+        _toApi = apiVal;
+      }
     }
   }
 
@@ -164,8 +177,8 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       'discount_value': double.parse(_valueCtrl.text.trim()),
       'target_type':    _targetType,
       'target_id':      _selectedTargetId,
-      'valid_from':     _fromCtrl.text.trim().isEmpty ? null : _fromCtrl.text.trim(),
-      'valid_to':       _toCtrl.text.trim().isEmpty   ? null : _toCtrl.text.trim(),
+      'valid_from':     _fromApi,
+      'valid_to':       _toApi,
       'is_active':      _isActive ? 1 : 0,
     };
 
@@ -339,7 +352,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                       controller: _fromCtrl,
                       prefixIcon: Icons.calendar_today_outlined,
                       readOnly: true,
-                      onTap: () => _pickDate(_fromCtrl),
+                      onTap: () => _pickDate(_fromCtrl, true),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -350,7 +363,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                       controller: _toCtrl,
                       prefixIcon: Icons.event_outlined,
                       readOnly: true,
-                      onTap: () => _pickDate(_toCtrl),
+                      onTap: () => _pickDate(_toCtrl, false),
                     ),
                   ),
                 ],

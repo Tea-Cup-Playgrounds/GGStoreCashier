@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/voucher.dart';
 import '../../../../core/services/voucher_service.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/helper/date_formatter.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import 'package:go_router/go_router.dart';
@@ -261,7 +262,7 @@ class _VoucherTile extends StatelessWidget {
                 if (voucher.validFrom != null || voucher.validTo != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '${voucher.validFrom ?? '∞'} → ${voucher.validTo ?? '∞'}',
+                    '${DateFormatter.format(voucher.validFrom)} → ${DateFormatter.format(voucher.validTo)}',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: cs.onSurface.withOpacity(0.45)),
                   ),

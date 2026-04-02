@@ -252,8 +252,8 @@ const groups = [
         errors: [{ code: 400, msg: 'Branch name is required' }],
       },
       {
-        method: 'PUT', path: '/api/branches/:id', auth: 'superadmin',
-        desc: 'Update branch info.',
+        method: 'PUT', path: '/api/branches/:id', auth: 'admin',
+        desc: 'Update branch info. Admin can only update their own assigned branch. Superadmin can update any.',
         headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }, { name: 'Content-Type', value: 'application/json', required: true }],
         params: [{ name: 'id', type: 'number', required: true, desc: 'Branch ID' }],
         body: [
@@ -262,7 +262,7 @@ const groups = [
           { name: 'phone', type: 'string', required: false, desc: 'Contact phone number' },
         ],
         response: { message: 'Branch updated successfully' },
-        errors: [{ code: 404, msg: 'Branch not found' }],
+        errors: [{ code: 403, msg: 'Admin can only edit their own branch / Cannot edit global branch (id=0)' }, { code: 404, msg: 'Branch not found' }],
       },
       {
         method: 'DELETE', path: '/api/branches/:id', auth: 'superadmin',
@@ -271,6 +271,18 @@ const groups = [
         params: [{ name: 'id', type: 'number', required: true, desc: 'Branch ID' }],
         response: { message: 'Branch deleted successfully' },
         errors: [{ code: 400, msg: 'Cannot delete branch with existing users or products' }, { code: 404, msg: 'Branch not found' }],
+      },
+    ]
+  },
+  {
+    name: 'Dashboard', icon: '📈', prefix: '/api/dashboard',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/dashboard', auth: 'required',
+        desc: 'Returns KPI stats and recent transactions. Superadmin sees all branches; admin/karyawan see their own branch only.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        response: { stats: { todayRevenue: 600000, todayTransactions: 1, monthlyTransactions: 5, monthlyRevenue: 1162000, lowStockCount: 0, outOfStockCount: 0 }, recentTransactions: [{ id: 5, final_amount: 600000, payment_status: 'paid', user_name: 'King Wahyu', branch_name: 'Cabang Empat', payment_method: 'cash', item_count: 2 }] },
+        errors: [],
       },
     ]
   },
@@ -311,6 +323,118 @@ const groups = [
         ],
         response: { message: 'Transaction created successfully', transactionId: 42, transaction: {} },
         errors: [{ code: 400, msg: 'Transaction items are required' }],
+      },
+    ]
+  },
+  {
+    name: 'Vouchers', icon: '🎟️', prefix: '/api/vouchers',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/vouchers', auth: 'admin',
+        desc: 'List all vouchers. Accessible by admin and superadmin.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        response: { vouchers: [{ id: 1, code: 'SUMMER20', description: 'Summer sale', discount_type: 'percent', discount_value: '20.00', target_type: null, target_id: null, valid_from: '2026-01-01', valid_to: '2026-12-31', is_active: 1 }] },
+        errors: [{ code: 403, msg: 'Insufficient permissions' }],
+      },
+      {
+        method: 'GET', path: '/api/vouchers/validate/:code', auth: 'required',
+        desc: 'Validate a voucher code at checkout. Checks is_active, valid_from, valid_to.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        params: [{ name: 'code', type: 'string', required: true, desc: 'Voucher code (case-insensitive)' }],
+        response: { voucher: { id: 1, code: 'SUMMER20', discount_type: 'percent', discount_value: '20.00', valid_to: '2026-12-31', is_active: 1 } },
+        errors: [{ code: 404, msg: 'Invalid or expired voucher code' }],
+      },
+      {
+        method: 'POST', path: '/api/vouchers', auth: 'admin',
+        desc: 'Create a new voucher.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }, { name: 'Content-Type', value: 'application/json', required: true }],
+        body: [
+          { name: 'code', type: 'string', required: true, desc: 'Unique voucher code (auto-uppercased)' },
+          { name: 'description', type: 'string', required: false, desc: 'Human-readable description' },
+          { name: 'discount_type', type: 'string', required: true, desc: 'percent | fixed' },
+          { name: 'discount_value', type: 'number', required: true, desc: 'Percent: 1–100 / Fixed: amount in Rp' },
+          { name: 'target_type', type: 'string', required: false, desc: 'categories | product | null (all products)' },
+          { name: 'target_id', type: 'number', required: false, desc: 'ID of the target category or product' },
+          { name: 'valid_from', type: 'string', required: false, desc: 'YYYY-MM-DD start date' },
+          { name: 'valid_to', type: 'string', required: false, desc: 'YYYY-MM-DD expiry date' },
+          { name: 'is_active', type: 'number', required: false, desc: '1 = active, 0 = disabled (default: 1)' },
+        ],
+        response: { message: 'Voucher created', voucherId: 5 },
+        errors: [{ code: 400, msg: 'code, discount_type, and discount_value are required / Invalid discount_type / Percent out of range' }, { code: 409, msg: 'Voucher code already exists' }],
+      },
+      {
+        method: 'PUT', path: '/api/vouchers/:id', auth: 'admin',
+        desc: 'Update an existing voucher.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }, { name: 'Content-Type', value: 'application/json', required: true }],
+        params: [{ name: 'id', type: 'number', required: true, desc: 'Voucher ID' }],
+        body: [
+          { name: 'code', type: 'string', required: true, desc: 'Voucher code' },
+          { name: 'description', type: 'string', required: false, desc: 'Description' },
+          { name: 'discount_type', type: 'string', required: true, desc: 'percent | fixed' },
+          { name: 'discount_value', type: 'number', required: true, desc: 'Discount value' },
+          { name: 'target_type', type: 'string', required: false, desc: 'categories | product | null' },
+          { name: 'target_id', type: 'number', required: false, desc: 'Target ID' },
+          { name: 'valid_from', type: 'string', required: false, desc: 'YYYY-MM-DD' },
+          { name: 'valid_to', type: 'string', required: false, desc: 'YYYY-MM-DD' },
+          { name: 'is_active', type: 'number', required: false, desc: '1 | 0' },
+        ],
+        response: { message: 'Voucher updated' },
+        errors: [{ code: 404, msg: 'Voucher not found' }, { code: 409, msg: 'Voucher code already exists' }],
+      },
+      {
+        method: 'DELETE', path: '/api/vouchers/:id', auth: 'admin',
+        desc: 'Delete a voucher permanently.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        params: [{ name: 'id', type: 'number', required: true, desc: 'Voucher ID' }],
+        response: { message: 'Voucher deleted' },
+        errors: [{ code: 404, msg: 'Voucher not found' }],
+      },
+    ]
+  },
+  {
+    name: 'Analytics', icon: '📊', prefix: '/api/analytics',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/analytics/summary', auth: 'superadmin',
+        desc: 'High-level KPIs across all branches: today, month, all-time revenue & transactions, active branches today.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        response: { today: { revenue: 600000, transactions: 1 }, month: { revenue: 1162000, transactions: 5 }, allTime: { revenue: 1162000, transactions: 5 }, activeBranchesToday: 1 },
+        errors: [{ code: 403, msg: 'Superadmin only' }],
+      },
+      {
+        method: 'GET', path: '/api/analytics/revenue-trend', auth: 'superadmin',
+        desc: 'Daily revenue time series for all branches combined.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        query: [{ name: 'days', type: 'number', required: false, desc: 'Lookback window in days (default: 30, max: 90)' }],
+        response: { data: [{ date: '2026-03-30', revenue: '462000.00', transactions: 4 }, { date: '2026-03-31', revenue: '600000.00', transactions: 1 }] },
+        errors: [{ code: 403, msg: 'Superadmin only' }],
+      },
+      {
+        method: 'GET', path: '/api/analytics/branch-revenue', auth: 'superadmin',
+        desc: 'Revenue and transaction count per branch for a given date.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        query: [{ name: 'date', type: 'string', required: false, desc: 'YYYY-MM-DD (default: today)' }],
+        response: { data: [{ branch_id: 1, branch_name: 'Cabang Satu', revenue: '12000.00', transactions: 1 }, { branch_id: 2, branch_name: 'Cabang Dua', revenue: '400000.00', transactions: 3 }], date: '2026-03-30' },
+        errors: [{ code: 403, msg: 'Superadmin only' }],
+      },
+      {
+        method: 'GET', path: '/api/analytics/category-sales', auth: 'superadmin',
+        desc: 'Top 10 categories ranked by total quantity sold.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        query: [{ name: 'days', type: 'number', required: false, desc: 'Lookback window in days (default: 30, max: 90)' }],
+        response: { data: [{ category_id: 1, category_name: 'Kategori 1', total_qty: '8', total_revenue: '1062000.00' }] },
+        errors: [{ code: 403, msg: 'Superadmin only' }],
+      },
+      {
+        method: 'GET', path: '/api/analytics/top-products', auth: 'superadmin',
+        desc: 'Top products ranked by quantity sold.',
+        headers: [{ name: 'Authorization', value: 'Bearer <token>', required: true }],
+        query: [
+          { name: 'days', type: 'number', required: false, desc: 'Lookback window in days (default: 30, max: 90)' },
+          { name: 'limit', type: 'number', required: false, desc: 'Max results (default: 10, max: 20)' },
+        ],
+        response: { data: [{ id: 9, name: 'tes camera 1', total_qty: '1', total_revenue: '500000.00', branch_name: 'Cabang Empat' }] },
+        errors: [{ code: 403, msg: 'Superadmin only' }],
       },
     ]
   },
