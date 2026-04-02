@@ -22,10 +22,8 @@ class UserListItem extends StatelessWidget {
         return AppTheme.gold;
       case 'admin':
         return AppTheme.success;
-      case 'karyawan':
-        return AppTheme.mutedForeground;
       default:
-        return AppTheme.mutedForeground;
+        return Colors.grey;
     }
   }
 
@@ -46,247 +44,111 @@ class UserListItem extends StatelessWidget {
     try {
       final date = DateTime.parse(dateString);
       return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
+    } catch (_) {
       return dateString;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isDesktop = MediaQuery.of(context).size.width > 768;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: EdgeInsets.all(isDesktop ? 24 : 20),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: cs.outlineVariant),
       ),
-      child: isDesktop ? _buildDesktopLayout(context) : _buildMobileLayout(context),
+      child: isDesktop
+          ? _buildDesktopLayout(context, cs)
+          : _buildMobileLayout(context, cs),
     );
   }
 
-  Widget _buildDesktopLayout(BuildContext context) {
+  Widget _buildDesktopLayout(BuildContext context, ColorScheme cs) {
     return Row(
       children: [
-        // Avatar
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: AppTheme.gold.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppTheme.gold.withOpacity(0.2)),
-          ),
-          child: Center(
-            child: Text(
-              user['name']?.toString().substring(0, 1).toUpperCase() ?? 'U',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppTheme.gold,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
+        _buildAvatar(context, 56, 28),
         const SizedBox(width: 20),
-        // User Info
         Expanded(
           flex: 2,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                user['name']?.toString() ?? 'Unknown',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppTheme.foreground,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text(user['name']?.toString() ?? 'Unknown',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
-              Text(
-                '@${user['username']?.toString() ?? 'unknown'}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.mutedForeground,
-                ),
-              ),
+              Text('@${user['username']?.toString() ?? 'unknown'}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurface.withOpacity(0.6))),
             ],
           ),
         ),
-        // Role
+        Expanded(child: _buildRoleBadge(context)),
+        const SizedBox(width: 20),
         Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _getRoleColor(user['role']?.toString() ?? '').withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: _getRoleColor(user['role']?.toString() ?? '').withOpacity(0.3),
-              ),
-            ),
-            child: Text(
-              _formatRole(user['role']?.toString() ?? ''),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: _getRoleColor(user['role']?.toString() ?? ''),
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
+          child: Text(user['branch_name']?.toString() ?? 'No Branch',
+              style: Theme.of(context).textTheme.bodyMedium),
         ),
         const SizedBox(width: 20),
-        // Branch
         Expanded(
           child: Text(
-            user['branch_name']?.toString() ?? 'No Branch',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.foreground,
-            ),
-          ),
+              _formatDate(user['created_at']?.toString() ?? ''),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurface.withOpacity(0.6))),
         ),
         const SizedBox(width: 20),
-        // Created Date
-        Expanded(
-          child: Text(
-            _formatDate(user['created_at']?.toString() ?? ''),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.mutedForeground,
-            ),
-          ),
-        ),
-        const SizedBox(width: 20),
-        // Actions
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (onEdit != null)
-              CustomButton(
-                text: 'Edit',
-                icon: Icons.edit,
-                size: ButtonSize.small,
-                variant: ButtonVariant.outline,
-                onPressed: onEdit!,
-              ),
-            if (onEdit != null && onDelete != null)
-              const SizedBox(width: 8),
-            if (onDelete != null)
-              CustomButton(
-                text: 'Delete',
-                icon: Icons.delete,
-                size: ButtonSize.small,
-                variant: ButtonVariant.outline,
-                onPressed: onDelete!,
-              ),
-            if (onEdit == null && onDelete == null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.mutedForeground.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'View Only',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.mutedForeground,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        _buildActions(context, cs),
       ],
     );
   }
 
-  Widget _buildMobileLayout(BuildContext context) {
+  Widget _buildMobileLayout(BuildContext context, ColorScheme cs) {
     return Column(
       children: [
         Row(
           children: [
-            // Avatar
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppTheme.gold.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppTheme.gold.withOpacity(0.2)),
-              ),
-              child: Center(
-                child: Text(
-                  user['name']?.toString().substring(0, 1).toUpperCase() ?? 'U',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppTheme.gold,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
+            _buildAvatar(context, 48, 24),
             const SizedBox(width: 16),
-            // User Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    user['name']?.toString() ?? 'Unknown',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.foreground,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  Text(user['name']?.toString() ?? 'Unknown',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 2),
-                  Text(
-                    '@${user['username']?.toString() ?? 'unknown'}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.mutedForeground,
-                    ),
-                  ),
+                  Text('@${user['username']?.toString() ?? 'unknown'}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withOpacity(0.6))),
                 ],
               ),
             ),
-            // Role Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: _getRoleColor(user['role']?.toString() ?? '').withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _getRoleColor(user['role']?.toString() ?? '').withOpacity(0.3),
-                ),
-              ),
-              child: Text(
-                _formatRole(user['role']?.toString() ?? ''),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _getRoleColor(user['role']?.toString() ?? ''),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 11,
-                ),
-              ),
-            ),
+            _buildRoleBadge(context),
           ],
         ),
         const SizedBox(height: 16),
-        // Additional Info
         Row(
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Cabang',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.mutedForeground,
-                      fontSize: 11,
-                    ),
-                  ),
+                  Text('Cabang',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withOpacity(0.5),
+                          fontSize: 11)),
                   const SizedBox(height: 2),
-                  Text(
-                    user['branch_name']?.toString() ?? 'Tidak ada cabang',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.foreground,
-                    ),
-                  ),
+                  Text(user['branch_name']?.toString() ?? 'Tidak ada cabang',
+                      style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
@@ -294,27 +156,19 @@ class UserListItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Dibuat',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.mutedForeground,
-                      fontSize: 11,
-                    ),
-                  ),
+                  Text('Dibuat',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withOpacity(0.5),
+                          fontSize: 11)),
                   const SizedBox(height: 2),
-                  Text(
-                    _formatDate(user['created_at']?.toString() ?? ''),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.foreground,
-                    ),
-                  ),
+                  Text(_formatDate(user['created_at']?.toString() ?? ''),
+                      style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        // Actions
         Row(
           children: [
             if (onEdit != null)
@@ -328,8 +182,7 @@ class UserListItem extends StatelessWidget {
                   onPressed: onEdit!,
                 ),
               ),
-            if (onEdit != null && onDelete != null)
-              const SizedBox(width: 12),
+            if (onEdit != null && onDelete != null) const SizedBox(width: 12),
             if (onDelete != null)
               Expanded(
                 child: CustomButton(
@@ -346,20 +199,90 @@ class UserListItem extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppTheme.mutedForeground.withOpacity(0.1),
+                    color: cs.onSurface.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    'View Only',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.mutedForeground,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  child: Text('View Only',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withOpacity(0.5)),
+                      textAlign: TextAlign.center),
                 ),
               ),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _buildAvatar(BuildContext context, double size, double radius) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppTheme.gold.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: AppTheme.gold.withOpacity(0.2)),
+      ),
+      child: Center(
+        child: Text(
+          user['name']?.toString().substring(0, 1).toUpperCase() ?? 'U',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: AppTheme.gold, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleBadge(BuildContext context) {
+    final roleStr = user['role']?.toString() ?? '';
+    final color = _getRoleColor(roleStr);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        _formatRole(roleStr),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color, fontWeight: FontWeight.w500, fontSize: 11),
+      ),
+    );
+  }
+
+  Widget _buildActions(BuildContext context, ColorScheme cs) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onEdit != null)
+          CustomButton(
+            text: 'Edit',
+            icon: Icons.edit,
+            size: ButtonSize.small,
+            variant: ButtonVariant.outline,
+            onPressed: onEdit!,
+          ),
+        if (onEdit != null && onDelete != null) const SizedBox(width: 8),
+        if (onDelete != null)
+          CustomButton(
+            text: 'Delete',
+            icon: Icons.delete,
+            size: ButtonSize.small,
+            variant: ButtonVariant.outline,
+            onPressed: onDelete!,
+          ),
+        if (onEdit == null && onDelete == null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: cs.onSurface.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('View Only',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurface.withOpacity(0.5))),
+          ),
       ],
     );
   }

@@ -7,11 +7,13 @@ import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/services/product_service.dart';
+import '../../../../core/services/voucher_service.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/provider/realtime_provider.dart';
 import '../../../../shared/widgets/custom_button.dart';
+import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../widgets/product_card.dart';
 import '../widgets/cart_item_widget.dart';
 import '../widgets/coupon_card.dart';
@@ -164,41 +166,44 @@ class _CashierPageState extends ConsumerState<CashierPage>
 
     setState(() => _isApplyingCoupon = true);
 
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 1000));
-
-    setState(() {
-      _isApplyingCoupon = false;
-      if (code == 'GOLD20' || code == 'VIP15') {
-        _appliedCoupon = {
-          'code': code,
-          'discount': code == 'GOLD20' ? 20 : 15,
-          'description': code == 'GOLD20'
-              ? 'Premium member discount'
-              : 'VIP customer exclusive',
-        };
-        _currentView = CashierView.cart;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Coupon $code applied successfully!'),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Invalid or expired coupon code'),
-            backgroundColor: AppTheme.destructive,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
+    try {
+      final voucher = await VoucherService.validate(code);
+      if (mounted) {
+        setState(() {
+          _isApplyingCoupon = false;
+          _appliedCoupon = {
+            'code': voucher.code,
+            'discount': voucher.discountType == 'percent'
+                ? voucher.discountValue
+                : null,
+            'fixedDiscount': voucher.discountType == 'fixed'
+                ? voucher.discountValue
+                : null,
+            'discountType': voucher.discountType,
+            'description': voucher.description ?? voucher.discountLabel,
+          };
+          _currentView = CashierView.cart;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Voucher $code applied!'),
+          backgroundColor: AppTheme.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ));
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isApplyingCoupon = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e is DioException
+              ? (e.response?.data?['error'] ?? 'Invalid or expired voucher')
+              : 'Invalid or expired voucher'),
+          backgroundColor: AppTheme.destructive,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ));
+      }
+    }
   }
 
   Future<void> _processPayment(String method) async {
@@ -290,7 +295,13 @@ class _CashierPageState extends ConsumerState<CashierPage>
 
   double get _discount {
     if (_appliedCoupon == null) return 0;
-    return _subtotal * (_appliedCoupon!['discount'] / 100);
+    if (_appliedCoupon!['discountType'] == 'fixed') {
+      final fixed = (_appliedCoupon!['fixedDiscount'] as num?)?.toDouble() ?? 0;
+      return fixed > _subtotal ? _subtotal : fixed;
+    }
+    // percent
+    final pct = (_appliedCoupon!['discount'] as num?)?.toDouble() ?? 0;
+    return _subtotal * (pct / 100);
   }
 
   double get _total => _subtotal - _discount;
@@ -462,7 +473,9 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                       ],
                                     ),
                                   )
-                                : GridView.builder(
+                                : PullToRefresh(
+                                    onRefresh: _loadProducts,
+                                    child: GridView.builder(
                                     padding: const EdgeInsets.all(16),
                                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: isLandscape ? 3 : 2,
@@ -478,6 +491,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                         onAdd: () => _addToCart(product),
                                       );
                                     },
+                                  ),
                                   ),
                   ),
                 ],
@@ -859,25 +873,28 @@ class _CashierPageState extends ConsumerState<CashierPage>
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.72,
+    return PullToRefresh(
+      onRefresh: _loadProducts,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.72,
+          ),
+          itemCount: _filteredProducts.length,
+          itemBuilder: (context, index) {
+            final product = _filteredProducts[index];
+            return ProductCard(
+              product: product,
+              onAdd: () => _addToCart(product),
+            );
+          },
         ),
-        itemCount: _filteredProducts.length,
-        itemBuilder: (context, index) {
-          final product = _filteredProducts[index];
-          return ProductCard(
-            product: product,
-            onAdd: () => _addToCart(product),
-          );
-        },
-      ),
-    );
+      ), // Padding
+    ); // PullToRefresh
   }
 
   Widget _buildCartView() {
@@ -1086,19 +1103,15 @@ class _CashierPageState extends ConsumerState<CashierPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Enter Coupon Code',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text('Enter Voucher Code',
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _couponController,
-                  decoration: const InputDecoration(
-                    hintText: 'e.g. GOLD20',
-                  ),
+                  decoration: const InputDecoration(hintText: 'e.g. SUMMER20'),
                   textCapitalization: TextCapitalization.characters,
                 ),
               ),
@@ -1109,25 +1122,6 @@ class _CashierPageState extends ConsumerState<CashierPage>
                 isLoading: _isApplyingCoupon,
               ),
             ],
-          ),
-          const SizedBox(height: 32),
-          Text(
-            'Available Coupons',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 16),
-          const CouponCard(
-            code: 'GOLD20',
-            discount: '20% OFF',
-            description: 'Premium member discount',
-            expiresAt: 'Dec 31, 2024',
-          ),
-          const SizedBox(height: 12),
-          const CouponCard(
-            code: 'VIP15',
-            discount: '15% OFF',
-            description: 'VIP customer exclusive',
-            expiresAt: 'Jan 15, 2025',
           ),
         ],
       ),

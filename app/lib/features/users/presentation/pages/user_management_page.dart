@@ -7,6 +7,7 @@ import '../widgets/user_list_item.dart';
 import '../widgets/user_form_dialog.dart';
 import '../widgets/user_delete_dialog.dart';
 import '../providers/user_management_provider.dart';
+import '../../../../shared/widgets/pull_to_refresh.dart';
 
 class UserManagementPage extends ConsumerStatefulWidget {
   const UserManagementPage({super.key});
@@ -38,25 +39,18 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
     showDialog(
       context: context,
       builder: (context) => UserFormDialog(user: user),
-    ).then((_) {
-      // Refresh users list after dialog closes
-      ref.read(userManagementProvider.notifier).loadUsers();
-    });
+    ).then((_) => ref.read(userManagementProvider.notifier).loadUsers());
   }
 
   void _showDeleteDialog(Map<String, dynamic> user) {
     showDialog(
       context: context,
       builder: (context) => UserDeleteDialog(user: user),
-    ).then((_) {
-      // Refresh users list after dialog closes
-      ref.read(userManagementProvider.notifier).loadUsers();
-    });
+    ).then((_) => ref.read(userManagementProvider.notifier).loadUsers());
   }
 
-  void _onSearch(String query) {
-    ref.read(userManagementProvider.notifier).searchUsers(query);
-  }
+  void _onSearch(String query) =>
+      ref.read(userManagementProvider.notifier).searchUsers(query);
 
   void _onFilterChanged() {
     ref.read(userManagementProvider.notifier).filterUsers(
@@ -67,21 +61,19 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final userState = ref.watch(userManagementProvider);
     final isDesktop = MediaQuery.of(context).size.width > 768;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: cs.surface,
       body: Column(
         children: [
-          // Header
           Container(
             padding: EdgeInsets.all(isDesktop ? 32 : 24),
-            decoration: const BoxDecoration(
-              color: AppTheme.surface,
-              border: Border(
-                bottom: BorderSide(color: AppTheme.border),
-              ),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              border: Border(bottom: BorderSide(color: cs.outlineVariant)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,17 +86,19 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                         children: [
                           Text(
                             'User Management',
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                              color: AppTheme.foreground,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Manage system users and their permissions',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.mutedForeground,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                    color: cs.onSurface.withOpacity(0.6)),
                           ),
                         ],
                       ),
@@ -112,22 +106,19 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                     Row(
                       children: [
                         IconButton(
-                          onPressed: userState.isLoading ? null : () {
-                            ref.read(userManagementProvider.notifier).loadUsers();
-                          },
-                          icon: userState.isLoading 
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.gold,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.refresh,
-                                color: AppTheme.mutedForeground,
-                              ),
+                          onPressed: userState.isLoading
+                              ? null
+                              : () => ref
+                                  .read(userManagementProvider.notifier)
+                                  .loadUsers(),
+                          icon: userState.isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: AppTheme.gold))
+                              : Icon(Icons.refresh,
+                                  color: cs.onSurface.withOpacity(0.6)),
                         ),
                         const SizedBox(width: 12),
                         CustomButton(
@@ -141,26 +132,20 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // Search and Filters
                 if (isDesktop)
                   Row(
                     children: [
                       Expanded(
-                        flex: 2,
-                        child: CustomSearchBar(
-                          controller: _searchController,
-                          hintText: 'Search users by name or username...',
-                          onChanged: _onSearch,
-                        ),
-                      ),
+                          flex: 2,
+                          child: CustomSearchBar(
+                            controller: _searchController,
+                            hintText: 'Search users by name or username...',
+                            onChanged: _onSearch,
+                          )),
                       const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildRoleFilter(),
-                      ),
+                      Expanded(child: _buildRoleFilter()),
                       const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildBranchFilter(),
-                      ),
+                      Expanded(child: _buildBranchFilter()),
                     ],
                   )
                 else
@@ -184,31 +169,30 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
               ],
             ),
           ),
-          // Content
-          Expanded(
-            child: _buildContent(userState, isDesktop),
-          ),
+          Expanded(child: _buildContent(userState, isDesktop)),
         ],
       ),
     );
   }
 
   Widget _buildRoleFilter() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        border: Border.all(color: AppTheme.border),
+        color: cs.surface,
+        border: Border.all(color: cs.outlineVariant),
         borderRadius: BorderRadius.circular(12),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedRole,
           isExpanded: true,
-          dropdownColor: AppTheme.surface,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppTheme.foreground,
-          ),
+          dropdownColor: cs.surface,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: cs.onSurface),
           items: const [
             DropdownMenuItem(value: 'all', child: Text('All Roles')),
             DropdownMenuItem(value: 'superadmin', child: Text('Super Admin')),
@@ -216,9 +200,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
             DropdownMenuItem(value: 'karyawan', child: Text('Employee')),
           ],
           onChanged: (value) {
-            setState(() {
-              _selectedRole = value!;
-            });
+            setState(() => _selectedRole = value!);
             _onFilterChanged();
           },
         ),
@@ -227,30 +209,30 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
   }
 
   Widget _buildBranchFilter() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        border: Border.all(color: AppTheme.border),
+        color: cs.surface,
+        border: Border.all(color: cs.outlineVariant),
         borderRadius: BorderRadius.circular(12),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedBranch,
           isExpanded: true,
-          dropdownColor: AppTheme.surface,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppTheme.foreground,
-          ),
+          dropdownColor: cs.surface,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: cs.onSurface),
           items: const [
             DropdownMenuItem(value: 'all', child: Text('All Branches')),
             DropdownMenuItem(value: '1', child: Text('Main Branch')),
             DropdownMenuItem(value: '2', child: Text('Branch 2')),
           ],
           onChanged: (value) {
-            setState(() {
-              _selectedBranch = value!;
-            });
+            setState(() => _selectedBranch = value!);
             _onFilterChanged();
           },
         ),
@@ -259,12 +241,11 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
   }
 
   Widget _buildContent(UserManagementState state, bool isDesktop) {
+    final cs = Theme.of(context).colorScheme;
+
     if (state.isLoading && state.users.isEmpty) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: AppTheme.gold,
-        ),
-      );
+          child: CircularProgressIndicator(color: AppTheme.gold));
     }
 
     if (state.error != null) {
@@ -272,32 +253,21 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: AppTheme.destructive,
-            ),
+            const Icon(Icons.error_outline,
+                size: 64, color: AppTheme.destructive),
             const SizedBox(height: 16),
-            Text(
-              'Error loading users',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppTheme.foreground,
-              ),
-            ),
+            Text('Error loading users',
+                style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
-            Text(
-              state.error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.mutedForeground,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            Text(state.error!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withOpacity(0.6)),
+                textAlign: TextAlign.center),
             const SizedBox(height: 24),
             CustomButton(
               text: 'Retry',
-              onPressed: () {
-                ref.read(userManagementProvider.notifier).loadUsers();
-              },
+              onPressed: () =>
+                  ref.read(userManagementProvider.notifier).loadUsers(),
             ),
           ],
         ),
@@ -309,25 +279,15 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.people_outline,
-              size: 64,
-              color: AppTheme.mutedForeground,
-            ),
+            Icon(Icons.people_outline,
+                size: 64, color: cs.onSurface.withOpacity(0.4)),
             const SizedBox(height: 16),
-            Text(
-              'No users found',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppTheme.foreground,
-              ),
-            ),
+            Text('No users found',
+                style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
-            Text(
-              'Add your first user to get started',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.mutedForeground,
-              ),
-            ),
+            Text('Add your first user to get started',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withOpacity(0.6))),
             const SizedBox(height: 24),
             CustomButton(
               text: 'Add User',
@@ -339,22 +299,24 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
       );
     }
 
-    return ListView.builder(
-      itemCount: state.users.length,
-      itemBuilder: (context, index) {
-        final user = state.users[index];
-        return Container(
-          margin: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 32 : 24,
-            vertical: 8,
-          ),
-          child: UserListItem(
-            user: user,
-            onEdit: () => _showUserForm(user: user),
-            onDelete: () => _showDeleteDialog(user),
-          ),
-        );
-      },
+    return PullToRefresh(
+      onRefresh: () async =>
+          ref.read(userManagementProvider.notifier).loadUsers(),
+      child: ListView.builder(
+        itemCount: state.users.length,
+        itemBuilder: (context, index) {
+          final user = state.users[index];
+          return Container(
+            margin: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 32 : 24, vertical: 8),
+            child: UserListItem(
+              user: user,
+              onEdit: () => _showUserForm(user: user),
+              onDelete: () => _showDeleteDialog(user),
+            ),
+          );
+        },
+      ),
     );
   }
 }

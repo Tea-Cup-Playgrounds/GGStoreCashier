@@ -13,6 +13,7 @@ import '../../../../core/helper/currency_formatter.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/quick_action_card.dart';
 import '../widgets/transaction_item.dart';
+import '../../../../shared/widgets/pull_to_refresh.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -204,7 +205,9 @@ class _HomePageState extends ConsumerState<HomePage>
   ) {
     final stats = _stats!;
 
-    return SingleChildScrollView(
+    return PullToRefresh(
+      onRefresh: _loadDashboard,
+      child: SingleChildScrollView(
       padding: EdgeInsets.symmetric(
           horizontal: horizontalPadding, vertical: 20),
       child: Column(
@@ -476,6 +479,7 @@ class _HomePageState extends ConsumerState<HomePage>
           const SizedBox(height: 100),
         ],
       ),
-    );
+    ), // SingleChildScrollView
+    ); // PullToRefresh
   }
 }

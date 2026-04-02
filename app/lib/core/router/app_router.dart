@@ -5,7 +5,11 @@ import 'package:gg_store_cashier/features/devices/presentation/pages/printer_dev
 import 'package:gg_store_cashier/features/devices/presentation/pages/scanner_devices_page.dart';
 import 'package:gg_store_cashier/features/inventory/presentation/pages/inventory_add_item_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/appearance_page.dart';
+import 'package:gg_store_cashier/features/settings/presentation/pages/branch_edit_page.dart';
 import 'package:gg_store_cashier/features/users/presentation/pages/user_management_router_page.dart';
+import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_management_page.dart';
+import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_form_page.dart';
+import 'package:gg_store_cashier/core/models/voucher.dart';
 import 'package:gg_store_cashier/shared/layout/scaffold_with_bottom_navbar.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -28,6 +32,10 @@ mixin AppRouter {
   static const String printerDevices = '/devices/printer';
   static const String settings = '/settings';
   static const String userManagement = '/users';
+  static const String branchEdit = '/branch/edit/:id';
+  static const String voucherManagement = '/vouchers';
+  static const String voucherCreate     = '/vouchers/new';
+  static const String voucherEdit       = '/vouchers/edit/:id';
 
   static final _rootNavigatorkey = GlobalKey<NavigatorState>();
   static final homeNavKey = GlobalKey<NavigatorState>();
@@ -113,6 +121,44 @@ mixin AppRouter {
             context: context,
             state: state,
             child: const UserManagementRouterPage()),
+      ),
+      GoRoute(
+        path: branchEdit,
+        name: 'branchEdit',
+        pageBuilder: (context, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          return TransitionFactory.getSlideBuilder(
+              context: context,
+              state: state,
+              child: BranchEditPage(branchId: id));
+        },
+      ),
+      GoRoute(
+        path: voucherManagement,
+        name: 'voucherManagement',
+        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
+            context: context,
+            state: state,
+            child: const VoucherManagementPage()),
+      ),
+      GoRoute(
+        path: voucherCreate,
+        name: 'voucherCreate',
+        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
+            context: context,
+            state: state,
+            child: const VoucherFormPage()),
+      ),
+      GoRoute(
+        path: voucherEdit,
+        name: 'voucherEdit',
+        pageBuilder: (context, state) {
+          final voucher = state.extra as Voucher;
+          return TransitionFactory.getSlideBuilder(
+              context: context,
+              state: state,
+              child: VoucherFormPage(voucher: voucher));
+        },
       ),
       // HALAMAN YANG BUTUH LAYOUT SCAFFOLD + BOTTOM NAV TARUH DI SINI
       StatefulShellRoute.indexedStack(

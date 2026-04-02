@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/inventory_header.dart';
 import 'category_management_page.dart';
+import '../../../../shared/widgets/pull_to_refresh.dart';
 
 class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
@@ -223,7 +224,9 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
         break;
     }
 
-    return CustomScrollView(
+    return PullToRefresh(
+      onRefresh: _loadProducts,
+      child: CustomScrollView(
       slivers: [
         SliverPersistentHeader(
           delegate: _InventoryHeaderDelegate(
@@ -327,7 +330,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
           ),
         )
       ],
-    );
+    ), // CustomScrollView
+    ); // PullToRefresh
   }
 }
 

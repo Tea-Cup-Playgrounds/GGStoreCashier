@@ -5,35 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f97149e0-b0e6-4add-b987-a4592228a1df" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/API/src/routes/categories.js" beforeDir="false" afterPath="$PROJECT_DIR$/API/src/routes/categories.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/API/src/routes/products.js" beforeDir="false" afterPath="$PROJECT_DIR$/API/src/routes/products.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/API/src/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/API/src/server.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/API/src/utils/upload.js" beforeDir="false" afterPath="$PROJECT_DIR$/API/src/utils/upload.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/app/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/android/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/android/app/src/main/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/core/config/api_config.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/core/config/api_config.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/core/router/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/core/router/app_router.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/core/router/auth_guard.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/core/router/auth_guard.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/core/services/auth_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/core/services/auth_service.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/core/services/connectivity_test.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/core/services/connectivity_test.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/core/services/product_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/core/services/product_service.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/core/services/session_manager.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/core/services/session_manager.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/core/services/socket_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/core/services/socket_service.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/features/auth/presentation/pages/login_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/auth/presentation/pages/login_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/features/inventory/presentation/pages/category_management_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/inventory/presentation/pages/category_management_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/features/inventory/presentation/pages/inventory_add_item_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/inventory/presentation/pages/inventory_add_item_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/features/inventory/presentation/pages/inventory_detail_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/inventory/presentation/pages/inventory_detail_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/features/users/presentation/providers/user_management_provider.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/users/presentation/providers/user_management_provider.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/main.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/shared/widgets/bottom_navigation.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/shared/widgets/bottom_navigation.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/shared/widgets/branch_autocomplete.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/shared/widgets/branch_autocomplete.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/shared/widgets/image_input.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/shared/widgets/image_input.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/shared/widgets/text_input.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/shared/widgets/text_input.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/app/pubspec.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/app/pubspec.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example.env" beforeDir="false" afterPath="$PROJECT_DIR$/example.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/lib/features/cashier/presentation/pages/cashier_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/cashier/presentation/pages/cashier_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/lib/features/cashier/presentation/widgets/product_card.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/cashier/presentation/widgets/product_card.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/lib/features/home/presentation/pages/home_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/home/presentation/pages/home_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/lib/features/inventory/presentation/pages/inventory_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/inventory/presentation/pages/inventory_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/lib/features/users/presentation/pages/admin_user_management_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/users/presentation/pages/admin_user_management_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/lib/features/users/presentation/pages/superadmin_user_management_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/users/presentation/pages/superadmin_user_management_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/lib/features/users/presentation/pages/user_management_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/features/users/presentation/pages/user_management_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/linux/flutter/generated_plugin_registrant.cc" beforeDir="false" afterPath="$PROJECT_DIR$/app/linux/flutter/generated_plugin_registrant.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/linux/flutter/generated_plugins.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/app/linux/flutter/generated_plugins.cmake" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/macos/Flutter/GeneratedPluginRegistrant.swift" beforeDir="false" afterPath="$PROJECT_DIR$/app/macos/Flutter/GeneratedPluginRegistrant.swift" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/windows/flutter/generated_plugin_registrant.cc" beforeDir="false" afterPath="$PROJECT_DIR$/app/windows/flutter/generated_plugin_registrant.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/windows/flutter/generated_plugins.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/app/windows/flutter/generated_plugins.cmake" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,25 +39,25 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "cf.first.check.clang-format": "false",
-    "cidr.known.project.marker": "true",
-    "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "big__big__big__update",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/Projects/MOBILE/GGStoreCashier/app",
-    "settings.editor.selected.configurable": "AndroidSdkUpdater",
-    "show.migrate.to.gradle.popup": "false"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;dart.analysis.tool.window.visible&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Projects/MOBILE/GGStoreCashier/app&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;AndroidSdkUpdater&quot;,
+    &quot;show.migrate.to.gradle.popup&quot;: &quot;false&quot;
   }
-}]]></component>
+}</component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="f97149e0-b0e6-4add-b987-a4592228a1df" name="Changes" comment="" />

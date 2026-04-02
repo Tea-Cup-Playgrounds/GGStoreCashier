@@ -68,20 +68,38 @@ router.post('/', requireRole(['superadmin']), async (req, res) => {
     }
 });
 
-// Update branch (superadmin only)
-router.put('/:id', requireRole(['superadmin']), async (req, res) => {
+// Update branch
+// - superadmin: can update any branch
+// - admin: can only update their own assigned branch
+router.put('/:id', async (req, res) => {
     try {
+        const { role, branch_id } = req.user;
+        const targetId = parseInt(req.params.id, 10);
+
+        // Role check
+        if (role === 'karyawan') {
+            return res.status(403).json({ error: 'Insufficient permissions' });
+        }
+
+        // Admin can only edit their own branch
+        if (role === 'admin' && branch_id !== targetId) {
+            return res.status(403).json({ error: 'You can only edit your own branch' });
+        }
+
+        // Prevent editing the global "Semua Branch" (id = 0) by admins
+        if (role === 'admin' && targetId === 0) {
+            return res.status(403).json({ error: 'Cannot edit the global branch' });
+        }
+
         const { name, address, phone } = req.body;
 
         if (!name) {
-            return res.status(400).json({ 
-                error: 'Branch name is required' 
-            });
+            return res.status(400).json({ error: 'Branch name is required' });
         }
 
         const [result] = await pool.execute(
             'UPDATE branches SET name = ?, address = ?, phone = ?, updated_at = NOW() WHERE id = ?',
-            [name, address, phone, req.params.id]
+            [name, address || null, phone || null, targetId]
         );
 
         if (result.affectedRows === 0) {

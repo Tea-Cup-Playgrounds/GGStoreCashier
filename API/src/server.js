@@ -27,6 +27,7 @@ const categoryRoutes = require('./routes/categories');
 const branchRoutes = require('./routes/branches');
 const transactionRoutes = require('./routes/transactions');
 const dashboardRoutes = require('./routes/dashboard');
+const voucherRoutes  = require('./routes/vouchers');
 
 const app = express();
 const server = http.createServer(app);
@@ -165,6 +166,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/branches', branchRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/vouchers',  voucherRoutes);
 
 // ── Docs session middleware ───────────────────────────────────────────────────
 const DOCS_SESSION_COOKIE = 'docs_session';

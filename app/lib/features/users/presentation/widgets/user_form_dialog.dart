@@ -52,7 +52,6 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
       _selectedBranchId = widget.user!['branch_id'];
       _selectedBranchName = widget.user!['branch_name']?.toString() ?? '';
     } else if (widget.restrictedBranchId != null) {
-      // For admin, set their branch as default
       _selectedBranch = widget.restrictedBranchId.toString();
       _selectedBranchId = widget.restrictedBranchId;
     }
@@ -69,9 +68,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-
     try {
       final userData = <String, dynamic>{
         'name': _nameController.text.trim(),
@@ -79,57 +76,38 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
         'role': _selectedRole,
       };
 
-      // Add branch_id if it's an existing branch, or branch_name if it's a new branch
       if (_selectedBranchId != null) {
         userData['branch_id'] = _selectedBranchId as dynamic;
       } else if (_selectedBranchName.isNotEmpty) {
         userData['branch_name'] = _selectedBranchName;
       }
 
-      // Only include password if it's provided (for editing) or if creating new user
       if (_passwordController.text.isNotEmpty || !_isEditing) {
         userData['password'] = _passwordController.text;
       }
 
       if (_isEditing) {
-        await ref.read(userManagementProvider.notifier).updateUser(
-          widget.user!['id'],
-          userData,
-        );
-        if (mounted) {
-          SnackBarService.success('User updated successfully');
-        }
+        await ref
+            .read(userManagementProvider.notifier)
+            .updateUser(widget.user!['id'], userData);
+        if (mounted) SnackBarService.success('User updated successfully');
       } else {
         await ref.read(userManagementProvider.notifier).createUser(userData);
-        if (mounted) {
-          SnackBarService.success('User created successfully');
-        }
+        if (mounted) SnackBarService.success('User created successfully');
       }
 
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      if (mounted) {
-        SnackBarService.error(e.toString());
-      }
+      if (mounted) SnackBarService.error(e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   String? _validateName(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Name is required';
-    }
-    if (value.trim().length < 2) {
-      return 'Name must be at least 2 characters';
-    }
-    if (value.trim().length > 50) {
-      return 'Name must be less than 50 characters';
-    }
+    if (value == null || value.trim().isEmpty) return 'Name is required';
+    if (value.trim().length < 2) return 'Name must be at least 2 characters';
+    if (value.trim().length > 50) return 'Name must be less than 50 characters';
     if (!RegExp(r"^[a-zA-Z\s\-'\.]+$").hasMatch(value.trim())) {
       return 'Name can only contain letters, spaces, hyphens, apostrophes, and periods';
     }
@@ -137,15 +115,9 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
   }
 
   String? _validateUsername(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Username is required';
-    }
-    if (value.trim().length < 3) {
-      return 'Username must be at least 3 characters';
-    }
-    if (value.trim().length > 30) {
-      return 'Username must be less than 30 characters';
-    }
+    if (value == null || value.trim().isEmpty) return 'Username is required';
+    if (value.trim().length < 3) return 'Username must be at least 3 characters';
+    if (value.trim().length > 30) return 'Username must be less than 30 characters';
     if (!RegExp(r'^[a-zA-Z0-9_\-\.]+$').hasMatch(value.trim())) {
       return 'Username can only contain letters, numbers, underscores, hyphens, and periods';
     }
@@ -156,11 +128,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
     if (!_isEditing && (value == null || value.isEmpty)) {
       return 'Password is required';
     }
-    if (value != null && value.isNotEmpty) {
-      if (value.length < 8) {
-        return 'Password must be at least 8 characters';
-      }
-      // Additional password strength validation is handled by the indicator
+    if (value != null && value.isNotEmpty && value.length < 8) {
+      return 'Password must be at least 8 characters';
     }
     return null;
   }
@@ -177,11 +146,11 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Dialog(
-      backgroundColor: AppTheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         width: MediaQuery.of(context).size.width * 0.9,
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
@@ -195,19 +164,21 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                 Expanded(
                   child: Text(
                     _isEditing ? 'Edit User' : 'Add New User',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppTheme.foreground,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: AppTheme.mutedForeground),
+                  icon: Icon(Icons.close,
+                      color: cs.onSurface.withOpacity(0.6)),
                 ),
               ],
             ),
             const SizedBox(height: 24),
+
             // Form
             Flexible(
               child: SingleChildScrollView(
@@ -216,7 +187,6 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Name Field
                       TextInput(
                         controller: _nameController,
                         label: 'Full Name',
@@ -225,7 +195,6 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         prefixIcon: Icons.person_outline,
                       ),
                       const SizedBox(height: 20),
-                      // Username Field
                       TextInput(
                         controller: _usernameController,
                         label: 'Username',
@@ -234,50 +203,58 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         prefixIcon: Icons.alternate_email,
                       ),
                       const SizedBox(height: 20),
-                      // Role Dropdown
+
+                      // Role dropdown
                       Text(
                         'Role',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.foreground,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: AppTheme.surface,
-                          border: Border.all(color: AppTheme.border),
+                          color: cs.surface,
+                          border: Border.all(color: cs.outlineVariant),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: _selectedRole,
                             isExpanded: true,
-                            dropdownColor: AppTheme.surface,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.foreground,
-                            ),
+                            dropdownColor: cs.surface,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: cs.onSurface),
                             items: widget.isSuperAdmin
                                 ? const [
-                                    DropdownMenuItem(value: 'karyawan', child: Text('Employee')),
-                                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                                    DropdownMenuItem(value: 'superadmin', child: Text('Super Admin')),
+                                    DropdownMenuItem(
+                                        value: 'karyawan',
+                                        child: Text('Employee')),
+                                    DropdownMenuItem(
+                                        value: 'admin',
+                                        child: Text('Admin')),
+                                    DropdownMenuItem(
+                                        value: 'superadmin',
+                                        child: Text('Super Admin')),
                                   ]
                                 : const [
-                                    DropdownMenuItem(value: 'karyawan', child: Text('Employee')),
+                                    DropdownMenuItem(
+                                        value: 'karyawan',
+                                        child: Text('Employee')),
                                   ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedRole = value!;
-                              });
-                            },
+                            onChanged: (value) =>
+                                setState(() => _selectedRole = value!),
                           ),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Branch Autocomplete
+
                       BranchAutocomplete(
                         initialValue: _selectedBranch,
                         initialBranchName: _selectedBranchName,
@@ -299,37 +276,36 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         },
                       ),
                       const SizedBox(height: 20),
-                      // Password Field
+
                       TextInput(
                         controller: _passwordController,
-                        label: _isEditing ? 'New Password (leave empty to keep current)' : 'Password',
+                        label: _isEditing
+                            ? 'New Password (leave empty to keep current)'
+                            : 'Password',
                         hintText: 'Enter password',
                         obscureText: _obscurePassword,
                         validator: _validatePassword,
                         prefixIcon: Icons.lock_outline,
                         suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                            color: AppTheme.mutedForeground,
+                            _obscurePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            color: cs.onSurface.withOpacity(0.6),
                           ),
                         ),
-                        onChanged: (value) {
-                          setState(() {}); // Trigger rebuild for password strength indicator
-                        },
+                        onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: 12),
-                      // Password Strength Indicator
                       PasswordStrengthIndicator(
                         password: _passwordController.text,
-                        showRequirements: _passwordController.text.isNotEmpty,
+                        showRequirements:
+                            _passwordController.text.isNotEmpty,
                       ),
                       const SizedBox(height: 20),
-                      // Confirm Password Field
+
                       TextInput(
                         controller: _confirmPasswordController,
                         label: 'Confirm Password',
@@ -338,14 +314,14 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         validator: _validateConfirmPassword,
                         prefixIcon: Icons.lock_outline,
                         suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
-                            });
-                          },
+                          onPressed: () => setState(() =>
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword),
                           icon: Icon(
-                            _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
-                            color: AppTheme.mutedForeground,
+                            _obscureConfirmPassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            color: cs.onSurface.withOpacity(0.6),
                           ),
                         ),
                       ),
@@ -355,6 +331,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
               ),
             ),
             const SizedBox(height: 24),
+
             // Actions
             Row(
               children: [

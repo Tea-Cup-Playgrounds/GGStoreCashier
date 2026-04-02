@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
+import 'package:gg_store_cashier/core/router/role_guard.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 
@@ -24,6 +25,7 @@ class SettingsPage extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final isKaryawan = user?.isEmployee ?? false;
+    final isAdminOrAbove = RoleGuard.isAdminOrAbove(user);
     
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -54,6 +56,25 @@ class SettingsPage extends ConsumerWidget {
                   // TODO: Implement navigation
                 },
               ),
+              // Branch edit tile — visible to admin and superadmin only
+              if (isAdminOrAbove) ...[
+                const SizedBox(height: 8.0),
+                _SettingsTile(
+                  title: RoleGuard.isSuperAdmin(user)
+                      ? 'Branch Management'
+                      : 'My Branch',
+                  subtitle: RoleGuard.isSuperAdmin(user)
+                      ? 'View and edit all branches'
+                      : 'Edit your branch information',
+                  icon: Icons.business_outlined,
+                  onTap: () {
+                    final branchId = user?.branchId ?? 0;
+                    context.push(
+                      AppRouter.branchEdit.replaceFirst(':id', '$branchId'),
+                    );
+                  },
+                ),
+              ],
               const SizedBox(height: 32.0),
 
               // 3. BAGIAN DEVICES
@@ -113,6 +134,15 @@ class SettingsPage extends ConsumerWidget {
                   icon: Icons.people_outline,
                   onTap: () {
                     context.push(AppRouter.userManagement);
+                  },
+                ),
+                const SizedBox(height: 8.0),
+                _SettingsTile(
+                  title: 'Vouchers',
+                  subtitle: 'Create and manage discount vouchers',
+                  icon: Icons.local_offer_outlined,
+                  onTap: () {
+                    context.push(AppRouter.voucherManagement);
                   },
                 ),
                 const SizedBox(height: 8.0),
@@ -265,13 +295,13 @@ class _StoreProfileHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.secondary,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   'Store ID: STORE001',
                   style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                        color: AppTheme.goldLight,
+                        color: AppTheme.gold,
                         fontWeight: FontWeight.w600,
                       ),
                 ),

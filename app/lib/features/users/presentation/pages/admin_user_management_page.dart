@@ -9,21 +9,18 @@ import '../widgets/user_list_item.dart';
 import '../widgets/user_form_dialog.dart';
 import '../widgets/user_delete_dialog.dart';
 import '../providers/user_management_provider.dart';
+import '../../../../shared/widgets/pull_to_refresh.dart';
 
-/// Admin User Management Page
-/// Admin can:
-/// - View users only in their assigned branch
-/// - Create/Edit/Delete employees (karyawan) in their branch
-/// - Cannot manage other admins or superadmins
-/// - Limited to their branch scope
 class AdminUserManagementPage extends ConsumerStatefulWidget {
   const AdminUserManagementPage({super.key});
 
   @override
-  ConsumerState<AdminUserManagementPage> createState() => _AdminUserManagementPageState();
+  ConsumerState<AdminUserManagementPage> createState() =>
+      _AdminUserManagementPageState();
 }
 
-class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPage> {
+class _AdminUserManagementPageState
+    extends ConsumerState<AdminUserManagementPage> {
   final _searchController = TextEditingController();
   String _selectedRole = 'all';
 
@@ -31,14 +28,11 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authState = ref.read(authProvider);
-      final user = authState.user;
-      
+      final user = ref.read(authProvider).user;
       if (user != null && user.branchId != null) {
-        // Load users filtered by admin's branch
         ref.read(userManagementProvider.notifier).filterUsers(
-          branchId: user.branchId.toString(),
-        );
+              branchId: user.branchId.toString(),
+            );
       }
     });
   }
@@ -49,10 +43,17 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
     super.dispose();
   }
 
-  void _showUserForm({Map<String, dynamic>? user}) {
-    final authState = ref.read(authProvider);
-    final currentUser = authState.user;
+  void _reload() {
+    final user = ref.read(authProvider).user;
+    if (user != null && user.branchId != null) {
+      ref.read(userManagementProvider.notifier).filterUsers(
+            branchId: user.branchId.toString(),
+          );
+    }
+  }
 
+  void _showUserForm({Map<String, dynamic>? user}) {
+    final currentUser = ref.read(authProvider).user;
     showDialog(
       context: context,
       builder: (context) => UserFormDialog(
@@ -60,63 +61,41 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
         isSuperAdmin: false,
         restrictedBranchId: currentUser?.branchId,
       ),
-    ).then((_) {
-      if (currentUser != null && currentUser.branchId != null) {
-        ref.read(userManagementProvider.notifier).filterUsers(
-          branchId: currentUser.branchId.toString(),
-        );
-      }
-    });
+    ).then((_) => _reload());
   }
 
   void _showDeleteDialog(Map<String, dynamic> user) {
-    // Check if user can be deleted by admin
     if (user['role'] == 'admin' || user['role'] == 'superadmin') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Anda tidak dapat menghapus pengguna admin atau superadmin'),
-          backgroundColor: AppTheme.destructive,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:
+            Text('Anda tidak dapat menghapus pengguna admin atau superadmin'),
+        backgroundColor: AppTheme.destructive,
+      ));
       return;
     }
-
     showDialog(
       context: context,
       builder: (context) => UserDeleteDialog(user: user),
-    ).then((_) {
-      final authState = ref.read(authProvider);
-      final currentUser = authState.user;
-      if (currentUser != null && currentUser.branchId != null) {
-        ref.read(userManagementProvider.notifier).filterUsers(
-          branchId: currentUser.branchId.toString(),
-        );
-      }
-    });
+    ).then((_) => _reload());
   }
 
-  void _onSearch(String query) {
-    ref.read(userManagementProvider.notifier).searchUsers(query);
-  }
+  void _onSearch(String query) =>
+      ref.read(userManagementProvider.notifier).searchUsers(query);
 
   void _onFilterChanged() {
-    final authState = ref.read(authProvider);
-    final user = authState.user;
-    
+    final user = ref.read(authProvider).user;
     if (user != null && user.branchId != null) {
       ref.read(userManagementProvider.notifier).filterUsers(
-        role: _selectedRole == 'all' ? null : _selectedRole,
-        branchId: user.branchId.toString(),
-      );
+            role: _selectedRole == 'all' ? null : _selectedRole,
+            branchId: user.branchId.toString(),
+          );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final user = authState.user;
+    final user = ref.watch(authProvider).user;
 
-    // Role check
     if (!RoleGuard.isAdmin(user)) {
       return Scaffold(
         body: Center(
@@ -125,10 +104,8 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
             children: [
               const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
-              Text(
-                'Admin Access Only',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+              Text('Admin Access Only',
+                  style: Theme.of(context).textTheme.headlineSmall),
             ],
           ),
         ),
@@ -139,24 +116,24 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
     final isDesktop = MediaQuery.of(context).size.width > 768;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Column(
         children: [
-          _buildHeader(context, userState, isDesktop, user),
-          Expanded(
-            child: _buildContent(userState, isDesktop),
-          ),
+          _buildHeader(context, userState, isDesktop),
+          Expanded(child: _buildContent(userState, isDesktop)),
         ],
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, UserManagementState state, bool isDesktop, user) {
+  Widget _buildHeader(
+      BuildContext context, UserManagementState state, bool isDesktop) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: EdgeInsets.all(isDesktop ? 32 : 24),
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(bottom: BorderSide(color: AppTheme.border)),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(bottom: BorderSide(color: cs.outlineVariant)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,7 +147,8 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
                   color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.manage_accounts, color: Colors.blue, size: 28),
+                child: const Icon(Icons.manage_accounts,
+                    color: Colors.blue, size: 28),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -182,28 +160,28 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
                         Flexible(
                           child: Text(
                             'Manajemen Pengguna',
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                              color: AppTheme.foreground,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.2),
+                            color: Colors.blue.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.blue),
                           ),
                           child: const Text(
                             'ADMIN',
                             style: TextStyle(
-                              color: Colors.blue,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
+                                color: Colors.blue,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -212,8 +190,7 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
                     Text(
                       'Kelola karyawan di cabang Anda',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.mutedForeground,
-                      ),
+                          color: cs.onSurface.withOpacity(0.6)),
                     ),
                   ],
                 ),
@@ -223,25 +200,7 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      onPressed: state.isLoading ? null : () {
-                        if (user != null && user.branchId != null) {
-                          ref.read(userManagementProvider.notifier).filterUsers(
-                            branchId: user.branchId.toString(),
-                          );
-                        }
-                      },
-                      icon: state.isLoading 
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.blue,
-                            ),
-                          )
-                        : const Icon(Icons.refresh, color: AppTheme.mutedForeground),
-                    ),
+                    _buildRefreshButton(state),
                     const SizedBox(width: 12),
                     CustomButton(
                       text: 'Tambah Karyawan',
@@ -268,29 +227,7 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
                   ),
                 ),
                 const SizedBox(width: 12),
-                IconButton(
-                  onPressed: state.isLoading ? null : () {
-                    if (user != null && user.branchId != null) {
-                      ref.read(userManagementProvider.notifier).filterUsers(
-                        branchId: user.branchId.toString(),
-                      );
-                    }
-                  },
-                  icon: state.isLoading 
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.blue,
-                        ),
-                      )
-                    : const Icon(Icons.refresh, color: AppTheme.mutedForeground),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.muted,
-                    padding: const EdgeInsets.all(12),
-                  ),
-                ),
+                _buildRefreshButton(state, asMobile: true),
               ],
             ),
           ],
@@ -298,6 +235,28 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
           _buildFilters(isDesktop),
         ],
       ),
+    );
+  }
+
+  Widget _buildRefreshButton(UserManagementState state,
+      {bool asMobile = false}) {
+    final cs = Theme.of(context).colorScheme;
+    final icon = state.isLoading
+        ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: AppTheme.gold))
+        : Icon(Icons.refresh, color: cs.onSurface.withOpacity(0.6));
+
+    return IconButton(
+      onPressed: state.isLoading ? null : _reload,
+      icon: icon,
+      style: asMobile
+          ? IconButton.styleFrom(
+              backgroundColor: cs.surfaceContainerHighest,
+              padding: const EdgeInsets.all(12))
+          : null,
     );
   }
 
@@ -314,14 +273,10 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
             ),
           ),
           const SizedBox(width: 16),
-          Flexible(
-            flex: 1,
-            child: _buildRoleFilter(),
-          ),
+          Flexible(flex: 1, child: _buildRoleFilter()),
         ],
       );
     }
-
     return Column(
       children: [
         CustomSearchBar(
@@ -336,21 +291,23 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
   }
 
   Widget _buildRoleFilter() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        border: Border.all(color: AppTheme.border),
+        color: cs.surface,
+        border: Border.all(color: cs.outlineVariant),
         borderRadius: BorderRadius.circular(12),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedRole,
           isExpanded: true,
-          dropdownColor: AppTheme.surface,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppTheme.foreground,
-          ),
+          dropdownColor: cs.surface,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: cs.onSurface),
           items: const [
             DropdownMenuItem(value: 'all', child: Text('Semua Role')),
             DropdownMenuItem(value: 'karyawan', child: Text('Karyawan')),
@@ -365,10 +322,11 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
   }
 
   Widget _buildContent(UserManagementState state, bool isDesktop) {
+    final cs = Theme.of(context).colorScheme;
+
     if (state.isLoading && state.users.isEmpty) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.blue),
-      );
+          child: CircularProgressIndicator(color: Colors.blue));
     }
 
     if (state.error != null) {
@@ -376,24 +334,17 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: AppTheme.destructive),
+            const Icon(Icons.error_outline,
+                size: 64, color: AppTheme.destructive),
             const SizedBox(height: 16),
-            Text('Error loading users', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Error loading users',
+                style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
-            Text(state.error!, style: Theme.of(context).textTheme.bodyMedium),
+            Text(state.error!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withOpacity(0.6))),
             const SizedBox(height: 24),
-            CustomButton(
-              text: 'Retry',
-              onPressed: () {
-                final authState = ref.read(authProvider);
-                final user = authState.user;
-                if (user != null && user.branchId != null) {
-                  ref.read(userManagementProvider.notifier).filterUsers(
-                    branchId: user.branchId.toString(),
-                  );
-                }
-              },
-            ),
+            CustomButton(text: 'Retry', onPressed: _reload),
           ],
         ),
       );
@@ -404,9 +355,11 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.people_outline, size: 64, color: AppTheme.mutedForeground),
+            Icon(Icons.people_outline,
+                size: 64, color: cs.onSurface.withOpacity(0.4)),
             const SizedBox(height: 16),
-            Text('Tidak ada karyawan ditemukan', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Tidak ada karyawan ditemukan',
+                style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 24),
             CustomButton(
               text: 'Tambah Karyawan',
@@ -418,26 +371,26 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
       );
     }
 
-    return ListView.builder(
-      itemCount: state.users.length,
-      itemBuilder: (context, index) {
-        final user = state.users[index];
-        final canEdit = user['role'] == 'karyawan';
-        final canDelete = user['role'] == 'karyawan';
-        
-        return Container(
-          margin: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 32 : 24,
-            vertical: 8,
-          ),
-          child: UserListItem(
-            user: user,
-            onEdit: canEdit ? () => _showUserForm(user: user) : null,
-            onDelete: canDelete ? () => _showDeleteDialog(user) : null,
-            isSuperAdmin: false,
-          ),
-        );
-      },
+    return PullToRefresh(
+      onRefresh: () async => _reload(),
+      child: ListView.builder(
+        itemCount: state.users.length,
+        itemBuilder: (context, index) {
+          final user = state.users[index];
+          final canEdit = user['role'] == 'karyawan';
+          final canDelete = user['role'] == 'karyawan';
+          return Container(
+            margin: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 32 : 24, vertical: 8),
+            child: UserListItem(
+              user: user,
+              onEdit: canEdit ? () => _showUserForm(user: user) : null,
+              onDelete: canDelete ? () => _showDeleteDialog(user) : null,
+              isSuperAdmin: false,
+            ),
+          );
+        },
+      ),
     );
   }
 }
