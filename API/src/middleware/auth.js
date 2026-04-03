@@ -69,13 +69,19 @@ const filterByBranch = (req, res, next) => {
         
         // For POST/PUT requests, ensure branch_id matches user's branch
         if (req.method === 'POST' || req.method === 'PUT') {
-            if (req.body.branch_id && req.body.branch_id != req.user.branch_id) {
+            // req.body may be undefined for multipart/form-data before multer runs.
+            // Attach the user's branch_id so route handlers can enforce it after parsing.
+            req.userBranchId = req.user.branch_id;
+
+            if (req.body && req.body.branch_id && req.body.branch_id != req.user.branch_id) {
                 return res.status(403).json({ 
                     error: 'You can only manage data for your own branch' 
                 });
             }
-            // Force branch_id to user's branch
-            req.body.branch_id = req.user.branch_id;
+            // Only force branch_id on JSON bodies; multipart bodies are handled in the route
+            if (req.body) {
+                req.body.branch_id = req.user.branch_id;
+            }
         }
     }
 

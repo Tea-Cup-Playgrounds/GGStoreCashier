@@ -94,7 +94,10 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
             filename: req.file.filename,
         } : 'no file');
 
-        const { name, barcode, category_id, sell_price, stock, branch_id } = req.body;
+        const { name, barcode, category_id, sell_price, stock } = req.body;
+        // For multipart requests, filterByBranch can't inject branch_id before multer runs.
+        // Fall back to req.userBranchId (set by filterByBranch for non-superadmin users).
+        const branch_id = req.body.branch_id || req.userBranchId;
 
         if (!name || !sell_price) {
             // Delete uploaded file if validation fails
@@ -179,7 +182,8 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
 // Update product (admin/superadmin only, with branch filtering and ownership validation)
 router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadProduct.single('product_image'), async (req, res) => {
     try {
-        const { name, barcode, category_id, sell_price, stock, branch_id } = req.body;
+        const { name, barcode, category_id, sell_price, stock } = req.body;
+        const branch_id = req.body.branch_id || req.userBranchId;
 
         // Get old product data to verify ownership and delete old image if new one is uploaded
         const [oldProducts] = await pool.execute(

@@ -14,6 +14,8 @@ import '../widgets/stat_card.dart';
 import '../widgets/quick_action_card.dart';
 import '../widgets/transaction_item.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
+import '../../../../shared/widgets/live_clock.dart';
+import '../../../../core/services/location_service.dart';
 import 'superadmin_dashboard_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -41,6 +43,8 @@ class _HomePageState extends ConsumerState<HomePage>
     super.initState();
     _setupAnimations();
     _loadDashboard();
+    // Request location permission silently on load for timezone awareness
+    LocationService.requestPermission();
   }
 
   @override
@@ -271,11 +275,17 @@ class _HomePageState extends ConsumerState<HomePage>
                         ),
                       ],
                     ),
-                    IconButton(
-                      onPressed: _loadDashboard,
-                      icon: const Icon(Icons.refresh,
-                          color: AppTheme.mutedForeground),
-                      tooltip: 'Refresh',
+                    Row(
+                      children: [
+                        const LiveClock(),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: _loadDashboard,
+                          icon: const Icon(Icons.refresh,
+                              color: AppTheme.mutedForeground),
+                          tooltip: 'Refresh',
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/analytics_service.dart';
+import '../../../../core/services/location_service.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/helper/date_formatter.dart';
 import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/live_clock.dart';
 
 const _palette = [
   Color(0xFFD4AF37), Color(0xFF6366F1), Color(0xFF10B981),
@@ -46,6 +48,7 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
   void initState() {
     super.initState();
     _load();
+    LocationService.requestPermission();
   }
 
   Future<void> _load() async {
@@ -190,6 +193,8 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
       ])),
+      const LiveClock(),
+      const SizedBox(width: 4),
       IconButton(onPressed: _load, icon: const Icon(Icons.refresh), tooltip: 'Refresh all'),
     ]);
   }

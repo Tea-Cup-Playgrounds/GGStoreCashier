@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/branch.dart';
 import '../../../../core/services/branch_service.dart';
+import '../../../../core/services/location_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/text_input.dart';
@@ -25,6 +26,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
   Branch? _branch;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isFetchingLocation = false;
   String? _error;
 
   @override
@@ -67,8 +69,38 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
     }
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _autofillAddress() async {
+    setState(() => _isFetchingLocation = true);
+    try {
+      final result = await LocationService.getCurrentLocation();
+      debugPrint('[BranchEdit] Location result:');
+      debugPrint('  lat: ${result.latitude}');
+      debugPrint('  lng: ${result.longitude}');
+      debugPrint('  address: ${result.address}');
+      if (mounted && result.address != null && result.address!.isNotEmpty) {
+        _addressController.text = result.address!;
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not determine address from location'),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      debugPrint('[BranchEdit] Location error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppTheme.destructive,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isFetchingLocation = false);
+    }
+  }
+
+  Future<void> _save() async {    if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
     try {
       await BranchService.updateBranch(
@@ -228,6 +260,32 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
               hintText: 'e.g. Jl. Sudirman No. 1, Jakarta',
               prefixIcon: Icons.location_on_outlined,
               maxLines: 3,
+            ),
+            const SizedBox(height: 8),
+            // Location autofill button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isFetchingLocation ? null : _autofillAddress,
+                icon: _isFetchingLocation
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppTheme.gold),
+                      )
+                    : const Icon(Icons.my_location, size: 18),
+                label: Text(_isFetchingLocation
+                    ? 'Getting location...'
+                    : 'Use current location'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.gold,
+                  side: BorderSide(color: AppTheme.gold.withOpacity(0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
             ),
 
             const SizedBox(height: 20),
