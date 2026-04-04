@@ -8,6 +8,7 @@ class UserListItem extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final bool isSuperAdmin;
+  final Widget? trailing;
 
   const UserListItem({
     super.key,
@@ -15,6 +16,7 @@ class UserListItem extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.isSuperAdmin = false,
+    this.trailing,
   });
 
   Color _getRoleColor(String role) {
@@ -101,6 +103,7 @@ class UserListItem extends StatelessWidget {
         ),
         const SizedBox(width: 20),
         _buildActions(context, cs),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
       ],
     );
   }
@@ -204,6 +207,7 @@ class UserListItem extends StatelessWidget {
                       textAlign: TextAlign.center),
                 ),
               ),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
           ],
         ),
       ],

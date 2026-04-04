@@ -4,3 +4,5 @@ templates/
 ApplicationFeature.txt
 .kiro
 .idea
+
+app/test

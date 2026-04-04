@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:gg_store_cashier/core/config/api_config.dart';
+import 'package:gg_store_cashier/core/services/auth_service.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
@@ -29,9 +32,11 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   bool _isSaving = false;
   Product? _currentProduct;
 
+  List<Map<String, dynamic>> _categories = [];
+  int? _selectedCategoryId;
+
   late TextEditingController _productNameController;
   late TextEditingController _skuController;
-  late TextEditingController _categoryController;
   late TextEditingController _stockController;
   late TextEditingController _priceController;
   late TextEditingController _descriptionController;
@@ -41,15 +46,32 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     super.initState();
     _productNameController = TextEditingController();
     _skuController = TextEditingController();
-    _categoryController = TextEditingController();
     _stockController = TextEditingController();
     _priceController = TextEditingController();
     _descriptionController = TextEditingController();
 
-    if (!widget.isNewItem) {
-      _loadProductData();
-    } else {
-      setState(() => _isLoading = false);
+    _loadCategories().then((_) {
+      if (!widget.isNewItem) {
+        _loadProductData();
+      } else {
+        setState(() => _isLoading = false);
+      }
+    });
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final token = await AuthService.getToken();
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.apiUrl,
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
+      ));
+      final response = await dio.get('/api/categories');
+      setState(() {
+        _categories = List<Map<String, dynamic>>.from(response.data['categories']);
+      });
+    } catch (_) {
+      // Non-fatal: dropdown will be empty
     }
   }
 
@@ -64,7 +86,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
         _currentProduct = product;
         _productNameController.text = product.name;
         _skuController.text = product.barcode ?? '';
-        _categoryController.text = product.category ?? '';
+        _selectedCategoryId = product.categoryId;
         _stockController.text = product.stock.toString();
         _priceController.text = product.sellPrice.toString();
         _descriptionController.text = product.description ?? '';
@@ -83,8 +105,11 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
 
     setState(() => _isSaving = true);
     try {
+      final updatedProduct = _currentProduct!.copyWith(
+        categoryId: _selectedCategoryId,
+      );
       await ProductService.updateProduct(
-        product: _currentProduct!,
+        product: updatedProduct,
         name: _productNameController.text.trim(),
         barcode: _skuController.text.trim(),
         stock: int.tryParse(_stockController.text.trim()) ?? 0,
@@ -106,7 +131,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   void dispose() {
     _productNameController.dispose();
     _skuController.dispose();
-    _categoryController.dispose();
     _stockController.dispose();
     _priceController.dispose();
     _descriptionController.dispose();
@@ -179,10 +203,47 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                       ),
                       const SizedBox(width: 16.0),
                       Expanded(
-                        child: TextInput(
-                          label: 'Category',
-                          hintText: "Masukkan Category",
-                          controller: _categoryController,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Category',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<int>(
+                              value: _selectedCategoryId,
+                              decoration: InputDecoration(
+                                hintText: 'Pilih Category',
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 14),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: AppTheme.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: AppTheme.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: AppTheme.gold),
+                                ),
+                                filled: true,
+                                fillColor: Theme.of(context).colorScheme.surface,
+                              ),
+                              items: _categories
+                                  .map((cat) => DropdownMenuItem<int>(
+                                        value: cat['id'] as int,
+                                        child: Text(cat['name'] as String),
+                                      ))
+                                  .toList(),
+                              onChanged: (val) =>
+                                  setState(() => _selectedCategoryId = val),
+                            ),
+                          ],
                         ),
                       ),
                     ],

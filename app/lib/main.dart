@@ -1,8 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:leak_tracker/leak_tracker.dart';
 import 'package:gg_store_cashier/core/provider/theme_provider.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
+import 'package:gg_store_cashier/core/services/cache_manager.dart';
+import 'package:gg_store_cashier/core/services/offline_queue.dart';
+import 'package:gg_store_cashier/core/services/pending_operations_queue.dart';
+import 'package:gg_store_cashier/core/services/notification_service.dart';
+import 'package:gg_store_cashier/core/services/orientation_manager.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/constants/app_constants.dart';
@@ -11,9 +19,16 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
+  await Hive.initFlutter();
+  Hive.registerAdapter(CacheEntryAdapter());
+  Hive.registerAdapter(OfflineTransactionEntryAdapter());
+  Hive.registerAdapter(PendingOperationAdapter());
+  await Hive.openBox<CacheEntry>('cache_box');
+  await Hive.openBox<OfflineTransactionEntry>('offline_queue_box');
+  await Hive.openBox<PendingOperation>('pending_ops_box');
+
+  await NotificationService.init();
+  await OrientationManager.init();
 
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
@@ -28,6 +43,10 @@ Future<void> main() async {
   await dotenv.load(fileName: ".env").catchError((_) {
     // .env not found — app will use fallback values from ApiConfig
   });
+
+  if (kDebugMode) {
+    LeakTracking.start();
+  }
 
   runApp(
     const ProviderScope(

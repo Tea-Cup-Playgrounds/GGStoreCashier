@@ -1,9 +1,11 @@
 // ignore_for_file: library_private_types_in_public_api
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/analytics_service.dart';
+import '../../../../core/services/connectivity_monitor.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/helper/date_formatter.dart';
@@ -38,17 +40,34 @@ class SuperAdminDashboardPage extends ConsumerStatefulWidget {
 
 class _DashState extends ConsumerState<SuperAdminDashboardPage> {
   bool _loading = true;
+  bool _isDataStale = false;
   String? _error;
   Map<String, dynamic>? _summary;
   List<Map<String, dynamic>> _trend = [], _branch = [], _cat = [], _top = [];
   int _trendDays = 30, _catDays = 30;
   String _branchDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
+  StreamSubscription<ConnectivityStatus>? _connectivitySub;
+  ConnectivityStatus? _lastConnectivity;
+
   @override
   void initState() {
     super.initState();
     _load();
     LocationService.requestPermission();
+    _connectivitySub = ConnectivityMonitor.instance.statusStream.listen((status) {
+      if (_lastConnectivity == ConnectivityStatus.offline &&
+          status == ConnectivityStatus.online) {
+        _load();
+      }
+      _lastConnectivity = status;
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -67,25 +86,33 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
         _branch  = r[2] as List<Map<String, dynamic>>;
         _cat     = r[3] as List<Map<String, dynamic>>;
         _top     = r[4] as List<Map<String, dynamic>>;
+        _isDataStale = false;
         _loading = false;
       });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        if (_summary != null) {
+          // We have previous data — show it as stale instead of error
+          setState(() { _isDataStale = true; _loading = false; });
+        } else {
+          setState(() { _error = e.toString(); _loading = false; });
+        }
+      }
     }
   }
 
   Future<void> _reloadTrend() async {
-    final d = await AnalyticsService.getRevenueTrend(_trendDays);
+    final d = await AnalyticsService.getRevenueTrend(_trendDays, forceRefresh: true);
     if (mounted) setState(() => _trend = d);
   }
 
   Future<void> _reloadBranch() async {
-    final d = await AnalyticsService.getBranchRevenue(_branchDate);
+    final d = await AnalyticsService.getBranchRevenue(_branchDate, forceRefresh: true);
     if (mounted) setState(() => _branch = d);
   }
 
   Future<void> _reloadCat() async {
-    final d = await AnalyticsService.getCategorySales(_catDays);
+    final d = await AnalyticsService.getCategorySales(_catDays, forceRefresh: true);
     if (mounted) setState(() => _cat = d);
   }
 
@@ -195,15 +222,20 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
       ])),
       const LiveClock(),
       const SizedBox(width: 4),
+      if (_isDataStale)
+        const Tooltip(
+          message: 'Data mungkin tidak terbaru',
+          child: Icon(Icons.cloud_off, size: 14, color: Colors.orange),
+        ),
       IconButton(onPressed: _load, icon: const Icon(Icons.refresh), tooltip: 'Refresh all'),
     ]);
   }
 
   Widget _buildKpiGrid() {
     if (_summary == null) return const SizedBox.shrink();
-    final today = _summary!['today'] as Map;
-    final month = _summary!['month'] as Map;
-    final all   = _summary!['allTime'] as Map;
+    final today = Map<String, dynamic>.from(_summary!['today'] as Map);
+    final month = Map<String, dynamic>.from(_summary!['month'] as Map);
+    final all   = Map<String, dynamic>.from(_summary!['allTime'] as Map);
     final act   = _summary!['activeBranchesToday'];
 
     final items = [

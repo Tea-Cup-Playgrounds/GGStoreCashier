@@ -16,6 +16,9 @@ import '../widgets/transaction_item.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/widgets/live_clock.dart';
 import '../../../../core/services/location_service.dart';
+import '../../../../core/services/connectivity_monitor.dart';
+import '../../../../core/services/error_handler.dart';
+import '../../../../shared/widgets/error_page.dart';
 import 'superadmin_dashboard_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -34,9 +37,12 @@ class _HomePageState extends ConsumerState<HomePage>
   DashboardStats? _stats;
   bool _isLoading = true;
   String? _error;
+  bool _isDataStale = false;
 
   ProviderSubscription<RealtimeTransactionState>? _txSub;
   ProviderSubscription<RealtimeProductState>? _productSub;
+  ProviderSubscription<AsyncValue<ConnectivityStatus>>? _connectivitySub;
+  ConnectivityStatus? _lastConnectivityStatus;
 
   @override
   void initState() {
@@ -55,6 +61,12 @@ class _HomePageState extends ConsumerState<HomePage>
     });
     _productSub ??= ref.listenManual(realtimeProductProvider, (prev, next) {
       if (next.lastUpdateTime != prev?.lastUpdateTime) _loadDashboard();
+    });
+    _connectivitySub ??= ref.listenManual(connectivityProvider, (previous, next) {
+      if (previous?.valueOrNull == ConnectivityStatus.offline &&
+          next.valueOrNull == ConnectivityStatus.online) {
+        if (mounted) _loadDashboard();
+      }
     });
   }
 
@@ -93,17 +105,18 @@ class _HomePageState extends ConsumerState<HomePage>
     });
   }
 
-  Future<void> _loadDashboard() async {
+  Future<void> _loadDashboard({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final stats = await DashboardService.getStats();
+      final stats = await DashboardService.getStats(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
           _stats = stats;
           _isLoading = false;
+          _isDataStale = DashboardService.lastFetchWasStale;
         });
         _animationController.forward(from: 0);
       }
@@ -121,6 +134,7 @@ class _HomePageState extends ConsumerState<HomePage>
   void dispose() {
     _txSub?.close();
     _productSub?.close();
+    _connectivitySub?.close();
     _animationController.dispose();
     super.dispose();
   }
@@ -175,6 +189,7 @@ class _HomePageState extends ConsumerState<HomePage>
                             quickActionsColumns,
                             isKaryawan,
                             user?.name ?? 'User',
+                            _isDataStale,
                           ),
               ),
             ),
@@ -185,6 +200,16 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildError() {
+    final isOffline = ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
+    if (isOffline && !_isDataStale) {
+      return ErrorPage(
+        error: AppError(
+          type: AppErrorType.offline,
+          userMessage: ErrorHandler.messageFor(AppErrorType.offline),
+        ),
+        onRetry: _loadDashboard,
+      );
+    }
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -213,11 +238,12 @@ class _HomePageState extends ConsumerState<HomePage>
     int quickActionsColumns,
     bool isKaryawan,
     String userName,
+    bool isDataStale,
   ) {
     final stats = _stats!;
 
     return PullToRefresh(
-      onRefresh: _loadDashboard,
+      onRefresh: () => _loadDashboard(forceRefresh: true),
       child: SingleChildScrollView(
       padding: EdgeInsets.symmetric(
           horizontal: horizontalPadding, vertical: 20),
@@ -273,6 +299,17 @@ class _HomePageState extends ConsumerState<HomePage>
                                     : null,
                               ),
                         ),
+                        if (isDataStale) ...[
+                          const SizedBox(height: 4),
+                          Tooltip(
+                            message: 'Data mungkin tidak terbaru',
+                            child: const Icon(
+                              Icons.cloud_off,
+                              size: 14,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     Row(

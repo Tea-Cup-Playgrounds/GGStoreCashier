@@ -9,6 +9,9 @@ import 'package:gg_store_cashier/core/provider/realtime_provider.dart';
 import 'package:gg_store_cashier/core/services/product_service.dart';
 import 'package:gg_store_cashier/core/models/product.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
+import 'package:gg_store_cashier/core/services/connectivity_monitor.dart';
+import 'package:gg_store_cashier/core/services/error_handler.dart';
+import 'package:gg_store_cashier/shared/widgets/error_page.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/inventory_header.dart';
@@ -32,8 +35,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   List<Product> _products = [];
   bool _isLoadingProducts = true;
   String? _productsError;
+  bool _isDataStale = false;
 
   ProviderSubscription<RealtimeProductState>? _realtimeSub;
+  ProviderSubscription<AsyncValue<ConnectivityStatus>>? _connectivitySub;
+  ConnectivityStatus? _lastConnectivityStatus;
 
   void _onSearchChanged(String value) {
     debugPrint('Search: $value');
@@ -56,19 +62,26 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
         _loadProducts();
       }
     });
+    _connectivitySub ??= ref.listenManual(connectivityProvider, (previous, next) {
+      if (previous?.valueOrNull == ConnectivityStatus.offline &&
+          next.valueOrNull == ConnectivityStatus.online) {
+        if (mounted) _loadProducts();
+      }
+    });
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadProducts({bool forceRefresh = false}) async {
     setState(() {
       _isLoadingProducts = true;
       _productsError = null;
     });
 
     try {
-      final products = await ProductService.getProducts();
+      final products = await ProductService.getProducts(forceRefresh: forceRefresh);
       setState(() {
         _products = products;
         _isLoadingProducts = false;
+        _isDataStale = ProductService.lastFetchWasStale;
       });
     } catch (e) {
       setState(() {
@@ -81,6 +94,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   @override
   void dispose() {
     _realtimeSub?.close();
+    _connectivitySub?.close();
     searchController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -102,6 +116,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final isKaryawan = user?.isEmployee ?? false;
+    final isOffline = ref.watch(connectivityProvider).valueOrNull == ConnectivityStatus.offline;
 
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
@@ -135,23 +150,52 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Spacer(),
-                      if (!isKaryawan)
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            context.push(AppRouter.inventoryAddItem);
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add Item'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.gold,
-                            foregroundColor: AppTheme.background,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: screenType == ScreenType.tablet ? 24 : 16,
-                              vertical: screenType == ScreenType.tablet ? 16 : 12,
-                            ),
+                      if (_isDataStale) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: 'Data mungkin tidak terbaru',
+                          child: Icon(
+                            Icons.cloud_off,
+                            size: 14,
+                            color: Colors.orange,
                           ),
                         ),
+                      ],
+                      const Spacer(),
+                      if (!isKaryawan)
+                        if (isOffline)
+                          Tooltip(
+                            message: 'Tidak tersedia saat offline',
+                            child: ElevatedButton.icon(
+                              onPressed: null,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Item'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.gold,
+                                foregroundColor: AppTheme.background,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: screenType == ScreenType.tablet ? 24 : 16,
+                                  vertical: screenType == ScreenType.tablet ? 16 : 12,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              context.push(AppRouter.inventoryAddItem);
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add Item'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.gold,
+                              foregroundColor: AppTheme.background,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: screenType == ScreenType.tablet ? 24 : 16,
+                                vertical: screenType == ScreenType.tablet ? 16 : 12,
+                              ),
+                            ),
+                          ),
                     ],
                   ),
                 ),
@@ -184,7 +228,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildProductsTab(screenType, horizontalPadding),
+                    _buildProductsTab(screenType, horizontalPadding, isOffline),
                     const CategoryManagementPage(),
                   ],
                 ),
@@ -196,7 +240,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     );
   }
 
-  Widget _buildProductsTab(ScreenType screenType, double horizontalPadding) {
+  Widget _buildProductsTab(ScreenType screenType, double horizontalPadding, bool isOffline) {
     // Filter products based on search and filter
     List<Product> filteredProducts = _products;
     
@@ -225,7 +269,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     }
 
     return PullToRefresh(
-      onRefresh: _loadProducts,
+      onRefresh: () => _loadProducts(forceRefresh: true),
       child: CustomScrollView(
       slivers: [
         SliverPersistentHeader(
@@ -254,34 +298,45 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
             ),
           )
         else if (_productsError != null)
-          SliverFillRemaining(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: AppTheme.destructive,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Failed to load products'),
-                  const SizedBox(height: 8),
-                  Text(
-                    _productsError!,
-                    style: const TextStyle(color: AppTheme.mutedForeground),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _loadProducts,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
+          if (isOffline && !_isDataStale)
+            SliverFillRemaining(
+              child: ErrorPage(
+                error: AppError(
+                  type: AppErrorType.offline,
+                  userMessage: ErrorHandler.messageFor(AppErrorType.offline),
+                ),
+                onRetry: _loadProducts,
               ),
-            ),
-          )
+            )
+          else
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: AppTheme.destructive,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Failed to load products'),
+                    const SizedBox(height: 8),
+                    Text(
+                      _productsError!,
+                      style: const TextStyle(color: AppTheme.mutedForeground),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _loadProducts,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
         else if (filteredProducts.isEmpty)
           SliverFillRemaining(
             child: Center(

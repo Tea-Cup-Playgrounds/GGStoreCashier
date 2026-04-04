@@ -1,12 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/cache_manager.dart';
+import '../../../../core/services/connectivity_monitor.dart';
+import '../../../../core/services/pending_operations_queue.dart';
 
 class UserManagementState {
   final List<Map<String, dynamic>> users;
   final bool isLoading;
   final String? error;
+  final bool isStale;
   final int currentPage;
   final int totalPages;
   final String? searchQuery;
@@ -17,6 +22,7 @@ class UserManagementState {
     this.users = const [],
     this.isLoading = false,
     this.error,
+    this.isStale = false,
     this.currentPage = 1,
     this.totalPages = 1,
     this.searchQuery,
@@ -28,6 +34,7 @@ class UserManagementState {
     List<Map<String, dynamic>>? users,
     bool? isLoading,
     String? error,
+    bool? isStale,
     int? currentPage,
     int? totalPages,
     String? searchQuery,
@@ -38,6 +45,7 @@ class UserManagementState {
       users: users ?? this.users,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      isStale: isStale ?? this.isStale,
       currentPage: currentPage ?? this.currentPage,
       totalPages: totalPages ?? this.totalPages,
       searchQuery: searchQuery ?? this.searchQuery,
@@ -59,164 +67,182 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     headers: {'ngrok-skip-browser-warning': 'true'},
   ));
 
-  // Setup Dio with interceptors
   void _setupDio() {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        // Add auth token to every request
         final token = await AuthService.getToken();
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
-        print('Request: ${options.method} ${options.uri}');
-        print('Headers: ${options.headers}');
         return handler.next(options);
-      },
-      onResponse: (response, handler) {
-        print('Response: ${response.statusCode} ${response.requestOptions.uri}');
-        return handler.next(response);
-      },
-      onError: (error, handler) {
-        print('Error: ${error.message}');
-        print('Status: ${error.response?.statusCode}');
-        print('Data: ${error.response?.data}');
-        return handler.next(error);
       },
     ));
   }
 
-  // Get authorization headers with token (kept for backward compatibility)
-  Future<Map<String, String>> _getAuthHeaders() async {
-    final token = await AuthService.getToken();
-    print('=== AUTH HEADERS ===');
-    print('Token retrieved: ${token != null ? "Yes (${token.substring(0, 20)}...)" : "No"}');
-    
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
+  bool get _isOffline =>
+      ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
 
-  Future<void> loadUsers({
-    int page = 1,
-    int limit = 10,
-  }) async {
+  Future<void> loadUsers({int page = 1, int limit = 10}) async {
+    const cacheKey = 'users:list';
+
+    final noFilters = (state.searchQuery == null || state.searchQuery!.isEmpty) &&
+        state.roleFilter == null &&
+        state.branchFilter == null;
+
     try {
       state = state.copyWith(isLoading: true, error: null);
 
-      final queryParams = <String, dynamic>{
-        'page': page,
-        'limit': limit,
-      };
-
-      if (state.searchQuery != null && state.searchQuery!.isNotEmpty) {
-        queryParams['search'] = state.searchQuery;
+      // Cache hit — only when no filters are active
+      if (noFilters && CacheManager.isValid(cacheKey)) {
+        final entry = CacheManager.get(cacheKey);
+        if (entry != null) {
+          final users = (entry.data as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          state = state.copyWith(users: users, isLoading: false, isStale: entry.isStale);
+          return;
+        }
       }
 
-      if (state.roleFilter != null) {
-        queryParams['role'] = state.roleFilter;
-      }
+      final queryParams = <String, dynamic>{'page': page, 'limit': limit};
+      if (state.searchQuery?.isNotEmpty == true) queryParams['search'] = state.searchQuery;
+      if (state.roleFilter != null) queryParams['role'] = state.roleFilter;
+      if (state.branchFilter != null) queryParams['branch_id'] = state.branchFilter;
 
-      if (state.branchFilter != null) {
-        queryParams['branch_id'] = state.branchFilter;
-      }
-      
-      print('=== LOADING USERS ===');
-      print('URL: ${AppConstants.baseUrl}/api/users');
-      print('Query Params: $queryParams');
-
-      final response = await _dio.get(
-        '/api/users',
-        queryParameters: queryParams,
-      );
-
-      print('Response Status: ${response.statusCode}');
-      print('Response Data: ${response.data}');
+      final response = await _dio.get('/api/users', queryParameters: queryParams);
 
       if (response.statusCode == 200) {
         final data = response.data;
         final users = List<Map<String, dynamic>>.from(data['users'] ?? []);
         final pagination = data['pagination'] ?? {};
 
+        if (noFilters) {
+          await CacheManager.put(cacheKey, users);
+        }
+
         state = state.copyWith(
           users: users,
           isLoading: false,
+          isStale: false,
           currentPage: pagination['page'] ?? 1,
           totalPages: pagination['totalPages'] ?? 1,
         );
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: 'Failed to load users',
-        );
+        state = state.copyWith(isLoading: false, error: 'Failed to load users');
       }
     } catch (e) {
-      print('=== LOAD USERS ERROR ===');
-      print('Error: $e');
-      if (e is DioException) {
-        print('DioException type: ${e.type}');
-        print('Response: ${e.response?.data}');
-        print('Status Code: ${e.response?.statusCode}');
+      if (e is DioException && noFilters) {
+        final entry = CacheManager.get(cacheKey);
+        if (entry != null) {
+          entry.isStale = true;
+          await entry.save();
+          final users = (entry.data as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          state = state.copyWith(users: users, isLoading: false, isStale: true);
+          return;
+        }
       }
-      
-      state = state.copyWith(
-        isLoading: false,
-        error: _getErrorMessage(e),
-      );
+      state = state.copyWith(isLoading: false, error: _errorMessage(e));
     }
   }
 
+  /// Creates a user. When offline, queues the operation and adds optimistically to local state.
   Future<void> createUser(Map<String, dynamic> userData) async {
-    try {
-      final response = await _dio.post(
-        '/api/users',
-        data: userData,
-      );
+    if (_isOffline) {
+      final op = PendingOperation()
+        ..id = const Uuid().v4()
+        ..method = 'POST'
+        ..path = '/api/users'
+        ..body = userData
+        ..createdAt = DateTime.now()
+        ..retryCount = 0
+        ..status = 'pending'
+        ..description = 'Tambah pengguna';
+      await PendingOperationsQueue.enqueue(op);
 
-      if (response.statusCode != 201) {
-        throw Exception(response.data['error'] ?? 'Failed to create user');
-      }
-
-      // Reload users after creation
-      await loadUsers();
-    } catch (e) {
-      throw Exception(_getErrorMessage(e));
+      // Optimistic local update
+      final optimistic = Map<String, dynamic>.from(userData)
+        ..['id'] = op.id
+        ..['_pending'] = true;
+      final updated = [...state.users, optimistic];
+      state = state.copyWith(users: updated);
+      await _updateUsersCache(updated);
+      return;
     }
+
+    final response = await _dio.post('/api/users', data: userData);
+    if (response.statusCode != 201) {
+      throw Exception(response.data['error'] ?? 'Failed to create user');
+    }
+    await loadUsers();
   }
 
+  /// Updates a user. When offline, queues and applies optimistically.
   Future<void> updateUser(int userId, Map<String, dynamic> userData) async {
-    try {
-      final response = await _dio.put(
-        '/api/users/$userId',
-        data: userData,
-      );
+    if (_isOffline) {
+      final op = PendingOperation()
+        ..id = const Uuid().v4()
+        ..method = 'PUT'
+        ..path = '/api/users/$userId'
+        ..body = userData
+        ..createdAt = DateTime.now()
+        ..retryCount = 0
+        ..status = 'pending'
+        ..description = 'Perubahan pengguna';
+      await PendingOperationsQueue.enqueue(op);
 
-      if (response.statusCode != 200) {
-        throw Exception(response.data['error'] ?? 'Failed to update user');
-      }
-
-      // Reload users after update
-      await loadUsers();
-    } catch (e) {
-      throw Exception(_getErrorMessage(e));
+      // Optimistic local update
+      final updated = state.users.map((u) {
+        if (u['id'].toString() == userId.toString()) {
+          return {...u, ...userData, '_pending': true};
+        }
+        return u;
+      }).toList();
+      state = state.copyWith(users: updated);
+      await _updateUsersCache(updated);
+      return;
     }
+
+    final response = await _dio.put('/api/users/$userId', data: userData);
+    if (response.statusCode != 200) {
+      throw Exception(response.data['error'] ?? 'Failed to update user');
+    }
+    await loadUsers();
   }
 
+  /// Deletes a user. When offline, queues and removes optimistically.
   Future<void> deleteUser(int userId) async {
-    try {
-      final response = await _dio.delete(
-        '/api/users/$userId',
-      );
+    if (_isOffline) {
+      final op = PendingOperation()
+        ..id = const Uuid().v4()
+        ..method = 'DELETE'
+        ..path = '/api/users/$userId'
+        ..body = {}
+        ..createdAt = DateTime.now()
+        ..retryCount = 0
+        ..status = 'pending'
+        ..description = 'Hapus pengguna';
+      await PendingOperationsQueue.enqueue(op);
 
-      if (response.statusCode != 200) {
-        throw Exception(response.data['error'] ?? 'Failed to delete user');
-      }
-
-      // Reload users after deletion
-      await loadUsers();
-    } catch (e) {
-      throw Exception(_getErrorMessage(e));
+      // Optimistic local removal
+      final updated = state.users
+          .where((u) => u['id'].toString() != userId.toString())
+          .toList();
+      state = state.copyWith(users: updated);
+      await _updateUsersCache(updated);
+      return;
     }
+
+    final response = await _dio.delete('/api/users/$userId');
+    if (response.statusCode != 200) {
+      throw Exception(response.data['error'] ?? 'Failed to delete user');
+    }
+    await loadUsers();
+  }
+
+  Future<void> _updateUsersCache(List<Map<String, dynamic>> users) async {
+    await CacheManager.put('users:list', users);
   }
 
   void searchUsers(String query) {
@@ -225,50 +251,27 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
   }
 
   void filterUsers({String? role, String? branchId}) {
-    state = state.copyWith(
-      roleFilter: role,
-      branchFilter: branchId,
-    );
+    state = state.copyWith(roleFilter: role, branchFilter: branchId);
     loadUsers();
   }
 
   void clearFilters() {
-    state = state.copyWith(
-      searchQuery: null,
-      roleFilter: null,
-      branchFilter: null,
-    );
+    state = state.copyWith(searchQuery: null, roleFilter: null, branchFilter: null);
     loadUsers();
   }
 
-  String _getErrorMessage(dynamic error) {
+  String _errorMessage(dynamic error) {
     if (error is DioException) {
-      if (error.response?.data != null && error.response?.data['error'] != null) {
-        return error.response!.data['error'];
-      }
-      
-      // Check for specific status codes
-      if (error.response?.statusCode == 401) {
-        return 'Authentication failed. Please login again.';
-      }
-      
-      if (error.response?.statusCode == 403) {
-        return 'You do not have permission to access this resource.';
-      }
-      
+      if (error.response?.data?['error'] != null) return error.response!.data['error'];
+      if (error.response?.statusCode == 401) return 'Authentication failed. Please login again.';
+      if (error.response?.statusCode == 403) return 'You do not have permission to access this resource.';
       switch (error.type) {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
           return 'Connection timeout. Please check your internet connection.';
-        case DioExceptionType.badResponse:
-          return 'Server error (${error.response?.statusCode}). Please try again later.';
-        case DioExceptionType.cancel:
-          return 'Request was cancelled.';
         case DioExceptionType.connectionError:
           return 'Cannot connect to server. Please check your network.';
-        case DioExceptionType.unknown:
-          return 'Network error. Please check your connection.';
         default:
           return 'An unexpected error occurred.';
       }
@@ -277,6 +280,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
   }
 }
 
-final userManagementProvider = StateNotifierProvider<UserManagementNotifier, UserManagementState>(
+final userManagementProvider =
+    StateNotifierProvider<UserManagementNotifier, UserManagementState>(
   (ref) => UserManagementNotifier(),
 );

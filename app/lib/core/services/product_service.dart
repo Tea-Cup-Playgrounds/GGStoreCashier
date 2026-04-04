@@ -4,8 +4,13 @@ import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/product.dart';
+import 'cache_manager.dart';
 
 class ProductService {
+  static const String _cacheKeyProductsAll = 'products:all';
+
+  /// Set to `true` after a call to [getProducts] that returned stale cached data.
+  static bool lastFetchWasStale = false;
   static final _dio = Dio(BaseOptions(
     baseUrl: ApiConfig.apiUrl,
     connectTimeout: ApiConfig.connectTimeout,
@@ -51,8 +56,26 @@ class ProductService {
     int? branchId,
     int? categoryId,
     String? search,
+    bool forceRefresh = false,
   }) async {
     _initializeDio();
+
+    // Reset stale flag at the start of every call.
+    lastFetchWasStale = false;
+
+    final bool noFilters =
+        branchId == null && categoryId == null && (search == null || search.isEmpty);
+
+    // --- Cache read (only when no filters are applied) ---
+    if (noFilters && !forceRefresh && CacheManager.isValid(_cacheKeyProductsAll)) {
+      final entry = CacheManager.get(_cacheKeyProductsAll);
+      if (entry != null) {
+        final cachedList = (entry.data as List)
+            .map((json) => Product.fromJson(Map<String, dynamic>.from(json as Map)))
+            .toList();
+        return cachedList;
+      }
+    }
 
     try {
       final token = await _getToken();
@@ -76,11 +99,32 @@ class ProductService {
       if (response.statusCode == 200) {
         final data = response.data;
         final productsJson = data['products'] as List;
-        return productsJson.map((json) => Product.fromJson(json)).toList();
+        final products =
+            productsJson.map((json) => Product.fromJson(json)).toList();
+
+        // Store raw JSON in cache (only when no filters).
+        if (noFilters) {
+          await CacheManager.put(_cacheKeyProductsAll, productsJson);
+        }
+
+        return products;
       } else {
         throw Exception('Failed to load products: ${response.statusCode}');
       }
     } on DioException catch (e) {
+      // Network failure — try to return stale cache if available.
+      if (noFilters) {
+        final staleEntry = CacheManager.get(_cacheKeyProductsAll);
+        if (staleEntry != null) {
+          lastFetchWasStale = true;
+          staleEntry.isStale = true;
+          await staleEntry.save();
+          return (staleEntry.data as List)
+              .map((json) =>
+                  Product.fromJson(Map<String, dynamic>.from(json as Map)))
+              .toList();
+        }
+      }
       throw Exception('Network error: ${e.message}');
     } catch (e) {
       rethrow;

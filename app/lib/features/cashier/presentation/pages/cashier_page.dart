@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
 import '../../../../core/models/cart_item.dart';
+import '../../../../core/models/transaction_model.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/services/product_service.dart';
 import '../../../../core/services/voucher_service.dart';
+import '../../../../core/services/connectivity_monitor.dart';
+import '../../../../core/services/offline_queue.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/provider/auth_provider.dart';
@@ -41,6 +45,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
   bool _isProcessingPayment = false;
   int? _lastTransactionId;
   String _selectedPaymentMethod = 'cash';
+  String _transactionUuid = const Uuid().v4();
 
   // Products state
   List<Product> _products = [];
@@ -50,13 +55,16 @@ class _CashierPageState extends ConsumerState<CashierPage>
   late AnimationController _viewAnimationController;
   ProviderSubscription<RealtimeProductState>? _realtimeSub;
 
-  // Payment methods — only cash is active for now
-  final List<Map<String, dynamic>> _paymentMethods = [
-    {'value': 'cash', 'label': 'Cash', 'icon': Icons.payments_outlined, 'enabled': true},
-    {'value': 'card', 'label': 'Card', 'icon': Icons.credit_card, 'enabled': false},
-    {'value': 'transfer', 'label': 'Bank Transfer', 'icon': Icons.account_balance, 'enabled': false},
-    {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet, 'enabled': false},
-  ];
+  // Payment methods — cash always enabled; card/transfer/e-wallet require connectivity
+  List<Map<String, dynamic>> get _paymentMethods {
+    final isOffline = ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
+    return [
+      {'value': 'cash', 'label': 'Cash', 'icon': Icons.payments_outlined, 'enabled': true},
+      {'value': 'card', 'label': 'Card', 'icon': Icons.credit_card, 'enabled': !isOffline},
+      {'value': 'transfer', 'label': 'Bank Transfer', 'icon': Icons.account_balance, 'enabled': !isOffline},
+      {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet, 'enabled': !isOffline},
+    ];
+  }
 
   @override
   void initState() {
@@ -76,14 +84,14 @@ class _CashierPageState extends ConsumerState<CashierPage>
     });
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadProducts({bool forceRefresh = false}) async {
     setState(() {
       _isLoadingProducts = true;
       _productsError = null;
     });
 
     try {
-      final products = await ProductService.getProducts();
+      final products = await ProductService.getProducts(forceRefresh: forceRefresh);
       setState(() {
         _products = products;
         _isLoadingProducts = false;
@@ -222,6 +230,50 @@ class _CashierPageState extends ConsumerState<CashierPage>
       }
     }
 
+    // Check connectivity — route offline transactions to the local queue
+    if (ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline) {
+      final user = ref.read(authProvider).user;
+      final items = _cart
+          .map((item) => {
+                'product_id': int.parse(item.product.id),
+                'qty': item.quantity,
+                'price': item.price,
+              })
+          .toList();
+
+      final branchId = user?.isSuperAdmin == true
+          ? _cart.first.product.branchId
+          : user?.branchId;
+
+      final transaction = TransactionModel(
+        uuid: _transactionUuid,
+        items: items,
+        discount: _discount,
+        paymentMethod: method,
+        total: _total,
+        branchId: branchId,
+        createdAt: DateTime.now(),
+      );
+
+      final entry = OfflineTransactionEntry()
+        ..uuid = transaction.uuid
+        ..payload = transaction.toHiveMap()
+        ..createdAt = transaction.createdAt
+        ..retryCount = 0
+        ..status = 'pending';
+
+      await OfflineQueue.enqueue(entry);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Transaksi disimpan — akan dikirim saat online'),
+          behavior: SnackBarBehavior.floating,
+        ));
+        _resetTransaction();
+      }
+      return;
+    }
+
     setState(() => _isProcessingPayment = true);
 
     try {
@@ -288,6 +340,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
       _appliedCoupon = null;
       _couponController.clear();
       _currentView = CashierView.products;
+      _transactionUuid = const Uuid().v4();
     });
   }
 
@@ -320,6 +373,18 @@ class _CashierPageState extends ConsumerState<CashierPage>
   Widget build(BuildContext context) {
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
+
+    // Watch connectivity — triggers rebuild when status changes and gates payment methods
+    final connectivityAsync = ref.watch(connectivityProvider);
+    final connectivityStatus = connectivityAsync.valueOrNull ?? ConnectivityMonitor.instance.currentStatus;
+
+    // If offline and an online-only method is selected, reset to cash
+    if (connectivityStatus == ConnectivityStatus.offline &&
+        _selectedPaymentMethod != 'cash') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedPaymentMethod = 'cash');
+      });
+    }
 
     if (_currentView == CashierView.success) {
       return PaymentSuccessView(
@@ -474,7 +539,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                     ),
                                   )
                                 : PullToRefresh(
-                                    onRefresh: _loadProducts,
+                                    onRefresh: () => _loadProducts(forceRefresh: true),
                                     child: GridView.builder(
                                     padding: const EdgeInsets.all(16),
                                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -692,32 +757,44 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                   icon: const Icon(Icons.arrow_drop_down),
                                   items: _paymentMethods.map((method) {
                                     final enabled = method['enabled'] as bool;
+                                    final isOfflineDisabled = !enabled &&
+                                        ConnectivityMonitor.instance.currentStatus ==
+                                            ConnectivityStatus.offline;
+                                    Widget item = Row(
+                                      children: [
+                                        Icon(method['icon'] as IconData,
+                                            size: 20,
+                                            color: enabled ? null : AppTheme.mutedForeground),
+                                        const SizedBox(width: 12),
+                                        Text(method['label'] as String,
+                                            style: TextStyle(
+                                                color: enabled ? null : AppTheme.mutedForeground)),
+                                        if (!enabled) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.muted.withOpacity(0.4),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              isOfflineDisabled ? 'Offline' : 'Soon',
+                                              style: const TextStyle(fontSize: 10, color: AppTheme.mutedForeground),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    );
+                                    if (isOfflineDisabled) {
+                                      item = Tooltip(
+                                        message: 'Membutuhkan koneksi internet',
+                                        child: item,
+                                      );
+                                    }
                                     return DropdownMenuItem<String>(
                                       value: method['value'],
                                       enabled: enabled,
-                                      child: Row(
-                                        children: [
-                                          Icon(method['icon'] as IconData,
-                                              size: 20,
-                                              color: enabled ? null : AppTheme.mutedForeground),
-                                          const SizedBox(width: 12),
-                                          Text(method['label'] as String,
-                                              style: TextStyle(
-                                                  color: enabled ? null : AppTheme.mutedForeground)),
-                                          if (!enabled) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.muted.withOpacity(0.4),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: const Text('Soon',
-                                                  style: TextStyle(fontSize: 10, color: AppTheme.mutedForeground)),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
+                                      child: item,
                                     );
                                   }).toList(),
                                   onChanged: (value) {
@@ -874,7 +951,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
     }
 
     return PullToRefresh(
-      onRefresh: _loadProducts,
+      onRefresh: () => _loadProducts(forceRefresh: true),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: GridView.builder(
@@ -1045,32 +1122,44 @@ class _CashierPageState extends ConsumerState<CashierPage>
                 icon: const Icon(Icons.arrow_drop_down),
                 items: _paymentMethods.map((method) {
                   final enabled = method['enabled'] as bool;
+                  final isOfflineDisabled = !enabled &&
+                      ConnectivityMonitor.instance.currentStatus ==
+                          ConnectivityStatus.offline;
+                  Widget item = Row(
+                    children: [
+                      Icon(method['icon'] as IconData,
+                          size: 20,
+                          color: enabled ? null : AppTheme.mutedForeground),
+                      const SizedBox(width: 12),
+                      Text(method['label'] as String,
+                          style: TextStyle(
+                              color: enabled ? null : AppTheme.mutedForeground)),
+                      if (!enabled) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.muted.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isOfflineDisabled ? 'Offline' : 'Soon',
+                            style: const TextStyle(fontSize: 10, color: AppTheme.mutedForeground),
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                  if (isOfflineDisabled) {
+                    item = Tooltip(
+                      message: 'Membutuhkan koneksi internet',
+                      child: item,
+                    );
+                  }
                   return DropdownMenuItem<String>(
                     value: method['value'],
                     enabled: enabled,
-                    child: Row(
-                      children: [
-                        Icon(method['icon'] as IconData,
-                            size: 20,
-                            color: enabled ? null : AppTheme.mutedForeground),
-                        const SizedBox(width: 12),
-                        Text(method['label'] as String,
-                            style: TextStyle(
-                                color: enabled ? null : AppTheme.mutedForeground)),
-                        if (!enabled) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppTheme.muted.withOpacity(0.4),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text('Soon',
-                                style: TextStyle(fontSize: 10, color: AppTheme.mutedForeground)),
-                          ),
-                        ],
-                      ],
-                    ),
+                    child: item,
                   );
                 }).toList(),
                 onChanged: (value) {

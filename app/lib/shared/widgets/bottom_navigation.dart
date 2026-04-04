@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
+import 'package:gg_store_cashier/core/services/offline_queue.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 
-class BottomNavigation extends StatelessWidget {
+class BottomNavigation extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
   const BottomNavigation(this.navigationShell, {super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = navigationShell.currentIndex;
+    final pendingCount =
+        ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
 
     return LayoutBuilder(builder: (context, constraints) {
       double fontSize;
@@ -49,6 +53,7 @@ class BottomNavigation extends StatelessWidget {
                   label: 'Cashier',
                   isActive: currentIndex == 1,
                   onTap: () => _onTap(1),
+                  badgeCount: pendingCount,
                 ),
                 _NavItem(
                   fontSize: fontSize,
@@ -89,6 +94,8 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
+  final int badgeCount;
+
   const _NavItem({
     required this.icon,
     required this.fontSize,
@@ -96,6 +103,7 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.isActive,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   @override
@@ -112,20 +120,48 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                isActive ? activeIcon : icon,
-                key: ValueKey(isActive),
-                color: isActive
-                    ? Theme.of(context)
-                        .bottomNavigationBarTheme
-                        .selectedItemColor
-                    : Theme.of(context)
-                        .bottomNavigationBarTheme
-                        .unselectedItemColor,
-                size: 20,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    isActive ? activeIcon : icon,
+                    key: ValueKey(isActive),
+                    color: isActive
+                        ? Theme.of(context)
+                            .bottomNavigationBarTheme
+                            .selectedItemColor
+                        : Theme.of(context)
+                            .bottomNavigationBarTheme
+                            .unselectedItemColor,
+                    size: 20,
+                  ),
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -6,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
