@@ -8,6 +8,7 @@ class CartItemWidget extends StatelessWidget {
   final Function(String) onIncrease;
   final Function(String) onDecrease;
   final Function(String) onRemove;
+  final int? maxQuantity;
 
   const CartItemWidget({
     super.key,
@@ -15,6 +16,7 @@ class CartItemWidget extends StatelessWidget {
     required this.onIncrease,
     required this.onDecrease,
     required this.onRemove,
+    this.maxQuantity,
   });
 
   @override
@@ -87,22 +89,28 @@ class CartItemWidget extends StatelessWidget {
                       ),
                 ),
               ),
-              GestureDetector(
-                onTap: () => onIncrease(cartItem.id),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.card,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppTheme.border),
+              Builder(builder: (context) {
+                final atMax = maxQuantity != null && cartItem.quantity >= maxQuantity!;
+                return Tooltip(
+                  message: atMax ? 'Stok habis' : '',
+                  child: GestureDetector(
+                    onTap: atMax ? null : () => onIncrease(cartItem.id),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: atMax ? AppTheme.muted : AppTheme.card,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Icon(
+                        Icons.add,
+                        size: 16,
+                        color: atMax ? AppTheme.mutedForeground : AppTheme.foreground,
+                      ),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.add,
-                    size: 16,
-                    color: AppTheme.foreground,
-                  ),
-                ),
-              ),
+                );
+              }),
             ],
           ),
         ],

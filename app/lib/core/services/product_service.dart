@@ -7,8 +7,6 @@ import '../models/product.dart';
 import 'cache_manager.dart';
 
 class ProductService {
-  static const String _cacheKeyProductsAll = 'products:all';
-
   /// Set to `true` after a call to [getProducts] that returned stale cached data.
   static bool lastFetchWasStale = false;
   static final _dio = Dio(BaseOptions(
@@ -41,6 +39,10 @@ class ProductService {
     return prefs.getString('auth_token');
   }
 
+  /// Cache key scoped to the branch so different users never share cached lists.
+  static String _cacheKey(int? branchId) =>
+      branchId != null ? 'products:branch_$branchId' : 'products:all';
+
   static String getProductImageUrl(String? imageName) {
     if (imageName == null || imageName.isEmpty) {
       return '';
@@ -64,11 +66,13 @@ class ProductService {
     lastFetchWasStale = false;
 
     final bool noFilters =
-        branchId == null && categoryId == null && (search == null || search.isEmpty);
+        categoryId == null && (search == null || search.isEmpty);
 
-    // --- Cache read (only when no filters are applied) ---
-    if (noFilters && !forceRefresh && CacheManager.isValid(_cacheKeyProductsAll)) {
-      final entry = CacheManager.get(_cacheKeyProductsAll);
+    final cacheKey = _cacheKey(branchId);
+
+    // --- Cache read (only when no extra filters are applied) ---
+    if (noFilters && !forceRefresh && CacheManager.isValid(cacheKey)) {
+      final entry = CacheManager.get(cacheKey);
       if (entry != null) {
         final cachedList = (entry.data as List)
             .map((json) => Product.fromJson(Map<String, dynamic>.from(json as Map)))
@@ -102,9 +106,9 @@ class ProductService {
         final products =
             productsJson.map((json) => Product.fromJson(json)).toList();
 
-        // Store raw JSON in cache (only when no filters).
+        // Store raw JSON in cache (only when no extra filters).
         if (noFilters) {
-          await CacheManager.put(_cacheKeyProductsAll, productsJson);
+          await CacheManager.put(cacheKey, productsJson);
         }
 
         return products;
@@ -114,7 +118,7 @@ class ProductService {
     } on DioException catch (e) {
       // Network failure — try to return stale cache if available.
       if (noFilters) {
-        final staleEntry = CacheManager.get(_cacheKeyProductsAll);
+        final staleEntry = CacheManager.get(cacheKey);
         if (staleEntry != null) {
           lastFetchWasStale = true;
           staleEntry.isStale = true;

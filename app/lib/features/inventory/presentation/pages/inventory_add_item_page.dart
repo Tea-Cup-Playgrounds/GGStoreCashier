@@ -263,31 +263,29 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Branch Dropdown (disabled for admin/karyawan)
-                    SearchableDropdown<int>(
-                      label: 'Branch',
-                      hintText: 'Select branch',
-                      value: _selectedBranchId,
-                      items: _branches.map((branch) {
-                        return DropdownItem<int>(
-                          value: branch['id'],
-                          label: branch['name'],
-                          icon: Icons.store,
-                        );
-                      }).toList(),
-                      onChanged: isSuperAdmin
-                          ? (value) => setState(() => _selectedBranchId = value)
-                          : (value) {}, // Disabled for non-superadmin
-                      enabled: isSuperAdmin,
-                      prefixIcon: Icons.store,
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select a branch';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                    // Branch Dropdown — only visible to superadmin
+                    if (isSuperAdmin) ...[
+                      SearchableDropdown<int>(
+                        label: 'Branch',
+                        hintText: 'Select branch',
+                        value: _selectedBranchId,
+                        items: _branches.map((branch) {
+                          return DropdownItem<int>(
+                            value: branch['id'],
+                            label: branch['name'],
+                            icon: Icons.store,
+                          );
+                        }).toList(),
+                        onChanged: (value) => setState(() => _selectedBranchId = value),
+                        enabled: true,
+                        prefixIcon: Icons.store,
+                        validator: (value) {
+                          if (value == null) return 'Please select a branch';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Category Dropdown
                     SearchableDropdown<int>(

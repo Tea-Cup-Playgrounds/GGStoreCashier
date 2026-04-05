@@ -142,6 +142,14 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
           state = state.copyWith(users: users, isLoading: false, isStale: true);
           return;
         }
+        // No cache — check if offline and give a friendly message
+        if (_isOffline) {
+          state = state.copyWith(
+            isLoading: false,
+            error: 'Kamu sedang offline dan belum ada data tersimpan.',
+          );
+          return;
+        }
       }
       state = state.copyWith(isLoading: false, error: _errorMessage(e));
     }
@@ -175,6 +183,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     if (response.statusCode != 201) {
       throw Exception(response.data['error'] ?? 'Failed to create user');
     }
+    await CacheManager.invalidate('users:list');
     await loadUsers();
   }
 
@@ -208,6 +217,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     if (response.statusCode != 200) {
       throw Exception(response.data['error'] ?? 'Failed to update user');
     }
+    await CacheManager.invalidate('users:list');
     await loadUsers();
   }
 
@@ -238,6 +248,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     if (response.statusCode != 200) {
       throw Exception(response.data['error'] ?? 'Failed to delete user');
     }
+    await CacheManager.invalidate('users:list');
     await loadUsers();
   }
 
@@ -271,7 +282,9 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
         case DioExceptionType.receiveTimeout:
           return 'Connection timeout. Please check your internet connection.';
         case DioExceptionType.connectionError:
-          return 'Cannot connect to server. Please check your network.';
+          return _isOffline
+              ? 'Kamu sedang offline dan belum ada data tersimpan.'
+              : 'Cannot connect to server. Please check your network.';
         default:
           return 'An unexpected error occurred.';
       }

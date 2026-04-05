@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart';
+import '../../../../core/models/product.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_search_bar.dart';
 
 class InventoryHeader extends StatelessWidget {
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
-
   final InventoryFilter currentFilter;
   final ValueChanged<InventoryFilter> onFilterChanged;
+  final List<Product> products;
+  final bool isLandscape;
 
   const InventoryHeader({
     super.key,
@@ -16,6 +18,8 @@ class InventoryHeader extends StatelessWidget {
     required this.onSearchChanged,
     required this.currentFilter,
     required this.onFilterChanged,
+    required this.products,
+    this.isLandscape = false,
   });
 
   Widget _buildSummaryTile(
@@ -24,17 +28,26 @@ class InventoryHeader extends StatelessWidget {
     String value,
     Color iconColor,
   ) {
+    final cardPadding = isLandscape ? 8.0 : 16.0;
+    final iconSize = isLandscape ? 16.0 : 22.0;
+    final valueStyle = isLandscape
+        ? Theme.of(context).textTheme.titleLarge?.copyWith(color: iconColor)
+        : Theme.of(context).textTheme.headlineLarge?.copyWith(color: iconColor);
+    final labelStyle = isLandscape
+        ? Theme.of(context).textTheme.labelSmall
+        : Theme.of(context).textTheme.bodySmall;
+
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(cardPadding),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.secondary,
-          borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
@@ -43,47 +56,39 @@ class InventoryHeader extends StatelessWidget {
                       ? Icons.archive_outlined
                       : Icons.warning_amber_rounded,
                   color: iconColor,
-                  size: 22,
+                  size: iconSize,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  value,
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineLarge
-                      ?.copyWith(color: iconColor),
-                ),
+                const SizedBox(width: 6),
+                Text(value, style: valueStyle),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(title, style: Theme.of(context).textTheme.bodySmall),
+            if (!isLandscape) const SizedBox(height: 6),
+            Text(title, style: labelStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
     );
   }
 
-  // =============================
-  // Filter Bar
-  // =============================
   Widget _buildFilterBar(BuildContext context) {
-    Widget buildButton(
-      InventoryFilter filter,
-      String label,
-    ) {
-      final bool isSelected = filter == currentFilter;
+    final btnPadding = isLandscape
+        ? const EdgeInsets.symmetric(vertical: 6, horizontal: 12)
+        : const EdgeInsets.symmetric(vertical: 12, horizontal: 16);
+    final minWidth = isLandscape ? 80.0 : 110.0;
 
+    Widget buildButton(InventoryFilter filter, String label) {
+      final bool isSelected = filter == currentFilter;
       return Padding(
         padding: const EdgeInsets.only(right: 8),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 110),
+          constraints: BoxConstraints(minWidth: minWidth),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
             decoration: BoxDecoration(
               color: isSelected
                   ? Theme.of(context).colorScheme.surface
-                  : Colors.transparent, //
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
                 color: isSelected
@@ -93,30 +98,25 @@ class InventoryHeader extends StatelessWidget {
               ),
             ),
             child: OutlinedButton(
-              onPressed: isSelected
-                  ? null
-                  : () {
-                      onFilterChanged(filter);
-                    },
+              onPressed: isSelected ? null : () => onFilterChanged(filter),
               style: OutlinedButton.styleFrom(
                 side: BorderSide.none,
                 backgroundColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
+                padding: btnPadding,
                 shape: const StadiumBorder(),
               ),
               child: AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOut,
-                style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.onSurface
-                          : Theme.of(context).colorScheme.outlineVariant,
-                    ),
+                style: (isLandscape
+                        ? Theme.of(context).textTheme.labelSmall
+                        : Theme.of(context).textTheme.labelLarge)!
+                    .copyWith(
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context).colorScheme.outlineVariant,
+                ),
                 child: Text(label),
               ),
             ),
@@ -134,31 +134,35 @@ class InventoryHeader extends StatelessWidget {
           buildButton(InventoryFilter.all, 'All Items'),
           buildButton(InventoryFilter.low, 'Low Stock'),
           buildButton(InventoryFilter.out, 'Out of Stock'),
-          buildButton(InventoryFilter.other1, 'Something'),
-          buildButton(InventoryFilter.other2, 'Something'),
         ],
       ),
     );
   }
 
-  // =============================
-  // BUILD
-  // =============================
   @override
   Widget build(BuildContext context) {
+    final totalItems = products.length;
+    final lowStock = products.where((p) => p.isLowStock && !p.isOutOfStock).length;
+    final outOfStock = products.where((p) => p.isOutOfStock).length;
+
+    final topPadding = isLandscape ? 4.0 : 8.0;
+    final bottomPadding = isLandscape ? 6.0 : 16.0;
+    final sectionGap = isLandscape ? 6.0 : 16.0;
+
     return Container(
       color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 16),
+            padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
             child: Text(
-              '8 items',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
+              '$totalItems item${totalItems == 1 ? '' : 's'}',
+              style: (isLandscape
+                      ? Theme.of(context).textTheme.labelSmall
+                      : Theme.of(context).textTheme.titleSmall)
                   ?.copyWith(color: AppTheme.mutedForeground),
             ),
           ),
@@ -169,22 +173,19 @@ class InventoryHeader extends StatelessWidget {
             onChanged: onSearchChanged,
           ),
 
-          const SizedBox(height: 16),
-
+          SizedBox(height: sectionGap),
           _buildFilterBar(context),
+          SizedBox(height: sectionGap),
 
-          const SizedBox(height: 16),
           Row(
             children: [
-              _buildSummaryTile(context, 'Total Items', '8', AppTheme.gold),
-              const SizedBox(width: 12),
-              _buildSummaryTile(context, 'Low Stock', '2', AppTheme.warning),
-              const SizedBox(width: 12),
-              _buildSummaryTile(
-                  context, 'Out of Stock', '1', AppTheme.destructive),
+              _buildSummaryTile(context, 'Total Items', '$totalItems', AppTheme.gold),
+              const SizedBox(width: 8),
+              _buildSummaryTile(context, 'Low Stock', '$lowStock', AppTheme.warning),
+              const SizedBox(width: 8),
+              _buildSummaryTile(context, 'Out of Stock', '$outOfStock', AppTheme.destructive),
             ],
           ),
-          // summary & lainnya (tidak diubah)
         ],
       ),
     );

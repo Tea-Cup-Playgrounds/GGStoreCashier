@@ -48,7 +48,11 @@ class BranchService {
         lastFetchWasStale = true;
         return Branch.fromJson(Map<String, dynamic>.from(entry.data as Map));
       }
-      rethrow;
+      final isOffline =
+          ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
+      throw Exception(isOffline
+          ? 'Kamu sedang offline dan belum ada data tersimpan untuk cabang ini.'
+          : 'Gagal memuat data cabang. Coba lagi.');
     }
   }
 

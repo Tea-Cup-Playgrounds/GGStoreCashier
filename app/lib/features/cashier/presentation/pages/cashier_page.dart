@@ -91,7 +91,12 @@ class _CashierPageState extends ConsumerState<CashierPage>
     });
 
     try {
-      final products = await ProductService.getProducts(forceRefresh: forceRefresh);
+      final user = ref.read(authProvider).user;
+      final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+      final products = await ProductService.getProducts(
+        branchId: branchId,
+        forceRefresh: forceRefresh,
+      );
       setState(() {
         _products = products;
         _isLoadingProducts = false;
@@ -141,9 +146,14 @@ class _CashierPageState extends ConsumerState<CashierPage>
     setState(() {
       final existingIndex = _cart.indexWhere((item) => item.id == product.id);
       if (existingIndex >= 0) {
-        _cart[existingIndex] = _cart[existingIndex].incrementQuantity();
+        final current = _cart[existingIndex];
+        if (current.quantity < product.stock) {
+          _cart[existingIndex] = current.incrementQuantity();
+        }
       } else {
-        _cart.add(CartItem.fromProduct(product));
+        if (product.stock > 0) {
+          _cart.add(CartItem.fromProduct(product));
+        }
       }
     });
   }
@@ -152,11 +162,14 @@ class _CashierPageState extends ConsumerState<CashierPage>
     setState(() {
       final index = _cart.indexWhere((item) => item.id == id);
       if (index >= 0) {
-        final newQuantity = _cart[index].quantity + delta;
+        final item = _cart[index];
+        final newQuantity = item.quantity + delta;
         if (newQuantity <= 0) {
           _cart.removeAt(index);
         } else {
-          _cart[index] = _cart[index].copyWith(quantity: newQuantity);
+          // Cap at available stock
+          final capped = newQuantity.clamp(1, item.product.stock);
+          _cart[index] = item.copyWith(quantity: capped);
         }
       }
     });
@@ -637,6 +650,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                 onIncrease: (id) => _updateCartItemQuantity(id, 1),
                                 onDecrease: (id) => _updateCartItemQuantity(id, -1),
                                 onRemove: _removeFromCart,
+                                maxQuantity: item.product.stock,
                               );
                             },
                           ),
@@ -1011,6 +1025,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                       onIncrease: (id) => _updateCartItemQuantity(id, 1),
                       onDecrease: (id) => _updateCartItemQuantity(id, -1),
                       onRemove: _removeFromCart,
+                      maxQuantity: item.product.stock,
                     );
                   },
                 ),

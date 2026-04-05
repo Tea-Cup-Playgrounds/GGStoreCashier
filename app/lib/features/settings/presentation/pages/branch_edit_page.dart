@@ -160,20 +160,32 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
   }
 
   Widget _buildError() {
+    final isOffline = ref.read(connectivityProvider).valueOrNull == ConnectivityStatus.offline;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
+            Icon(
+              isOffline ? Icons.wifi_off : Icons.error_outline,
+              size: 56,
+              color: isOffline ? Colors.orange : AppTheme.destructive,
+            ),
             const SizedBox(height: 16),
-            Text('Failed to load branch', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              isOffline ? 'Kamu Sedang Offline' : 'Failed to load branch',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
-            Text(_error!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-                textAlign: TextAlign.center),
+            Text(
+              isOffline
+                  ? 'Data cabang belum tersimpan di perangkat ini. Coba lagi saat online.'
+                  : _error!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 24),
             CustomButton(text: 'Retry', icon: Icons.refresh, onPressed: _loadBranch),
           ],

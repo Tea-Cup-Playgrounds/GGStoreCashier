@@ -77,7 +77,13 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     });
 
     try {
-      final products = await ProductService.getProducts(forceRefresh: forceRefresh);
+      final user = ref.read(authProvider).user;
+      // Non-superadmin users only see their branch's products
+      final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+      final products = await ProductService.getProducts(
+        branchId: branchId,
+        forceRefresh: forceRefresh,
+      );
       setState(() {
         _products = products;
         _isLoadingProducts = false;
@@ -117,12 +123,28 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     final user = authState.user;
     final isKaryawan = user?.isEmployee ?? false;
     final isOffline = ref.watch(connectivityProvider).valueOrNull == ConnectivityStatus.offline;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
     final horizontalPadding = Breakpoints.getHorizontalPadding(screenType, orientation);
 
+    final canAdd = !isKaryawan && !isOffline;
+    final isOnProductsTab = _tabController.index == 0;
+
     return Scaffold(
+      floatingActionButton: (canAdd && isOnProductsTab)
+          ? FloatingActionButton(
+              onPressed: () async {
+                await context.push(AppRouter.inventoryAddItem);
+                if (mounted) _loadProducts(forceRefresh: true);
+              },
+              backgroundColor: AppTheme.gold,
+              foregroundColor: AppTheme.background,
+              tooltip: 'Add Item',
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
@@ -152,50 +174,19 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                       ),
                       if (_isDataStale) ...[
                         const SizedBox(width: 6),
-                        Tooltip(
+                        const Tooltip(
                           message: 'Data mungkin tidak terbaru',
-                          child: Icon(
-                            Icons.cloud_off,
-                            size: 14,
-                            color: Colors.orange,
-                          ),
+                          child: Icon(Icons.cloud_off, size: 14, color: Colors.orange),
                         ),
                       ],
-                      const Spacer(),
-                      if (!isKaryawan)
-                        if (isOffline)
-                          Tooltip(
-                            message: 'Tidak tersedia saat offline',
-                            child: ElevatedButton.icon(
-                              onPressed: null,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Add Item'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.gold,
-                                foregroundColor: AppTheme.background,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: screenType == ScreenType.tablet ? 24 : 16,
-                                  vertical: screenType == ScreenType.tablet ? 16 : 12,
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              context.push(AppRouter.inventoryAddItem);
-                            },
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Item'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.gold,
-                              foregroundColor: AppTheme.background,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: screenType == ScreenType.tablet ? 24 : 16,
-                                vertical: screenType == ScreenType.tablet ? 16 : 12,
-                              ),
-                            ),
-                          ),
+                      if (!isKaryawan && isOffline) ...[
+                        const Spacer(),
+                        Tooltip(
+                          message: 'Tidak tersedia saat offline',
+                          child: Icon(Icons.add_circle_outline,
+                              color: AppTheme.mutedForeground.withOpacity(0.4)),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -216,6 +207,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   labelColor: AppTheme.gold,
                   unselectedLabelColor: AppTheme.mutedForeground,
                   indicatorColor: AppTheme.gold,
+                  onTap: (_) => setState(() {}), // rebuild to update FAB visibility
                   tabs: const [
                     Tab(text: 'Products'),
                     Tab(text: 'Categories'),
@@ -228,7 +220,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildProductsTab(screenType, horizontalPadding, isOffline),
+                    _buildProductsTab(screenType, horizontalPadding, isOffline, isLandscape),
                     const CategoryManagementPage(),
                   ],
                 ),
@@ -240,7 +232,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     );
   }
 
-  Widget _buildProductsTab(ScreenType screenType, double horizontalPadding, bool isOffline) {
+  Widget _buildProductsTab(ScreenType screenType, double horizontalPadding, bool isOffline, bool isLandscape) {
     // Filter products based on search and filter
     List<Product> filteredProducts = _products;
     
@@ -274,11 +266,14 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
       slivers: [
         SliverPersistentHeader(
           delegate: _InventoryHeaderDelegate(
+            isLandscape: isLandscape,
             child: InventoryHeader(
               searchController: searchController,
               onSearchChanged: _onSearchChanged,
               currentFilter: _currentFilter,
               onFilterChanged: _onFilterChanged,
+              products: _products,
+              isLandscape: isLandscape,
             ),
           ),
           pinned: true,
@@ -372,6 +367,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   return _ProductListTile(
                     product: product,
                     isTablet: screenType == ScreenType.tablet,
+                    onReturn: () => _loadProducts(forceRefresh: true),
                   );
                 },
                 childCount: filteredProducts.length,
@@ -392,34 +388,35 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
 
 class _InventoryHeaderDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
+  final bool isLandscape;
 
-  const _InventoryHeaderDelegate({required this.child});
+  const _InventoryHeaderDelegate({required this.child, this.isLandscape = false});
 
   @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return child;
   }
 
   @override
-  double get maxExtent => 280.0;
+  double get maxExtent => isLandscape ? 160.0 : 280.0;
 
   @override
-  double get minExtent => 280.0;
+  double get minExtent => isLandscape ? 160.0 : 280.0;
 
   @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
-    return true;
-  }
+  bool shouldRebuild(covariant _InventoryHeaderDelegate oldDelegate) =>
+      oldDelegate.isLandscape != isLandscape;
 }
 
 class _ProductListTile extends StatelessWidget {
   final Product product;
   final bool isTablet;
+  final VoidCallback? onReturn;
 
   const _ProductListTile({
     required this.product,
     this.isTablet = false,
+    this.onReturn,
   });
 
   @override
@@ -443,8 +440,9 @@ class _ProductListTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: ListTile(
-          onTap: () {
-            context.pushNamed('inventoryDetail', pathParameters: {'id': product.id});
+          onTap: () async {
+            await context.pushNamed('inventoryDetail', pathParameters: {'id': product.id});
+            onReturn?.call();
           },
           contentPadding: EdgeInsets.symmetric(
             horizontal: isTablet ? 20 : 16, 
