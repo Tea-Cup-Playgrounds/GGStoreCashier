@@ -76,7 +76,7 @@ router.post('/check-password-strength', requireRole(['admin', 'superadmin']), (r
         const { password } = req.body;
         
         if (!password) {
-            return res.status(400).json({ error: 'Password is required' });
+            return res.status(400).json({ error: 'Password wajib diisi' });
         }
         
         const validation = validatePasswordStrength(password);
@@ -84,7 +84,7 @@ router.post('/check-password-strength', requireRole(['admin', 'superadmin']), (r
         
     } catch (error) {
         console.error('Password strength check error:', error);
-        res.status(500).json({ error: 'Failed to check password strength' });
+        res.status(500).json({ error: 'Gagal memeriksa kekuatan password' });
     }
 });
 
@@ -186,7 +186,7 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
 
     } catch (error) {
         console.error('Get users error:', error);
-        res.status(500).json({ error: 'Failed to fetch users' });
+        res.status(500).json({ error: 'Gagal mengambil data pengguna' });
     }
 
 });
@@ -204,14 +204,14 @@ router.get('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         );
 
         if (users.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
         }
 
         res.json({ user: users[0] });
 
     } catch (error) {
         console.error('Get user error:', error);
-        res.status(500).json({ error: 'Failed to fetch user' });
+        res.status(500).json({ error: 'Gagal mengambil data pengguna' });
     }
 });
 
@@ -223,7 +223,7 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         // Input validation
         if (!name || !username || !password) {
             return res.status(400).json({ 
-                error: 'Name, username, and password are required' 
+                error: 'Nama, username, dan password wajib diisi' 
             });
         }
 
@@ -239,7 +239,7 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         if (branch_name && !branch_id) {
             if (req.user.role !== 'superadmin') {
                 return res.status(403).json({ 
-                    error: 'Only superadmin can create new branches' 
+                    error: 'Hanya superadmin yang dapat membuat cabang baru' 
                 });
             }
 
@@ -271,33 +271,33 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         // Validate inputs against malicious patterns
         if (!validateInput(sanitizedName) || !validateInput(sanitizedUsername)) {
             return res.status(400).json({ 
-                error: 'Invalid characters detected in input' 
+                error: 'Input mengandung karakter yang tidak diizinkan' 
             });
         }
 
         // Validate input formats
         if (!SECURITY_PATTERNS.NAME.test(sanitizedName)) {
             return res.status(400).json({ 
-                error: 'Name must be 2-50 characters and contain only letters, spaces, hyphens, apostrophes, and periods' 
+                error: 'Nama harus 2–50 karakter dan hanya boleh mengandung huruf, spasi, tanda hubung, apostrof, dan titik' 
             });
         }
 
         if (!SECURITY_PATTERNS.USERNAME.test(sanitizedUsername)) {
             return res.status(400).json({ 
-                error: 'Username must be 3-30 characters and contain only letters, numbers, underscores, hyphens, and periods' 
+                error: 'Username harus 3–30 karakter dan hanya boleh mengandung huruf, angka, garis bawah, tanda hubung, dan titik' 
             });
         }
 
         if (!SECURITY_PATTERNS.ROLE.test(sanitizedRole)) {
             return res.status(400).json({ 
-                error: 'Invalid role specified' 
+                error: 'Role yang dipilih tidak valid' 
             });
         }
 
         // Admin cannot create superadmin or admin users
         if (req.user.role === 'admin' && (sanitizedRole === 'superadmin' || sanitizedRole === 'admin')) {
             return res.status(403).json({ 
-                error: 'You do not have permission to create admin or superadmin users' 
+                error: 'Anda tidak memiliki izin untuk membuat pengguna admin atau superadmin' 
             });
         }
 
@@ -305,7 +305,7 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         const passwordValidation = validatePasswordStrength(password);
         if (!passwordValidation.isValid) {
             return res.status(400).json({ 
-                error: 'Password does not meet security requirements',
+                error: 'Password tidak memenuhi persyaratan keamanan',
                 passwordRequirements: passwordValidation.requirements
             });
         }
@@ -318,7 +318,7 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
 
         if (existingUsers.length > 0) {
             return res.status(400).json({ 
-                error: 'Username already exists' 
+                error: 'Username sudah digunakan' 
             });
         }
 
@@ -332,13 +332,13 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         );
 
         res.status(201).json({ 
-            message: 'User created successfully',
+            message: 'Pengguna berhasil dibuat',
             userId: result.insertId 
         });
 
     } catch (error) {
         console.error('Create user error:', error);
-        res.status(500).json({ error: 'Failed to create user' });
+        res.status(500).json({ error: 'Gagal membuat pengguna' });
     }
 });
 
@@ -349,7 +349,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         const { name, username, password, role, branch_id, branch_name } = req.body;
 
         if (!userId || isNaN(userId)) {
-            return res.status(400).json({ error: 'Valid user ID is required' });
+            return res.status(400).json({ error: 'ID pengguna tidak valid' });
         }
 
         // Check if user exists
@@ -359,19 +359,19 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         );
 
         if (existingUsers.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
         }
 
         const existingUser = existingUsers[0];
 
         // Admin can only update users from their own branch
         if (req.user.role === 'admin' && existingUser.branch_id !== req.user.branch_id) {
-            return res.status(403).json({ error: 'You can only update users from your own branch' });
+            return res.status(403).json({ error: 'Anda hanya dapat mengubah pengguna dari cabang Anda sendiri' });
         }
 
         // Admin cannot update superadmin or admin users
         if (req.user.role === 'admin' && (existingUser.role === 'superadmin' || existingUser.role === 'admin')) {
-            return res.status(403).json({ error: 'You do not have permission to update admin or superadmin users' });
+            return res.status(403).json({ error: 'Anda tidak memiliki izin untuk mengubah pengguna admin atau superadmin' });
         }
 
         const updates = [];
@@ -384,7 +384,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         if (branch_name && !branch_id) {
             if (req.user.role !== 'superadmin') {
                 return res.status(403).json({ 
-                    error: 'Only superadmin can create new branches' 
+                    error: 'Hanya superadmin yang dapat membuat cabang baru' 
                 });
             }
 
@@ -413,7 +413,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
             const sanitizedName = sanitizeInput(name);
             if (!validateInput(sanitizedName) || !SECURITY_PATTERNS.NAME.test(sanitizedName)) {
                 return res.status(400).json({ 
-                    error: 'Invalid name format' 
+                    error: 'Format nama tidak valid' 
                 });
             }
             updates.push('name = ?');
@@ -425,7 +425,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
             const sanitizedUsername = sanitizeInput(username);
             if (!validateInput(sanitizedUsername) || !SECURITY_PATTERNS.USERNAME.test(sanitizedUsername)) {
                 return res.status(400).json({ 
-                    error: 'Invalid username format' 
+                    error: 'Format username tidak valid' 
                 });
             }
 
@@ -437,7 +437,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
 
             if (duplicateUsers.length > 0) {
                 return res.status(400).json({ 
-                    error: 'Username already exists' 
+                    error: 'Username sudah digunakan' 
                 });
             }
 
@@ -450,7 +450,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
             const passwordValidation = validatePasswordStrength(password);
             if (!passwordValidation.isValid) {
                 return res.status(400).json({ 
-                    error: 'Password does not meet security requirements',
+                    error: 'Password tidak memenuhi persyaratan keamanan',
                     passwordRequirements: passwordValidation.requirements
                 });
             }
@@ -465,14 +465,14 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         if (role !== undefined) {
             if (!SECURITY_PATTERNS.ROLE.test(role)) {
                 return res.status(400).json({ 
-                    error: 'Invalid role specified' 
+                    error: 'Role yang dipilih tidak valid' 
                 });
             }
             
             // Admin cannot change role to superadmin or admin
             if (req.user.role === 'admin' && (role === 'superadmin' || role === 'admin')) {
                 return res.status(403).json({ 
-                    error: 'You do not have permission to assign admin or superadmin roles' 
+                    error: 'Anda tidak memiliki izin untuk menetapkan role admin atau superadmin' 
                 });
             }
             
@@ -484,7 +484,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         if (userBranchId !== undefined || branch_id !== undefined) {
             if (req.user.role === 'admin') {
                 return res.status(403).json({ 
-                    error: 'You do not have permission to change user branch' 
+                    error: 'Anda tidak memiliki izin untuk mengubah cabang pengguna' 
                 });
             }
             updates.push('branch_id = ?');
@@ -492,7 +492,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         }
 
         if (updates.length === 0) {
-            return res.status(400).json({ error: 'No valid fields to update' });
+            return res.status(400).json({ error: 'Tidak ada field yang valid untuk diperbarui' });
         }
 
         updates.push('updated_at = CURRENT_TIMESTAMP');
@@ -501,11 +501,11 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
         await pool.execute(query, params);
 
-        res.json({ message: 'User updated successfully' });
+        res.json({ message: 'Pengguna berhasil diperbarui' });
 
     } catch (error) {
         console.error('Update user error:', error);
-        res.status(500).json({ error: 'Failed to update user' });
+        res.status(500).json({ error: 'Gagal memperbarui pengguna' });
     }
 });
 
@@ -515,12 +515,12 @@ router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => 
         const userId = parseInt(req.params.id);
 
         if (!userId || isNaN(userId)) {
-            return res.status(400).json({ error: 'Valid user ID is required' });
+            return res.status(400).json({ error: 'ID pengguna tidak valid' });
         }
 
         // Prevent self-deletion
         if (userId === req.user.id) {
-            return res.status(400).json({ error: 'Cannot delete your own account' });
+            return res.status(400).json({ error: 'Anda tidak dapat menghapus akun Anda sendiri' });
         }
 
         // Check if user exists
@@ -530,28 +530,28 @@ router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => 
         );
 
         if (existingUsers.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
         }
 
         const existingUser = existingUsers[0];
 
         // Admin can only delete users from their own branch
         if (req.user.role === 'admin' && existingUser.branch_id !== req.user.branch_id) {
-            return res.status(403).json({ error: 'You can only delete users from your own branch' });
+            return res.status(403).json({ error: 'Anda hanya dapat menghapus pengguna dari cabang Anda sendiri' });
         }
 
         // Prevent deletion of superadmin by admin
         if (req.user.role === 'admin' && (existingUser.role === 'superadmin' || existingUser.role === 'admin')) {
-            return res.status(403).json({ error: 'Cannot delete admin or superadmin account' });
+            return res.status(403).json({ error: 'Tidak dapat menghapus akun admin atau superadmin' });
         }
 
         await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
 
-        res.json({ message: 'User deleted successfully' });
+        res.json({ message: 'Pengguna berhasil dihapus' });
 
     } catch (error) {
         console.error('Delete user error:', error);
-        res.status(500).json({ error: 'Failed to delete user' });
+        res.status(500).json({ error: 'Gagal menghapus pengguna' });
     }
 });
 

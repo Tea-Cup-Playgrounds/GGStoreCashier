@@ -90,10 +90,10 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
         await ref
             .read(userManagementProvider.notifier)
             .updateUser(widget.user!['id'], userData);
-        if (mounted) SnackBarService.success('User updated successfully');
+        if (mounted) SnackBarService.success('Pengguna berhasil diperbarui');
       } else {
         await ref.read(userManagementProvider.notifier).createUser(userData);
-        if (mounted) SnackBarService.success('User created successfully');
+        if (mounted) SnackBarService.success('Pengguna berhasil dibuat');
       }
 
       if (mounted) Navigator.of(context).pop();
@@ -105,41 +105,41 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
   }
 
   String? _validateName(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Name is required';
-    if (value.trim().length < 2) return 'Name must be at least 2 characters';
-    if (value.trim().length > 50) return 'Name must be less than 50 characters';
+    if (value == null || value.trim().isEmpty) return 'Nama wajib diisi';
+    if (value.trim().length < 2) return 'Nama minimal 2 karakter';
+    if (value.trim().length > 50) return 'Nama maksimal 50 karakter';
     if (!RegExp(r"^[a-zA-Z\s\-'\.]+$").hasMatch(value.trim())) {
-      return 'Name can only contain letters, spaces, hyphens, apostrophes, and periods';
+      return 'Nama hanya boleh mengandung huruf, spasi, tanda hubung, apostrof, dan titik';
     }
     return null;
   }
 
   String? _validateUsername(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Username is required';
-    if (value.trim().length < 3) return 'Username must be at least 3 characters';
-    if (value.trim().length > 30) return 'Username must be less than 30 characters';
+    if (value == null || value.trim().isEmpty) return 'Username wajib diisi';
+    if (value.trim().length < 3) return 'Username minimal 3 karakter';
+    if (value.trim().length > 30) return 'Username maksimal 30 karakter';
     if (!RegExp(r'^[a-zA-Z0-9_\-\.]+$').hasMatch(value.trim())) {
-      return 'Username can only contain letters, numbers, underscores, hyphens, and periods';
+      return 'Username hanya boleh mengandung huruf, angka, garis bawah, tanda hubung, dan titik';
     }
     return null;
   }
 
   String? _validatePassword(String? value) {
     if (!_isEditing && (value == null || value.isEmpty)) {
-      return 'Password is required';
+      return 'Password wajib diisi';
     }
     if (value != null && value.isNotEmpty && value.length < 8) {
-      return 'Password must be at least 8 characters';
+      return 'Password minimal 8 karakter';
     }
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
     if (!_isEditing && (value == null || value.isEmpty)) {
-      return 'Please confirm your password';
+      return 'Konfirmasi password wajib diisi';
     }
     if (value != null && value.isNotEmpty && value != _passwordController.text) {
-      return 'Passwords do not match';
+      return 'Password tidak cocok';
     }
     return null;
   }
@@ -163,7 +163,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
               children: [
                 Expanded(
                   child: Text(
-                    _isEditing ? 'Edit User' : 'Add New User',
+                    _isEditing ? 'Edit Pengguna' : 'Tambah Pengguna Baru',
                     style: Theme.of(context)
                         .textTheme
                         .headlineSmall
@@ -189,8 +189,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                     children: [
                       TextInput(
                         controller: _nameController,
-                        label: 'Full Name',
-                        hintText: 'Enter full name',
+                        label: 'Nama Lengkap',
+                        hintText: 'Masukkan nama lengkap',
                         validator: _validateName,
                         prefixIcon: Icons.person_outline,
                       ),
@@ -198,7 +198,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                       TextInput(
                         controller: _usernameController,
                         label: 'Username',
-                        hintText: 'Enter username',
+                        hintText: 'Masukkan username',
                         validator: _validateUsername,
                         prefixIcon: Icons.alternate_email,
                       ),
@@ -235,7 +235,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                                 ? const [
                                     DropdownMenuItem(
                                         value: 'karyawan',
-                                        child: Text('Employee')),
+                                        child: Text('Karyawan')),
                                     DropdownMenuItem(
                                         value: 'admin',
                                         child: Text('Admin')),
@@ -246,7 +246,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                                 : const [
                                     DropdownMenuItem(
                                         value: 'karyawan',
-                                        child: Text('Employee')),
+                                        child: Text('Karyawan')),
                                   ],
                             onChanged: (value) =>
                                 setState(() => _selectedRole = value!),
@@ -270,7 +270,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         },
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Branch is required';
+                            return 'Cabang wajib dipilih';
                           }
                           return null;
                         },
@@ -280,9 +280,9 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                       TextInput(
                         controller: _passwordController,
                         label: _isEditing
-                            ? 'New Password (leave empty to keep current)'
+                            ? 'Password Baru (kosongkan untuk tetap sama)'
                             : 'Password',
-                        hintText: 'Enter password',
+                        hintText: 'Masukkan password',
                         obscureText: _obscurePassword,
                         validator: _validatePassword,
                         prefixIcon: Icons.lock_outline,
@@ -308,8 +308,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
                       TextInput(
                         controller: _confirmPasswordController,
-                        label: 'Confirm Password',
-                        hintText: 'Confirm password',
+                        label: 'Konfirmasi Password',
+                        hintText: 'Konfirmasi password',
                         obscureText: _obscureConfirmPassword,
                         validator: _validateConfirmPassword,
                         prefixIcon: Icons.lock_outline,
@@ -337,7 +337,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
               children: [
                 Expanded(
                   child: CustomButton(
-                    text: 'Cancel',
+                    text: 'Batal',
                     variant: ButtonVariant.outline,
                     fullWidth: true,
                     onPressed: () => Navigator.of(context).pop(),
@@ -346,7 +346,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: CustomButton(
-                    text: _isEditing ? 'Update User' : 'Create User',
+                    text: _isEditing ? 'Perbarui Pengguna' : 'Buat Pengguna',
                     fullWidth: true,
                     isLoading: _isLoading,
                     onPressed: _handleSubmit,

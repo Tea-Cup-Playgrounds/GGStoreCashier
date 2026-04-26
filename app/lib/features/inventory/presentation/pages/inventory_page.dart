@@ -141,7 +141,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
               },
               backgroundColor: AppTheme.gold,
               foregroundColor: AppTheme.background,
-              tooltip: 'Add Item',
+              tooltip: 'Tambah Item',
               child: const Icon(Icons.add),
             )
           : null,
@@ -209,8 +209,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   indicatorColor: AppTheme.gold,
                   onTap: (_) => setState(() {}), // rebuild to update FAB visibility
                   tabs: const [
-                    Tab(text: 'Products'),
-                    Tab(text: 'Categories'),
+                    Tab(text: 'Produk'),
+                    Tab(text: 'Kategori'),
                   ],
                 ),
               ),
@@ -287,7 +287,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                 children: [
                   CircularProgressIndicator(color: AppTheme.gold),
                   SizedBox(height: 16),
-                  Text('Loading products...'),
+                  Text('Memuat produk...'),
                 ],
               ),
             ),
@@ -315,7 +315,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                       color: AppTheme.destructive,
                     ),
                     const SizedBox(height: 16),
-                    const Text('Failed to load products'),
+                    const Text('Gagal memuat produk'),
                     const SizedBox(height: 8),
                     Text(
                       _productsError!,
@@ -326,7 +326,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                     ElevatedButton.icon(
                       onPressed: _loadProducts,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
+                      label: const Text('Coba Lagi'),
                     ),
                   ],
                 ),
@@ -346,8 +346,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   const SizedBox(height: 16),
                   Text(
                     searchQuery.isNotEmpty
-                        ? 'No products found'
-                        : 'No products available',
+                        ? 'Produk tidak ditemukan'
+                        : 'Belum ada produk tersedia',
                     style: const TextStyle(
                       color: AppTheme.mutedForeground,
                       fontSize: 18,
@@ -499,7 +499,7 @@ class _ProductListTile extends StatelessWidget {
                 ),
               const SizedBox(height: 2),
               Text(
-                '${product.stock} in stock',
+                '${product.stock} stok tersedia',
                 style: Theme.of(context).textTheme.bodySmall!.copyWith(
                       color: stockColor,
                       fontWeight: FontWeight.w500,

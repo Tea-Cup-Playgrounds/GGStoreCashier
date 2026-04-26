@@ -57,7 +57,7 @@ class ImageInputState extends State<ImageInput> {
         // Check MIME type from XFile as fallback
         final String? mime = picked.mimeType;
         if (mime != null && !mime.startsWith('image/')) {
-          setState(() => _errorText = 'Invalid file type. Only JPG and PNG are allowed.');
+          setState(() => _errorText = 'Tipe file tidak valid. Hanya JPG dan PNG yang diizinkan.');
           return;
         }
       }
@@ -99,7 +99,7 @@ class ImageInputState extends State<ImageInput> {
       debugPrint('[ImageInput] file size: ${(fileSize / 1024).toStringAsFixed(1)} KB');
 
       if (fileSize > maxSize) {
-        setState(() => _errorText = 'File size exceeds 5MB limit.');
+        setState(() => _errorText = 'Ukuran file melebihi batas 5MB.');
         return;
       }
 
@@ -111,7 +111,7 @@ class ImageInputState extends State<ImageInput> {
     } catch (e, stack) {
       debugPrint('[ImageInput] ERROR picking image: $e');
       debugPrint('[ImageInput] stack: $stack');
-      setState(() => _errorText = 'Failed to pick image: $e');
+      setState(() => _errorText = 'Gagal memilih gambar: $e');
     }
   }
 
@@ -128,7 +128,7 @@ class ImageInputState extends State<ImageInput> {
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt_outlined),
-              title: const Text("Camera"),
+              title: const Text("Kamera"),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.camera);
@@ -136,7 +136,7 @@ class ImageInputState extends State<ImageInput> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text("Gallery"),
+              title: const Text("Galeri"),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.gallery);
@@ -156,7 +156,7 @@ class ImageInputState extends State<ImageInput> {
 
   bool validate() {
     if (widget.isRequired && !_hasImage) {
-      setState(() => _errorText = "Image is required");
+      setState(() => _errorText = "Gambar wajib diisi");
       return false;
     }
     setState(() => _errorText = null);
@@ -284,7 +284,7 @@ class ImageInputState extends State<ImageInput> {
           ),
           SizedBox(height: 12),
           Text(
-            "Tap to upload image",
+            "Ketuk untuk unggah gambar",
             style: TextStyle(
               color: AppTheme.mutedForeground,
               fontSize: 14,

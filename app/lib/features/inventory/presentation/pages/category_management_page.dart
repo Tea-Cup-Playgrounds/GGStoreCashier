@@ -48,7 +48,7 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        SnackBarService.error('Failed to load categories');
+        SnackBarService.error('Gagal memuat kategori');
       }
     }
   }
@@ -70,17 +70,17 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Category'),
-        content: const Text('Are you sure you want to delete this category?'),
+        title: const Text('Hapus Kategori'),
+        content: const Text('Apakah Anda yakin ingin menghapus kategori ini?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Batal'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
-            child: const Text('Delete'),
+            child: const Text('Hapus'),
           ),
         ],
       ),
@@ -98,12 +98,12 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
       await dio.delete('/api/categories/$id');
       
       if (mounted) {
-        SnackBarService.success('Category deleted successfully');
+        SnackBarService.success('Kategori berhasil dihapus');
         _loadCategories();
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Failed to delete category';
+        String errorMessage = 'Gagal menghapus kategori';
         if (e is DioException && e.response?.data != null) {
           errorMessage = e.response!.data['error'] ?? errorMessage;
         }
@@ -137,7 +137,7 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No categories yet',
+                        'Belum ada kategori',
                         style: TextStyle(
                           color: AppTheme.mutedForeground,
                           fontSize: 18,
@@ -296,19 +296,19 @@ class _CategoryDialogState extends State<_CategoryDialog> {
       if (widget.category == null) {
         await dio.post('/api/categories', data: formData);
         if (mounted) {
-          SnackBarService.success('Category created successfully');
+          SnackBarService.success('Kategori berhasil dibuat');
         }
       } else {
         await dio.put('/api/categories/${widget.category!['id']}', data: formData);
         if (mounted) {
-          SnackBarService.success('Category updated successfully');
+          SnackBarService.success('Kategori berhasil diperbarui');
         }
       }
 
       widget.onSaved();
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Failed to save category';
+        String errorMessage = 'Gagal menyimpan kategori';
         if (e is DioException && e.response?.data != null) {
           errorMessage = e.response!.data['error'] ?? errorMessage;
         }
@@ -377,7 +377,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.category == null ? 'Add New Category' : 'Edit Category',
+                          widget.category == null ? 'Tambah Kategori Baru' : 'Edit Kategori',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppTheme.foreground,
@@ -386,8 +386,8 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                         const SizedBox(height: 4),
                         Text(
                           widget.category == null 
-                              ? 'Create a new product category'
-                              : 'Update category information',
+                              ? 'Buat kategori produk baru'
+                              : 'Perbarui informasi kategori',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppTheme.mutedForeground,
                           ),
@@ -398,7 +398,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                   IconButton(
                     onPressed: _isLoading ? null : () => Navigator.pop(context),
                     icon: const Icon(Icons.close, color: AppTheme.mutedForeground),
-                    tooltip: 'Close',
+                    tooltip: 'Tutup',
                   ),
                 ],
               ),
@@ -416,7 +416,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                       // Image Upload Section
                       ImageInput(
                         file: _categoryImage,
-                        label: 'Category Image',
+                        label: 'Gambar Kategori',
                         onChanged: (img) => setState(() => _categoryImage = img),
                         height: 200,
                       ),
@@ -424,16 +424,16 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                       
                       // Category Name
                       TextInput(
-                        label: 'Category Name',
-                        hintText: 'Enter category name',
+                        label: 'Nama Kategori',
+                        hintText: 'Masukkan nama kategori',
                         controller: _nameController,
                         prefixIcon: Icons.category_outlined,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Category name is required';
+                            return 'Nama kategori wajib diisi';
                           }
                           if (value.trim().length < 2) {
-                            return 'Category name must be at least 2 characters';
+                            return 'Nama kategori minimal 2 karakter';
                           }
                           return null;
                         },
@@ -442,8 +442,8 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                       
                       // Description
                       TextInput(
-                        label: 'Description (Optional)',
-                        hintText: 'Enter category description',
+                        label: 'Deskripsi (Opsional)',
+                        hintText: 'Masukkan deskripsi kategori',
                         controller: _descriptionController,
                         prefixIcon: Icons.description_outlined,
                         maxLines: 4,
@@ -471,7 +471,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                 children: [
                   Expanded(
                     child: CustomButton(
-                      text: 'Cancel',
+                      text: 'Batal',
                       variant: ButtonVariant.outline,
                       fullWidth: true,
                       onPressed: _isLoading ? null : () => Navigator.pop(context),
@@ -481,7 +481,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                   Expanded(
                     flex: isDesktop ? 1 : 2,
                     child: CustomButton(
-                      text: widget.category == null ? 'Create Category' : 'Update Category',
+                      text: widget.category == null ? 'Buat Kategori' : 'Perbarui Kategori',
                       icon: widget.category == null ? Icons.add : Icons.check,
                       fullWidth: true,
                       isLoading: _isLoading,

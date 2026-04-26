@@ -128,7 +128,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
           totalPages: pagination['totalPages'] ?? 1,
         );
       } else {
-        state = state.copyWith(isLoading: false, error: 'Failed to load users');
+        state = state.copyWith(isLoading: false, error: 'Gagal memuat pengguna');
       }
     } catch (e) {
       if (e is DioException && noFilters) {
@@ -181,7 +181,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
 
     final response = await _dio.post('/api/users', data: userData);
     if (response.statusCode != 201) {
-      throw Exception(response.data['error'] ?? 'Failed to create user');
+      throw Exception(response.data['error'] ?? 'Gagal membuat pengguna');
     }
     await CacheManager.invalidate('users:list');
     await loadUsers();
@@ -215,7 +215,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
 
     final response = await _dio.put('/api/users/$userId', data: userData);
     if (response.statusCode != 200) {
-      throw Exception(response.data['error'] ?? 'Failed to update user');
+      throw Exception(response.data['error'] ?? 'Gagal memperbarui pengguna');
     }
     await CacheManager.invalidate('users:list');
     await loadUsers();
@@ -246,7 +246,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
 
     final response = await _dio.delete('/api/users/$userId');
     if (response.statusCode != 200) {
-      throw Exception(response.data['error'] ?? 'Failed to delete user');
+      throw Exception(response.data['error'] ?? 'Gagal menghapus pengguna');
     }
     await CacheManager.invalidate('users:list');
     await loadUsers();

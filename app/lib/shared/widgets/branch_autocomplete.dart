@@ -67,7 +67,7 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      debugPrint('Failed to load branches: $e');
+      debugPrint('Gagal memuat cabang: $e');
     }
   }
 

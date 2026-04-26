@@ -95,20 +95,20 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
 
   String? _validateUsername(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Username is required';
+      return 'Username wajib diisi';
     }
     if (value.trim().length < 3) {
-      return 'Username must be at least 3 characters';
+      return 'Username minimal 3 karakter';
     }
     return null;
   }
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Password is required';
+      return 'Password wajib diisi';
     }
     if (value.length < 6) {
-      return 'Password must be at least 6 characters';
+      return 'Password minimal 6 karakter';
     }
     return null;
   }
@@ -192,7 +192,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
     return Column(
       children: [
         Text(
-          'Welcome Back',
+          'Selamat Datang',
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
             color: AppTheme.foreground,
             fontWeight: FontWeight.bold,
@@ -201,7 +201,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
         ),
         const SizedBox(height: 4),
         Text(
-          'Sign in to your account',
+          'Masuk ke akun Anda',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: AppTheme.mutedForeground,
             fontSize: subSize != null ? subSize * scale : (Theme.of(context).textTheme.bodyLarge!.fontSize! * scale),
@@ -243,14 +243,14 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
           if (authState.remainingAttempts != null && authState.remainingAttempts! > 0) ...[
             const SizedBox(height: 8),
             Text(
-              'Remaining attempts: ${authState.remainingAttempts}',
+              'Sisa percobaan: ${authState.remainingAttempts}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.destructive),
             ),
           ],
           if (authState.isLockedOut) ...[
             const SizedBox(height: 8),
             Text(
-              'Account locked for ${ref.read(authProvider.notifier).getRemainingLockoutMinutes()} minutes',
+              'Akun dikunci selama ${ref.read(authProvider.notifier).getRemainingLockoutMinutes()} menit',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: AppTheme.destructive,
                 fontWeight: FontWeight.w600,
@@ -272,7 +272,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
             TextInput(
               controller: _usernameController,
               label: 'Username',
-              hintText: 'Enter your username',
+              hintText: 'Masukkan username Anda',
               prefixIcon: Icons.person_outline,
               validator: _validateUsername,
               keyboardType: TextInputType.text,
@@ -281,7 +281,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
             TextInput(
               controller: _passwordController,
               label: 'Password',
-              hintText: 'Enter your password',
+              hintText: 'Masukkan password Anda',
               prefixIcon: Icons.lock_outline,
               obscureText: _obscurePassword,
               validator: _validatePassword,
@@ -302,14 +302,14 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
                   activeColor: AppTheme.gold,
                 ),
                 Text(
-                  'Remember me',
+                  'Ingat saya',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.foreground),
                 ),
               ],
             ),
             SizedBox(height: spacing),
             CustomButton(
-              text: 'Sign In',
+              text: 'Masuk',
               fullWidth: true,
               isLoading: authState.isLoading,
               onPressed: (authState.isLockedOut && !ref.read(authProvider.notifier).isLockoutExpired())

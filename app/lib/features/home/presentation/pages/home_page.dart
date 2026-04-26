@@ -141,9 +141,9 @@ class _HomePageState extends ConsumerState<HomePage>
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 18) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return 'Selamat Pagi';
+    if (hour < 18) return 'Selamat Siang';
+    return 'Selamat Malam';
   }
 
   @override
@@ -217,12 +217,12 @@ class _HomePageState extends ConsumerState<HomePage>
           const Icon(Icons.error_outline,
               size: 48, color: AppTheme.destructive),
           const SizedBox(height: 16),
-          const Text('Failed to load dashboard'),
+          const Text('Gagal memuat dashboard'),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: _loadDashboard,
             icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
+            label: const Text('Coba Lagi'),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold),
           ),
         ],
@@ -388,7 +388,7 @@ class _HomePageState extends ConsumerState<HomePage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Quick Actions',
+                    'Aksi Cepat',
                     style: Theme.of(context)
                         .textTheme
                         .headlineSmall
@@ -413,7 +413,7 @@ class _HomePageState extends ConsumerState<HomePage>
                     children: [
                       QuickActionCard(
                         icon: Icons.shopping_cart_outlined,
-                        label: 'New Sale',
+                        label: 'Transaksi Baru',
                         onTap: () => context.go(AppRouter.cashier),
                       ),
                       QuickActionCard(
@@ -423,18 +423,18 @@ class _HomePageState extends ConsumerState<HomePage>
                       ),
                       QuickActionCard(
                         icon: Icons.inventory_2_outlined,
-                        label: 'Check Stock',
+                        label: 'Cek Stok',
                         onTap: () => context.go(AppRouter.inventory),
                       ),
                       QuickActionCard(
                         icon: Icons.bluetooth,
-                        label: 'Kontrol Devices',
+                        label: 'Kontrol Perangkat',
                         onTap: () => context.go(AppRouter.cashier),
                       ),
                       if (!isKaryawan)
                         QuickActionCard(
                           icon: Icons.add,
-                          label: 'Tambah Stock',
+                          label: 'Tambah Stok',
                           onTap: () => context.go(AppRouter.inventory),
                         ),
                     ],
@@ -458,7 +458,7 @@ class _HomePageState extends ConsumerState<HomePage>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Recent Transactions',
+                        'Transaksi Terbaru',
                         style: Theme.of(context)
                             .textTheme
                             .headlineSmall
@@ -475,7 +475,7 @@ class _HomePageState extends ConsumerState<HomePage>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'View All',
+                              'Lihat Semua',
                               style: Theme.of(context)
                                   .textTheme
                                   .labelLarge
@@ -495,7 +495,7 @@ class _HomePageState extends ConsumerState<HomePage>
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 32),
                         child: Text(
-                          'No transactions yet today',
+                          'Belum ada transaksi hari ini',
                           style: TextStyle(color: AppTheme.mutedForeground),
                         ),
                       ),

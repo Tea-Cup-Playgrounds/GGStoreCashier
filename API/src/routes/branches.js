@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 
     } catch (error) {
         console.error('Get branches error:', error);
-        res.status(500).json({ error: 'Failed to fetch branches' });
+        res.status(500).json({ error: 'Gagal mengambil data cabang' });
     }
 });
 
@@ -30,14 +30,14 @@ router.get('/:id', async (req, res) => {
         );
 
         if (branches.length === 0) {
-            return res.status(404).json({ error: 'Branch not found' });
+            return res.status(404).json({ error: 'Cabang tidak ditemukan' });
         }
 
         res.json({ branch: branches[0] });
 
     } catch (error) {
         console.error('Get branch error:', error);
-        res.status(500).json({ error: 'Failed to fetch branch' });
+        res.status(500).json({ error: 'Gagal mengambil data cabang' });
     }
 });
 
@@ -48,7 +48,7 @@ router.post('/', requireRole(['superadmin']), async (req, res) => {
 
         if (!name) {
             return res.status(400).json({ 
-                error: 'Branch name is required' 
+                error: 'Nama cabang wajib diisi' 
             });
         }
 
@@ -58,13 +58,13 @@ router.post('/', requireRole(['superadmin']), async (req, res) => {
         );
 
         res.status(201).json({ 
-            message: 'Branch created successfully',
+            message: 'Cabang berhasil dibuat',
             branchId: result.insertId 
         });
 
     } catch (error) {
         console.error('Create branch error:', error);
-        res.status(500).json({ error: 'Failed to create branch' });
+        res.status(500).json({ error: 'Gagal membuat cabang' });
     }
 });
 
@@ -78,23 +78,23 @@ router.put('/:id', async (req, res) => {
 
         // Role check
         if (role === 'karyawan') {
-            return res.status(403).json({ error: 'Insufficient permissions' });
+            return res.status(403).json({ error: 'Akses tidak diizinkan' });
         }
 
         // Admin can only edit their own branch
         if (role === 'admin' && branch_id !== targetId) {
-            return res.status(403).json({ error: 'You can only edit your own branch' });
+            return res.status(403).json({ error: 'Anda hanya dapat mengedit cabang Anda sendiri' });
         }
 
         // Prevent editing the global "Semua Branch" (id = 0) by admins
         if (role === 'admin' && targetId === 0) {
-            return res.status(403).json({ error: 'Cannot edit the global branch' });
+            return res.status(403).json({ error: 'Tidak dapat mengedit cabang global' });
         }
 
         const { name, address, phone } = req.body;
 
         if (!name) {
-            return res.status(400).json({ error: 'Branch name is required' });
+            return res.status(400).json({ error: 'Nama cabang wajib diisi' });
         }
 
         const [result] = await pool.execute(
@@ -103,14 +103,14 @@ router.put('/:id', async (req, res) => {
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Branch not found' });
+            return res.status(404).json({ error: 'Cabang tidak ditemukan' });
         }
 
-        res.json({ message: 'Branch updated successfully' });
+        res.json({ message: 'Cabang berhasil diperbarui' });
 
     } catch (error) {
         console.error('Update branch error:', error);
-        res.status(500).json({ error: 'Failed to update branch' });
+        res.status(500).json({ error: 'Gagal memperbarui cabang' });
     }
 });
 
@@ -120,7 +120,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
         // Prevent deletion of "Semua Branch" (id = 0)
         if (req.params.id === '0') {
             return res.status(400).json({ 
-                error: 'Cannot delete the main branch' 
+                error: 'Tidak dapat menghapus cabang utama' 
             });
         }
 
@@ -137,7 +137,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
 
         if (users[0].count > 0 || products[0].count > 0) {
             return res.status(400).json({ 
-                error: 'Cannot delete branch with existing users or products' 
+                error: 'Tidak dapat menghapus cabang yang masih memiliki pengguna atau produk' 
             });
         }
 
@@ -147,14 +147,14 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Branch not found' });
+            return res.status(404).json({ error: 'Cabang tidak ditemukan' });
         }
 
-        res.json({ message: 'Branch deleted successfully' });
+        res.json({ message: 'Cabang berhasil dihapus' });
 
     } catch (error) {
         console.error('Delete branch error:', error);
-        res.status(500).json({ error: 'Failed to delete branch' });
+        res.status(500).json({ error: 'Gagal menghapus cabang' });
     }
 });
 

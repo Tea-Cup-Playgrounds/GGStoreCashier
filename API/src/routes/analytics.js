@@ -25,7 +25,7 @@ router.get('/revenue-trend', async (req, res) => {
         res.json({ data: rows });
     } catch (err) {
         console.error('revenue-trend error:', err);
-        res.status(500).json({ error: 'Failed to fetch revenue trend' });
+        res.status(500).json({ error: 'Gagal mengambil data tren pendapatan' });
     }
 });
 
@@ -51,7 +51,7 @@ router.get('/branch-revenue', async (req, res) => {
         res.json({ data: rows, date });
     } catch (err) {
         console.error('branch-revenue error:', err);
-        res.status(500).json({ error: 'Failed to fetch branch revenue' });
+        res.status(500).json({ error: 'Gagal mengambil data pendapatan cabang' });
     }
 });
 
@@ -79,7 +79,7 @@ router.get('/category-sales', async (req, res) => {
         res.json({ data: rows });
     } catch (err) {
         console.error('category-sales error:', err);
-        res.status(500).json({ error: 'Failed to fetch category sales' });
+        res.status(500).json({ error: 'Gagal mengambil data penjualan kategori' });
     }
 });
 
@@ -108,7 +108,7 @@ router.get('/top-products', async (req, res) => {
         res.json({ data: rows });
     } catch (err) {
         console.error('top-products error:', err);
-        res.status(500).json({ error: 'Failed to fetch top products' });
+        res.status(500).json({ error: 'Gagal mengambil data produk terlaris' });
     }
 });
 
@@ -141,7 +141,7 @@ router.get('/summary', async (req, res) => {
         });
     } catch (err) {
         console.error('summary error:', err);
-        res.status(500).json({ error: 'Failed to fetch summary' });
+        res.status(500).json({ error: 'Gagal mengambil data ringkasan' });
     }
 });
 

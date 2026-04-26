@@ -151,7 +151,7 @@ app.set('trust proxy', 1);
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    max: 500, // limit each IP to 500 requests per windowMs
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -217,12 +217,12 @@ app.post('/api/docs/login', async (req, res) => {
     if (isDocsLockedOut(clientIP)) {
         const rec = docsLoginAttempts.get(clientIP);
         const mins = Math.ceil((rec.lockedUntil - Date.now()) / 60000);
-        return res.status(429).json({ error: `Too many attempts. Try again in ${mins} minute(s).` });
+        return res.status(429).json({ error: `Terlalu banyak percobaan. Coba lagi dalam ${mins} menit.` });
     }
 
     const { username, password, remember } = req.body;
     if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required' });
+        return res.status(400).json({ error: 'Username dan password wajib diisi' });
     }
 
     try {
@@ -236,7 +236,7 @@ app.post('/api/docs/login', async (req, res) => {
 
         if (!valid || user.role !== 'superadmin') {
             recordDocsFailure(clientIP);
-            return res.status(401).json({ error: 'Invalid credentials or insufficient permissions' });
+            return res.status(401).json({ error: 'Kredensial tidak valid atau akses tidak diizinkan' });
         }
 
         docsLoginAttempts.delete(clientIP);
@@ -260,7 +260,7 @@ app.post('/api/docs/login', async (req, res) => {
         res.json({ ok: true });
     } catch (err) {
         console.error('Docs login error:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Terjadi kesalahan pada server' });
     }
 });
 
@@ -306,8 +306,8 @@ app.get('/api/test', (req, res) => {
 const errorHandler = (err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ 
-        error: 'Something went wrong!',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+        error: 'Terjadi kesalahan pada server',
+        message: process.env.NODE_ENV === 'development' ? err.message : 'Terjadi kesalahan internal'
     });
 };
 

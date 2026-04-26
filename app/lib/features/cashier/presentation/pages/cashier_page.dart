@@ -59,9 +59,9 @@ class _CashierPageState extends ConsumerState<CashierPage>
   List<Map<String, dynamic>> get _paymentMethods {
     final isOffline = ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
     return [
-      {'value': 'cash', 'label': 'Cash', 'icon': Icons.payments_outlined, 'enabled': true},
-      {'value': 'card', 'label': 'Card', 'icon': Icons.credit_card, 'enabled': !isOffline},
-      {'value': 'transfer', 'label': 'Bank Transfer', 'icon': Icons.account_balance, 'enabled': !isOffline},
+      {'value': 'cash', 'label': 'Tunai', 'icon': Icons.payments_outlined, 'enabled': true},
+      {'value': 'card', 'label': 'Kartu', 'icon': Icons.credit_card, 'enabled': !isOffline},
+      {'value': 'transfer', 'label': 'Transfer Bank', 'icon': Icons.account_balance, 'enabled': !isOffline},
       {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet, 'enabled': !isOffline},
     ];
   }
@@ -109,7 +109,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load products: $e'),
+            content: Text('Gagal memuat produk: $e'),
             backgroundColor: AppTheme.destructive,
             behavior: SnackBarBehavior.floating,
           ),
@@ -206,7 +206,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
           _currentView = CashierView.cart;
         });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Voucher $code applied!'),
+          content: Text('Voucher $code berhasil diterapkan!'),
           backgroundColor: AppTheme.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -217,8 +217,8 @@ class _CashierPageState extends ConsumerState<CashierPage>
         setState(() => _isApplyingCoupon = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e is DioException
-              ? (e.response?.data?['error'] ?? 'Invalid or expired voucher')
-              : 'Invalid or expired voucher'),
+              ? (e.response?.data?['error'] ?? 'Voucher tidak valid atau sudah kadaluarsa')
+              : 'Voucher tidak valid atau sudah kadaluarsa'),
           backgroundColor: AppTheme.destructive,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -235,7 +235,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
       final pid = int.tryParse(item.product.id);
       if (pid == null || pid <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Invalid product ID for "${item.product.name}"'),
+          content: Text('ID produk tidak valid untuk "${item.product.name}"'),
           backgroundColor: AppTheme.destructive,
           behavior: SnackBarBehavior.floating,
         ));
@@ -334,7 +334,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessingPayment = false);
-        String msg = 'Payment failed';
+        String msg = 'Pembayaran gagal';
         if (e is DioException && e.response?.data != null) {
           msg = e.response!.data['error'] ?? msg;
         }
@@ -414,7 +414,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: Text(isTablet ? 'New Sale' : _getAppBarTitle()),
+        title: Text(isTablet ? 'Transaksi Baru' : _getAppBarTitle()),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
@@ -488,7 +488,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                     child: TextField(
                       controller: _searchController,
                       decoration: const InputDecoration(
-                        hintText: 'Search products...',
+                        hintText: 'Cari produk...',
                         prefixIcon: Icon(Icons.search),
                       ),
                       onChanged: (value) => setState(() {}),
@@ -503,7 +503,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                               children: [
                                 CircularProgressIndicator(color: AppTheme.gold),
                                 SizedBox(height: 16),
-                                Text('Loading products...'),
+                                Text('Memuat produk...'),
                               ],
                             ),
                           )
@@ -518,10 +518,10 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                       color: AppTheme.destructive,
                                     ),
                                     const SizedBox(height: 16),
-                                    const Text('Failed to load products'),
+                                    const Text('Gagal memuat produk'),
                                     const SizedBox(height: 16),
                                     CustomButton(
-                                      text: 'Retry',
+                                      text: 'Coba Lagi',
                                       icon: Icons.refresh,
                                       onPressed: _loadProducts,
                                     ),
@@ -541,8 +541,8 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                         const SizedBox(height: 16),
                                         Text(
                                           _searchController.text.isNotEmpty
-                                              ? 'No products found'
-                                              : 'No products available',
+                                              ? 'Produk tidak ditemukan'
+                                              : 'Belum ada produk tersedia',
                                           style: const TextStyle(
                                             color: AppTheme.mutedForeground,
                                             fontSize: 18,
@@ -600,14 +600,14 @@ class _CashierPageState extends ConsumerState<CashierPage>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Order Summary',
+                          'Ringkasan Pesanan',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         if (_cart.isNotEmpty)
                           Text(
-                            '${_cart.fold(0, (sum, item) => sum + item.quantity)} items',
+                            '${_cart.fold(0, (sum, item) => sum + item.quantity)} item',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppTheme.mutedForeground,
                             ),
@@ -630,7 +630,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'Cart is empty',
+                                  'Keranjang kosong',
                                   style: TextStyle(
                                     color: AppTheme.mutedForeground,
                                     fontSize: 18,
@@ -682,7 +682,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                               )
                             else
                               CustomButton(
-                                text: 'Add Coupon',
+                                text: 'Tambah Kupon',
                                 variant: ButtonVariant.outline,
                                 icon: Icons.local_offer_outlined,
                                 onPressed: () => _changeView(CashierView.coupon),
@@ -716,7 +716,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         const Text(
-                                          'Discount',
+                                          'Diskon',
                                           style: TextStyle(color: AppTheme.success),
                                         ),
                                         Text(
@@ -792,7 +792,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                                               borderRadius: BorderRadius.circular(4),
                                             ),
                                             child: Text(
-                                              isOfflineDisabled ? 'Offline' : 'Soon',
+                                              isOfflineDisabled ? 'Offline' : 'Segera',
                                               style: const TextStyle(fontSize: 10, color: AppTheme.mutedForeground),
                                             ),
                                           ),
@@ -823,7 +823,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                             
                             // Process Payment Button
                             CustomButton(
-                              text: 'Process Payment',
+                              text: 'Proses Pembayaran',
                               icon: Icons.check_circle_outline,
                               onPressed: _isProcessingPayment ? null : () => _processPayment(_selectedPaymentMethod),
                               isLoading: _isProcessingPayment,
@@ -856,13 +856,13 @@ class _CashierPageState extends ConsumerState<CashierPage>
   String _getAppBarTitle() {
     switch (_currentView) {
       case CashierView.products:
-        return 'New Sale';
+        return 'Transaksi Baru';
       case CashierView.cart:
-        return 'Cart';
+        return 'Keranjang';
       case CashierView.coupon:
-        return 'Apply Coupon';
+        return 'Terapkan Voucher';
       case CashierView.success:
-        return 'Payment Success';
+        return 'Pembayaran Berhasil';
     }
   }
 
@@ -872,7 +872,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
       child: TextField(
         controller: _searchController,
         decoration: const InputDecoration(
-          hintText: 'Search products...',
+          hintText: 'Cari produk...',
           prefixIcon: Icon(Icons.search),
         ),
         onChanged: (value) => setState(() {}),
@@ -901,7 +901,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
           children: [
             CircularProgressIndicator(color: AppTheme.gold),
             SizedBox(height: 16),
-            Text('Loading products...'),
+            Text('Memuat produk...'),
           ],
         ),
       );
@@ -919,7 +919,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
             ),
             const SizedBox(height: 16),
             Text(
-              'Failed to load products',
+              'Gagal memuat produk',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -930,7 +930,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
             ),
             const SizedBox(height: 16),
             CustomButton(
-              text: 'Retry',
+              text: 'Coba Lagi',
               icon: Icons.refresh,
               onPressed: _loadProducts,
             ),
@@ -952,8 +952,8 @@ class _CashierPageState extends ConsumerState<CashierPage>
             const SizedBox(height: 16),
             Text(
               _searchController.text.isNotEmpty
-                  ? 'No products found'
-                  : 'No products available',
+                  ? 'Produk tidak ditemukan'
+                  : 'Belum ada produk tersedia',
               style: TextStyle(
                 color: AppTheme.mutedForeground,
                 fontSize: 18,
@@ -993,21 +993,21 @@ class _CashierPageState extends ConsumerState<CashierPage>
       children: [
         Expanded(
           child: _cart.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.shopping_cart_outlined,
                         size: 64,
-                        color: AppTheme.mutedForeground,
+                        color: AppTheme.mutedForeground.withOpacity(0.5),
                       ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Your cart is empty',
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Keranjang kosong',
                         style: TextStyle(
                           color: AppTheme.mutedForeground,
-                          fontSize: 16,
+                          fontSize: 18,
                         ),
                       ),
                     ],
@@ -1016,8 +1016,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: _cart.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = _cart[index];
                     return CartItemWidget(
@@ -1029,11 +1028,11 @@ class _CashierPageState extends ConsumerState<CashierPage>
                     );
                   },
                 ),
-        ),
-        if (_cart.isNotEmpty) _buildCartSummary(),
-      ],
-    );
-  }
+          ),
+          if (_cart.isNotEmpty) _buildCartSummary(),
+        ],
+      );
+    }
 
   Widget _buildCartSummary() {
     return Container(
@@ -1056,7 +1055,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
             )
           else
             CustomButton(
-              text: 'Add Coupon / Voucher',
+              text: 'Tambah Kupon / Voucher',
               variant: ButtonVariant.outline,
               icon: Icons.local_offer_outlined,
               onPressed: () => _changeView(CashierView.coupon),
@@ -1087,7 +1086,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Discount',
+                      const Text('Diskon',
                           style: TextStyle(color: AppTheme.success)),
                       Text(
                         CurrencyFormatter.formatToRupiah(_discount),
@@ -1158,7 +1157,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            isOfflineDisabled ? 'Offline' : 'Soon',
+                            isOfflineDisabled ? 'Offline' : 'Segera',
                             style: const TextStyle(fontSize: 10, color: AppTheme.mutedForeground),
                           ),
                         ),
@@ -1189,7 +1188,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
 
           // Process Payment Button
           CustomButton(
-            text: 'Process Payment',
+            text: 'Proses Pembayaran',
             icon: Icons.check_circle_outline,
             onPressed: _isProcessingPayment ? null : () => _processPayment(_selectedPaymentMethod),
             isLoading: _isProcessingPayment,
@@ -1207,7 +1206,7 @@ class _CashierPageState extends ConsumerState<CashierPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Enter Voucher Code',
+          Text('Masukkan Kode Voucher',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Row(
@@ -1215,13 +1214,13 @@ class _CashierPageState extends ConsumerState<CashierPage>
               Expanded(
                 child: TextField(
                   controller: _couponController,
-                  decoration: const InputDecoration(hintText: 'e.g. SUMMER20'),
+                  decoration: const InputDecoration(hintText: 'cth. SUMMER20'),
                   textCapitalization: TextCapitalization.characters,
                 ),
               ),
               const SizedBox(width: 12),
               CustomButton(
-                text: _isApplyingCoupon ? 'Applying...' : 'Apply',
+                text: _isApplyingCoupon ? 'Menerapkan...' : 'Terapkan',
                 onPressed: _isApplyingCoupon ? null : _applyCoupon,
                 isLoading: _isApplyingCoupon,
               ),

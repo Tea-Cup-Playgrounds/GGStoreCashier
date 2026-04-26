@@ -8,7 +8,7 @@ const authenticateToken = async (req, res, next) => {
         const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
         
         if (!token) {
-            return res.status(401).json({ error: 'Access token required' });
+            return res.status(401).json({ error: 'Token akses diperlukan' });
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -20,7 +20,7 @@ const authenticateToken = async (req, res, next) => {
         );
 
         if (users.length === 0) {
-            return res.status(401).json({ error: 'User not found' });
+            return res.status(401).json({ error: 'Pengguna tidak ditemukan' });
         }
 
         req.user = users[0];
@@ -28,7 +28,7 @@ const authenticateToken = async (req, res, next) => {
 
     } catch (error) {
         console.error('Auth middleware error:', error);
-        res.status(401).json({ error: 'Invalid token' });
+        res.status(401).json({ error: 'Token tidak valid' });
     }
 };
 
@@ -36,11 +36,11 @@ const authenticateToken = async (req, res, next) => {
 const requireRole = (roles) => {
     return (req, res, next) => {
         if (!req.user) {
-            return res.status(401).json({ error: 'Authentication required' });
+            return res.status(401).json({ error: 'Autentikasi diperlukan' });
         }
 
         if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ error: 'Insufficient permissions' });
+            return res.status(403).json({ error: 'Akses tidak diizinkan' });
         }
 
         next();
@@ -52,7 +52,7 @@ const requireRole = (roles) => {
 // Superadmin can see/modify all branches
 const filterByBranch = (req, res, next) => {
     if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return res.status(401).json({ error: 'Autentikasi diperlukan' });
     }
 
     // Superadmin can access all branches
@@ -75,7 +75,7 @@ const filterByBranch = (req, res, next) => {
 
             if (req.body && req.body.branch_id && req.body.branch_id != req.user.branch_id) {
                 return res.status(403).json({ 
-                    error: 'You can only manage data for your own branch' 
+                    error: 'Anda hanya dapat mengelola data cabang Anda sendiri' 
                 });
             }
             // Only force branch_id on JSON bodies; multipart bodies are handled in the route

@@ -30,7 +30,7 @@ class SettingsPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Pengaturan'),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         centerTitle: false,
@@ -46,10 +46,10 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 32.0),
 
               // 2. BAGIAN STORE
-              _buildSectionTitle(context, 'Store'),
+              _buildSectionTitle(context, 'Toko'),
               const SizedBox(height: 8.0),
               _SettingsTile(
-                title: 'Store Profile',
+                title: 'Profil Toko',
                 subtitle: 'Flagship Store - Downtown',
                 icon: Icons.storefront_outlined,
                 onTap: () {
@@ -61,11 +61,11 @@ class SettingsPage extends ConsumerWidget {
                 const SizedBox(height: 8.0),
                 _SettingsTile(
                   title: RoleGuard.isSuperAdmin(user)
-                      ? 'Branch Management'
-                      : 'My Branch',
+                      ? 'Manajemen Cabang'
+                      : 'Cabang Saya',
                   subtitle: RoleGuard.isSuperAdmin(user)
-                      ? 'View and edit all branches'
-                      : 'Edit your branch information',
+                      ? 'Lihat dan edit semua cabang'
+                      : 'Edit informasi cabang Anda',
                   icon: Icons.business_outlined,
                   onTap: () {
                     final branchId = user?.branchId ?? 0;
@@ -78,35 +78,35 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 32.0),
 
               // 3. BAGIAN DEVICES
-              _buildSectionTitle(context, 'Devices'),
+              _buildSectionTitle(context, 'Perangkat'),
               const SizedBox(height: 8.0),
               _SettingsTile(
-                title: 'Barcode Scanner',
-                subtitle: 'Zebra DS9308 - Connected',
-                icon: Icons.qr_code_scanner,
-                statusColor: AppTheme.success,
+                title: 'Manajer Perangkat',
+                subtitle: 'Printer, scanner & perangkat nirkabel',
+                icon: Icons.devices_outlined,
                 onTap: () {
-                  context.push(AppRouter.scannerDevices);
+                  context.push(AppRouter.deviceManager);
                 },
               ),
-              const SizedBox(height: 8.0),
-              _SettingsTile(
-                title: 'Receipt Printer',
-                subtitle: 'Epson TM-T88VI - Disconnected',
-                icon: Icons.print_outlined,
-                statusColor: AppTheme.mutedForeground,
-                onTap: () {
-                  context.push(AppRouter.printerDevices);
-                },
-              ),
+              if (RoleGuard.isSuperAdmin(user)) ...[
+                const SizedBox(height: 8.0),
+                _SettingsTile(
+                  title: 'Editor Struk',
+                  subtitle: 'Sesuaikan tata letak & ukuran kertas struk',
+                  icon: Icons.receipt_long_outlined,
+                  onTap: () {
+                    context.push(AppRouter.receiptEditor);
+                  },
+                ),
+              ],
               const SizedBox(height: 32.0),
 
               // 4. BAGIAN PREFERENCES
-              _buildSectionTitle(context, 'Preferences'),
+              _buildSectionTitle(context, 'Preferensi'),
               const SizedBox(height: 8.0),
               _SettingsTile(
-                title: 'Notifications',
-                subtitle: 'Push & alerts',
+                title: 'Notifikasi',
+                subtitle: 'Push & peringatan',
                 icon: Icons.notifications_none_outlined,
                 onTap: () {
                   // TODO: Implement navigation
@@ -114,8 +114,8 @@ class SettingsPage extends ConsumerWidget {
               ),
               const SizedBox(height: 8.0),
               _SettingsTile(
-                title: 'Appearance',
-                subtitle: 'Dark mode',
+                title: 'Tampilan',
+                subtitle: 'Mode gelap',
                 icon: Icons.light_mode_outlined,
                 onTap: () {
                   context.push(AppRouter.apprearance);
@@ -124,13 +124,13 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 32.0),
 
               // 5. BAGIAN SUPPORT
-              _buildSectionTitle(context, 'Support'),
+              _buildSectionTitle(context, 'Dukungan'),
               const SizedBox(height: 8.0),
               // Hide "User Management" for karyawan
               if (!isKaryawan) ...[
                 _SettingsTile(
-                  title: 'User Management',
-                  subtitle: 'Manage users and permissions',
+                  title: 'Manajemen Pengguna',
+                  subtitle: 'Kelola pengguna dan hak akses',
                   icon: Icons.people_outline,
                   onTap: () {
                     context.push(AppRouter.userManagement);
@@ -138,8 +138,8 @@ class SettingsPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8.0),
                 _SettingsTile(
-                  title: 'Vouchers',
-                  subtitle: 'Create and manage discount vouchers',
+                  title: 'Voucher',
+                  subtitle: 'Buat dan kelola voucher diskon',
                   icon: Icons.local_offer_outlined,
                   onTap: () {
                     context.push(AppRouter.voucherManagement);
@@ -148,7 +148,7 @@ class SettingsPage extends ConsumerWidget {
                 const SizedBox(height: 8.0),
               ],
               _SettingsTile(
-                title: 'Privacy & Security',
+                title: 'Privasi & Keamanan',
                 subtitle: 'Password, 2FA',
                 icon: Icons.security_outlined,
                 onTap: () {
@@ -157,8 +157,8 @@ class SettingsPage extends ConsumerWidget {
               ),
               const SizedBox(height: 8.0),
               _SettingsTile(
-                title: 'Help Center',
-                subtitle: 'FAQs, contact support',
+                title: 'Pusat Bantuan',
+                subtitle: 'FAQ, hubungi dukungan',
                 icon: Icons.help_outline,
                 onTap: () {
                   // TODO: Implement navigation
@@ -174,16 +174,16 @@ class SettingsPage extends ConsumerWidget {
                     final shouldLogout = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text('Sign Out'),
-                        content: const Text('Are you sure you want to sign out?'),
+                        title: const Text('Keluar'),
+                        content: const Text('Apakah Anda yakin ingin keluar?'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Cancel'),
+                            child: const Text('Batal'),
                           ),
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(true),
-                            child: const Text('Sign Out'),
+                            child: const Text('Keluar'),
                             style: TextButton.styleFrom(
                               foregroundColor: AppTheme.destructive,
                             ),
@@ -200,7 +200,7 @@ class SettingsPage extends ConsumerWidget {
                     }
                   },
                   icon: const Icon(Icons.logout),
-                  label: const Text('Sign Out'),
+                  label: const Text('Keluar'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppTheme.destructive, // Warna merah
                   ),
@@ -210,7 +210,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 16.0),
               Center(
                 child: Text(
-                  'Version 1.0.0',
+                  'Versi 1.0.0',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),

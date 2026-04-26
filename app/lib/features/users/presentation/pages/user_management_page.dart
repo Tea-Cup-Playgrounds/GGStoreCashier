@@ -89,7 +89,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                           Row(
                             children: [
                               Text(
-                                'User Management',
+                                'Manajemen Pengguna',
                                 style: Theme.of(context)
                                     .textTheme
                                     .headlineLarge
@@ -106,7 +106,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Manage system users and their permissions',
+                            'Kelola pengguna sistem dan hak aksesnya',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: cs.onSurface.withOpacity(0.6)),
                           ),
@@ -129,7 +129,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                         Tooltip(
                           message: isOffline ? 'Perubahan akan disimpan dan dikirim saat online' : '',
                           child: CustomButton(
-                            text: 'Add User',
+                            text: 'Tambah Pengguna',
                             icon: Icons.add,
                             onPressed: () => _showUserForm(),
                             variant: ButtonVariant.primary,
@@ -173,7 +173,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                           flex: 2,
                           child: CustomSearchBar(
                             controller: _searchController,
-                            hintText: 'Search users by name or username...',
+                            hintText: 'Cari pengguna berdasarkan nama atau username...',
                             onChanged: _onSearch,
                           )),
                       const SizedBox(width: 16),
@@ -187,7 +187,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                     children: [
                       CustomSearchBar(
                         controller: _searchController,
-                        hintText: 'Search users...',
+                        hintText: 'Cari pengguna...',
                         onChanged: _onSearch,
                       ),
                       const SizedBox(height: 16),
@@ -225,10 +225,10 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
           dropdownColor: cs.surface,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface),
           items: const [
-            DropdownMenuItem(value: 'all', child: Text('All Roles')),
+            DropdownMenuItem(value: 'all', child: Text('Semua Role')),
             DropdownMenuItem(value: 'superadmin', child: Text('Super Admin')),
             DropdownMenuItem(value: 'admin', child: Text('Admin')),
-            DropdownMenuItem(value: 'karyawan', child: Text('Employee')),
+            DropdownMenuItem(value: 'karyawan', child: Text('Karyawan')),
           ],
           onChanged: (value) {
             setState(() => _selectedRole = value!);
@@ -255,9 +255,9 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
           dropdownColor: cs.surface,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface),
           items: const [
-            DropdownMenuItem(value: 'all', child: Text('All Branches')),
-            DropdownMenuItem(value: '1', child: Text('Main Branch')),
-            DropdownMenuItem(value: '2', child: Text('Branch 2')),
+            DropdownMenuItem(value: 'all', child: Text('Semua Cabang')),
+            DropdownMenuItem(value: '1', child: Text('Cabang Utama')),
+            DropdownMenuItem(value: '2', child: Text('Cabang 2')),
           ],
           onChanged: (value) {
             setState(() => _selectedBranch = value!);
@@ -282,7 +282,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
           children: [
             const Icon(Icons.error_outline, size: 64, color: AppTheme.destructive),
             const SizedBox(height: 16),
-            Text('Error loading users', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Gagal memuat pengguna', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(state.error!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -290,7 +290,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                 textAlign: TextAlign.center),
             const SizedBox(height: 24),
             CustomButton(
-              text: 'Retry',
+              text: 'Coba Lagi',
               onPressed: () => ref.read(userManagementProvider.notifier).loadUsers(),
             ),
           ],
@@ -305,13 +305,13 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
           children: [
             Icon(Icons.people_outline, size: 64, color: cs.onSurface.withOpacity(0.4)),
             const SizedBox(height: 16),
-            Text('No users found', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Pengguna tidak ditemukan', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
-            Text('Add your first user to get started',
+            Text('Tambahkan pengguna pertama Anda untuk memulai',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: cs.onSurface.withOpacity(0.6))),
             const SizedBox(height: 24),
-            CustomButton(text: 'Add User', icon: Icons.add, onPressed: () => _showUserForm()),
+            CustomButton(text: 'Tambah Pengguna', icon: Icons.add, onPressed: () => _showUserForm()),
           ],
         ),
       );

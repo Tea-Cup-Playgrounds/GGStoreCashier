@@ -105,19 +105,19 @@ const absensiStorage = multer.diskStorage({
 const imageFileFilter = (req, file, cb) => {
     // Check 1: MIME type — only jpeg/png
     if (!ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
-        return cb(new Error('Invalid file type. Only JPG and PNG images are allowed.'), false);
+        return cb(new Error('Tipe file tidak valid. Hanya gambar JPG dan PNG yang diizinkan.'), false);
     }
 
     // Check 2: Extension — only .jpg, .jpeg, .png
     const ext = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
-        return cb(new Error('Invalid file extension. Only .jpg, .jpeg, and .png are allowed.'), false);
+        return cb(new Error('Ekstensi file tidak valid. Hanya .jpg, .jpeg, dan .png yang diizinkan.'), false);
     }
 
     // Check 3: Prevent path traversal
     const filename = path.basename(file.originalname);
     if (filename !== file.originalname || filename.includes('..')) {
-        return cb(new Error('Invalid filename detected.'), false);
+        return cb(new Error('Nama file tidak valid.'), false);
     }
 
     cb(null, true);
@@ -130,25 +130,25 @@ const validateUploadedImage = (filePath, mimeType) => {
         console.log('[validateUploadedImage] checking path:', filePath, '| mime:', mimeType);
 
         if (!fs.existsSync(filePath)) {
-            throw new Error(`File not found at path: ${filePath}`);
+            throw new Error(`File tidak ditemukan: ${filePath}`);
         }
 
         // Validate file signature
         if (!validateFileSignature(filePath, mimeType)) {
             fs.unlinkSync(filePath);
-            throw new Error('File content does not match image format. File has been rejected for security reasons.');
+            throw new Error('Konten file tidak sesuai format gambar. File ditolak karena alasan keamanan.');
         }
 
         // Additional size check
         const stats = fs.statSync(filePath);
         if (stats.size === 0) {
             fs.unlinkSync(filePath);
-            throw new Error('Empty file detected.');
+            throw new Error('File kosong terdeteksi.');
         }
 
         if (stats.size > 5 * 1024 * 1024) { // 5MB
             fs.unlinkSync(filePath);
-            throw new Error('File size exceeds 5MB limit.');
+            throw new Error('Ukuran file melebihi batas 5MB.');
         }
 
         console.log('[validateUploadedImage] passed, size:', stats.size);

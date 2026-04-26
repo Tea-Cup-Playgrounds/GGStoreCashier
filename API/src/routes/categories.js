@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 
     } catch (error) {
         console.error('Get categories error:', error);
-        res.status(500).json({ error: 'Failed to fetch categories' });
+        res.status(500).json({ error: 'Gagal mengambil data kategori' });
     }
 });
 
@@ -31,14 +31,14 @@ router.get('/:id', async (req, res) => {
         );
 
         if (categories.length === 0) {
-            return res.status(404).json({ error: 'Category not found' });
+            return res.status(404).json({ error: 'Kategori tidak ditemukan' });
         }
 
         res.json({ category: categories[0] });
 
     } catch (error) {
         console.error('Get category error:', error);
-        res.status(500).json({ error: 'Failed to fetch category' });
+        res.status(500).json({ error: 'Gagal mengambil data kategori' });
     }
 });
 
@@ -52,7 +52,7 @@ router.post('/', requireRole(['admin', 'superadmin']), uploadCategory.single('ca
                 deleteFile(`API/uploads/categories/${req.file.filename}`);
             }
             return res.status(400).json({ 
-                error: 'Category name is required' 
+                error: 'Nama kategori wajib diisi' 
             });
         }
 
@@ -62,7 +62,7 @@ router.post('/', requireRole(['admin', 'superadmin']), uploadCategory.single('ca
                 validateUploadedImage(req.file.path, req.file.mimetype);
             } catch (error) {
                 return res.status(400).json({ 
-                    error: error.message || 'Invalid image file' 
+                    error: error.message || 'File gambar tidak valid' 
                 });
             }
         }
@@ -81,7 +81,7 @@ router.post('/', requireRole(['admin', 'superadmin']), uploadCategory.single('ca
         );
 
         res.status(201).json({ 
-            message: 'Category created successfully',
+            message: 'Kategori berhasil dibuat',
             categoryId: result.insertId,
             category: categories[0]
         });
@@ -91,7 +91,7 @@ router.post('/', requireRole(['admin', 'superadmin']), uploadCategory.single('ca
             deleteFile(`API/uploads/categories/${req.file.filename}`);
         }
         console.error('Create category error:', error);
-        res.status(500).json({ error: 'Failed to create category' });
+        res.status(500).json({ error: 'Gagal membuat kategori' });
     }
 });
 
@@ -105,7 +105,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
                 deleteFile(`API/uploads/categories/${req.file.filename}`);
             }
             return res.status(400).json({ 
-                error: 'Category name is required' 
+                error: 'Nama kategori wajib diisi' 
             });
         }
 
@@ -119,7 +119,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
             if (req.file) {
                 deleteFile(`API/uploads/categories/${req.file.filename}`);
             }
-            return res.status(404).json({ error: 'Category not found' });
+            return res.status(404).json({ error: 'Kategori tidak ditemukan' });
         }
 
         // Validate uploaded image (magic number check)
@@ -128,7 +128,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
                 validateUploadedImage(req.file.path, req.file.mimetype);
             } catch (error) {
                 return res.status(400).json({ 
-                    error: error.message || 'Invalid image file' 
+                    error: error.message || 'File gambar tidak valid' 
                 });
             }
         }
@@ -144,7 +144,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
             if (req.file) {
                 deleteFile(`API/uploads/categories/${req.file.filename}`);
             }
-            return res.status(404).json({ error: 'Category not found' });
+            return res.status(404).json({ error: 'Kategori tidak ditemukan' });
         }
 
         // Delete old image if new one was uploaded
@@ -159,7 +159,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
         );
 
         res.json({ 
-            message: 'Category updated successfully',
+            message: 'Kategori berhasil diperbarui',
             category: categories[0]
         });
 
@@ -168,7 +168,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), uploadCategory.single('
             deleteFile(`API/uploads/categories/${req.file.filename}`);
         }
         console.error('Update category error:', error);
-        res.status(500).json({ error: 'Failed to update category' });
+        res.status(500).json({ error: 'Gagal memperbarui kategori' });
     }
 });
 
@@ -183,7 +183,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
 
         if (products[0].count > 0) {
             return res.status(400).json({ 
-                error: 'Cannot delete category with existing products' 
+                error: 'Tidak dapat menghapus kategori yang masih memiliki produk' 
             });
         }
 
@@ -194,7 +194,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
         );
 
         if (categories.length === 0) {
-            return res.status(404).json({ error: 'Category not found' });
+            return res.status(404).json({ error: 'Kategori tidak ditemukan' });
         }
 
         const [result] = await pool.execute(
@@ -203,7 +203,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Category not found' });
+            return res.status(404).json({ error: 'Kategori tidak ditemukan' });
         }
 
         // Delete category image if exists
@@ -211,11 +211,11 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
             deleteFile(`API/uploads/categories/${categories[0].category_image}`);
         }
 
-        res.json({ message: 'Category deleted successfully' });
+        res.json({ message: 'Kategori berhasil dihapus' });
 
     } catch (error) {
         console.error('Delete category error:', error);
-        res.status(500).json({ error: 'Failed to delete category' });
+        res.status(500).json({ error: 'Gagal menghapus kategori' });
     }
 });
 

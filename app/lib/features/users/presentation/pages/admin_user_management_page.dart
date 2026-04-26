@@ -337,14 +337,14 @@ class _AdminUserManagementPageState
             const Icon(Icons.error_outline,
                 size: 64, color: AppTheme.destructive),
             const SizedBox(height: 16),
-            Text('Error loading users',
+            Text('Gagal memuat pengguna',
                 style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(state.error!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: cs.onSurface.withOpacity(0.6))),
             const SizedBox(height: 24),
-            CustomButton(text: 'Retry', onPressed: _reload),
+            CustomButton(text: 'Coba Lagi', onPressed: _reload),
           ],
         ),
       );

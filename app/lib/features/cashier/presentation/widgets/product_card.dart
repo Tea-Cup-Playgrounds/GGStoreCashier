@@ -83,7 +83,7 @@ class ProductCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              product.isOutOfStock ? 'Out of Stock' : 'Low Stock',
+                              product.isOutOfStock ? 'Habis' : 'Stok Rendah',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,

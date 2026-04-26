@@ -150,7 +150,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.isNewItem ? 'Add Item' : 'Edit Item',
+              widget.isNewItem ? 'Tambah Item' : 'Edit Item',
               style: Theme.of(context).textTheme.headlineMedium!.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -187,8 +187,8 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                   ),
                   const SizedBox(height: 32),
                   TextInput(
-                    label: 'Product Name',
-                    hintText: "Masukkan nama product",
+                    label: 'Nama Produk',
+                    hintText: "Masukkan nama produk",
                     controller: _productNameController,
                   ),
                   const SizedBox(height: 16.0),
@@ -207,7 +207,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Category',
+                              'Kategori',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -216,7 +216,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                             DropdownButtonFormField<int>(
                               value: _selectedCategoryId,
                               decoration: InputDecoration(
-                                hintText: 'Pilih Category',
+                                hintText: 'Pilih Kategori',
                                 contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 14),
                                 border: OutlineInputBorder(
@@ -253,8 +253,8 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                     children: [
                       Expanded(
                         child: TextInput(
-                          label: 'Stock Quantity',
-                          hintText: "Masukkan Quantity",
+                          label: 'Jumlah Stok',
+                          hintText: "Masukkan jumlah",
                           keyboardType: TextInputType.number,
                           controller: _stockController,
                         ),
@@ -262,8 +262,8 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                       const SizedBox(width: 16.0),
                       Expanded(
                         child: TextInput(
-                          label: 'Price',
-                          hintText: "Masukkan Price",
+                          label: 'Harga',
+                          hintText: "Masukkan harga",
                           keyboardType: TextInputType.number,
                           controller: _priceController,
                         ),
@@ -272,14 +272,14 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                   ),
                   const SizedBox(height: 16.0),
                   TextInput(
-                    label: 'Description',
-                    hintText: "Masukkan Description",
+                    label: 'Deskripsi',
+                    hintText: "Masukkan deskripsi",
                     controller: _descriptionController,
                     maxLines: 5,
                   ),
                   const SizedBox(height: 30),
                   CustomButton(
-                    text: _isSaving ? "Saving..." : "Save Changes",
+                    text: _isSaving ? "Menyimpan..." : "Simpan Perubahan",
                     size: ButtonSize.large,
                     onPressed: _isSaving ? null : _saveChanges,
                     fullWidth: true,

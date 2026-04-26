@@ -84,7 +84,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
     } catch (e) {
       setState(() => _isLoadingData = false);
       if (mounted) {
-        SnackBarService.error('Failed to load data: ${e.toString()}');
+        SnackBarService.error('Gagal memuat data: ${e.toString()}');
       }
     }
   }
@@ -98,7 +98,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
     }
 
     if (_selectedBranchId == null) {
-      SnackBarService.error('Please select a branch');
+      SnackBarService.error('Pilih cabang terlebih dahulu');
       return;
     }
 
@@ -170,7 +170,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
       if (response.statusCode == 201) {
         if (mounted) {
-          SnackBarService.success('Product added successfully');
+          SnackBarService.success('Produk berhasil ditambahkan');
           context.pop();
         }
       }
@@ -183,7 +183,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
         debugPrint('[AddProduct] response data: ${e.response?.data}');
       }
       if (mounted) {
-        String errorMessage = 'Failed to add product';
+        String errorMessage = 'Gagal menambahkan produk';
         if (e is DioException && e.response?.data != null) {
           errorMessage = e.response!.data['error'] ?? errorMessage;
         }
@@ -218,7 +218,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
           icon: const Icon(Icons.arrow_back),
         ),
         title: const Text(
-          "Add Product",
+          "Tambah Produk",
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -236,19 +236,19 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                     // Product Image
                     ImageInput(
                       file: _productImage,
-                      label: "Product Image",
+                      label: "Gambar Produk",
                       onChanged: (img) => setState(() => _productImage = img),
                     ),
                     const SizedBox(height: 24),
 
                     // Product Name
                     TextInput(
-                      label: 'Product Name',
-                      hintText: "Enter product name",
+                      label: 'Nama Produk',
+                      hintText: "Masukkan nama produk",
                       controller: _productNameController,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Product name is required';
+                          return 'Nama produk wajib diisi';
                         }
                         return null;
                       },
@@ -257,8 +257,8 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
                     // Barcode (optional - will be auto-generated if empty)
                     TextInput(
-                      label: 'Barcode (Optional)',
-                      hintText: "Leave empty for auto-generate",
+                      label: 'Barcode (Opsional)',
+                      hintText: "Kosongkan untuk generate otomatis",
                       controller: _barcodeController,
                     ),
                     const SizedBox(height: 16),
@@ -280,7 +280,9 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                         enabled: true,
                         prefixIcon: Icons.store,
                         validator: (value) {
-                          if (value == null) return 'Please select a branch';
+                          if (value == null) {
+                            return 'Pilih cabang terlebih dahulu';
+                          }
                           return null;
                         },
                       ),
@@ -289,8 +291,8 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
                     // Category Dropdown
                     SearchableDropdown<int>(
-                      label: 'Category (Optional)',
-                      hintText: 'Select category',
+                      label: 'Kategori (Opsional)',
+                      hintText: 'Pilih kategori',
                       value: _selectedCategoryId,
                       items: _categories.map((category) {
                         return DropdownItem<int>(
@@ -309,16 +311,16 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                       children: [
                         Expanded(
                           child: TextInput(
-                            label: 'Stock Quantity',
-                            hintText: "Enter quantity",
+                            label: 'Jumlah Stok',
+                            hintText: "Masukkan jumlah",
                             controller: _stockController,
                             keyboardType: TextInputType.number,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Stock is required';
+                                return 'Stok wajib diisi';
                               }
                               if (int.tryParse(value) == null) {
-                                return 'Invalid number';
+                                return 'Angka tidak valid';
                               }
                               return null;
                             },
@@ -327,18 +329,18 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: TextInput(
-                            label: 'Sell Price',
+                            label: 'Harga Jual',
                             hintText: "Rp0",
                             controller: _priceController,
                             keyboardType: TextInputType.number,
                             inputFormatters: [RupiahInputFormatter()],
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Price is required';
+                                return 'Harga wajib diisi';
                               }
                               final price = RupiahInputFormatter.parseRupiahAsDouble(value);
                               if (price == null || price <= 0) {
-                                return 'Invalid price';
+                                return 'Harga tidak valid';
                               }
                               return null;
                             },
@@ -350,7 +352,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
                     // Submit Button
                     CustomButton(
-                      text: "Add Product",
+                      text: "Tambah Produk",
                       size: ButtonSize.large,
                       onPressed: _isLoading ? null : _submitForm,
                       isLoading: _isLoading,

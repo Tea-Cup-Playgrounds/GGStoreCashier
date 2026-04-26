@@ -65,15 +65,15 @@ class _VoucherManagementPageState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Voucher'),
-        content: Text('Delete voucher "${v.code}"? This cannot be undone.'),
+        title: const Text('Hapus Voucher'),
+        content: Text('Hapus voucher "${v.code}"? Tindakan ini tidak dapat dibatalkan.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+              child: const Text('Batal')),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete',
+              child: const Text('Hapus',
                   style: TextStyle(color: AppTheme.destructive))),
         ],
       ),
@@ -100,7 +100,7 @@ class _VoucherManagementPageState
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        title: const Text('Voucher Management'),
+        title: const Text('Manajemen Voucher'),
         backgroundColor: cs.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -108,7 +108,7 @@ class _VoucherManagementPageState
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: CustomButton(
-              text: 'Add Voucher',
+              text: 'Tambah Voucher',
               icon: Icons.add,
               onPressed: () => _showForm(),
             ),
@@ -130,7 +130,7 @@ class _VoucherManagementPageState
         children: [
           const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
           const SizedBox(height: 16),
-          Text('Failed to load vouchers',
+          Text('Gagal memuat voucher',
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(_error!,
@@ -141,7 +141,7 @@ class _VoucherManagementPageState
                       .withOpacity(0.6)),
               textAlign: TextAlign.center),
           const SizedBox(height: 24),
-          CustomButton(text: 'Retry', icon: Icons.refresh, onPressed: _load),
+          CustomButton(text: 'Coba Lagi', icon: Icons.refresh, onPressed: _load),
         ],
       ),
     );
@@ -156,10 +156,10 @@ class _VoucherManagementPageState
             Icon(Icons.local_offer_outlined,
                 size: 64, color: cs.onSurface.withOpacity(0.3)),
             const SizedBox(height: 16),
-            Text('No vouchers yet',
+            Text('Belum ada voucher',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text('Tap "Add Voucher" to create one.',
+            Text('Ketuk "Tambah Voucher" untuk membuat voucher baru.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: cs.onSurface.withOpacity(0.6))),
           ],
@@ -246,7 +246,7 @@ class _VoucherTile extends StatelessWidget {
                     const SizedBox(width: 6),
                     _badge(
                       context,
-                      isActive ? 'Active' : 'Inactive',
+                      isActive ? 'Aktif' : 'Nonaktif',
                       isActive ? AppTheme.success : cs.onSurface.withOpacity(0.3),
                     ),
                   ],
@@ -285,7 +285,7 @@ class _VoucherTile extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline,
                     size: 20, color: AppTheme.destructive),
                 onPressed: onDelete,
-                tooltip: 'Delete',
+                tooltip: 'Hapus',
               ),
             ],
           ),

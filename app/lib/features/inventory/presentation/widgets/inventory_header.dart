@@ -131,9 +131,9 @@ class InventoryHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          buildButton(InventoryFilter.all, 'All Items'),
-          buildButton(InventoryFilter.low, 'Low Stock'),
-          buildButton(InventoryFilter.out, 'Out of Stock'),
+          buildButton(InventoryFilter.all, 'Semua'),
+          buildButton(InventoryFilter.low, 'Stok Rendah'),
+          buildButton(InventoryFilter.out, 'Habis'),
         ],
       ),
     );
@@ -159,7 +159,7 @@ class InventoryHeader extends StatelessWidget {
           Padding(
             padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
             child: Text(
-              '$totalItems item${totalItems == 1 ? '' : 's'}',
+              '$totalItems produk',
               style: (isLandscape
                       ? Theme.of(context).textTheme.labelSmall
                       : Theme.of(context).textTheme.titleSmall)
@@ -179,11 +179,11 @@ class InventoryHeader extends StatelessWidget {
 
           Row(
             children: [
-              _buildSummaryTile(context, 'Total Items', '$totalItems', AppTheme.gold),
+              _buildSummaryTile(context, 'Total Item', '$totalItems', AppTheme.gold),
               const SizedBox(width: 8),
-              _buildSummaryTile(context, 'Low Stock', '$lowStock', AppTheme.warning),
+              _buildSummaryTile(context, 'Stok Rendah', '$lowStock', AppTheme.warning),
               const SizedBox(width: 8),
-              _buildSummaryTile(context, 'Out of Stock', '$outOfStock', AppTheme.destructive),
+              _buildSummaryTile(context, 'Habis', '$outOfStock', AppTheme.destructive),
             ],
           ),
         ],

@@ -70,7 +70,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
         _addressController.text = result.address!;
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Could not determine address from location'),
+          content: Text('Tidak dapat menentukan alamat dari lokasi saat ini'),
           behavior: SnackBarBehavior.floating,
         ));
       }
@@ -100,7 +100,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
       );
       if (mounted) {
         final msg = savedOnline
-            ? 'Branch updated successfully'
+            ? 'Cabang berhasil diperbarui'
             : 'Perubahan disimpan — akan dikirim saat online';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(msg),
@@ -133,7 +133,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
       appBar: AppBar(
         title: Row(
           children: [
-            const Text('Edit Branch'),
+            const Text('Edit Cabang'),
             if (_isStale) ...[
               const SizedBox(width: 8),
               const Tooltip(
@@ -174,7 +174,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              isOffline ? 'Kamu Sedang Offline' : 'Failed to load branch',
+              isOffline ? 'Kamu Sedang Offline' : 'Gagal memuat data cabang',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
@@ -187,7 +187,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            CustomButton(text: 'Retry', icon: Icons.refresh, onPressed: _loadBranch),
+            CustomButton(text: 'Coba Lagi', icon: Icons.refresh, onPressed: _loadBranch),
           ],
         ),
       ),
@@ -266,12 +266,12 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
 
             TextInput(
               controller: _nameController,
-              label: 'Branch Name',
-              hintText: 'e.g. Downtown Branch',
+              label: 'Nama Cabang',
+              hintText: 'cth. Cabang Pusat',
               prefixIcon: Icons.storefront_outlined,
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Name is required';
-                if (v.trim().length < 2) return 'Name must be at least 2 characters';
+                if (v == null || v.trim().isEmpty) return 'Nama wajib diisi';
+                if (v.trim().length < 2) return 'Nama minimal 2 karakter';
                 return null;
               },
             ),
@@ -280,8 +280,8 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
 
             TextInput(
               controller: _addressController,
-              label: 'Address',
-              hintText: 'e.g. Jl. Sudirman No. 1, Jakarta',
+              label: 'Alamat',
+              hintText: 'cth. Jl. Sudirman No. 1, Jakarta',
               prefixIcon: Icons.location_on_outlined,
               maxLines: 3,
             ),
@@ -295,7 +295,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
                         width: 16, height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold))
                     : const Icon(Icons.my_location, size: 18),
-                label: Text(_isFetchingLocation ? 'Getting location...' : 'Use current location'),
+                label: Text(_isFetchingLocation ? 'Mendapatkan lokasi...' : 'Gunakan lokasi saat ini'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.gold,
                   side: BorderSide(color: AppTheme.gold.withOpacity(0.4)),
@@ -309,14 +309,14 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
 
             TextInput(
               controller: _phoneController,
-              label: 'Phone',
-              hintText: 'e.g. +62 21 1234 5678',
+              label: 'Telepon',
+              hintText: 'cth. +62 21 1234 5678',
               prefixIcon: Icons.phone_outlined,
               keyboardType: TextInputType.phone,
               validator: (v) {
                 if (v != null && v.trim().isNotEmpty) {
                   if (!RegExp(r'^[+\d\s\-()]{6,20}$').hasMatch(v.trim())) {
-                    return 'Enter a valid phone number';
+                    return 'Masukkan nomor telepon yang valid';
                   }
                 }
                 return null;
@@ -326,7 +326,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
             const SizedBox(height: 40),
 
             CustomButton(
-              text: isOffline ? 'Simpan (akan disinkronkan)' : 'Save Changes',
+              text: isOffline ? 'Simpan (akan disinkronkan)' : 'Simpan Perubahan',
               icon: isOffline ? Icons.cloud_upload_outlined : Icons.save_outlined,
               fullWidth: true,
               isLoading: _isSaving,

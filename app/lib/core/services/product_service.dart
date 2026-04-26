@@ -84,7 +84,7 @@ class ProductService {
     try {
       final token = await _getToken();
       if (token == null) {
-        throw Exception('No authentication token found');
+        throw Exception('Token autentikasi tidak ditemukan');
       }
 
       final queryParams = <String, dynamic>{};
@@ -113,7 +113,7 @@ class ProductService {
 
         return products;
       } else {
-        throw Exception('Failed to load products: ${response.statusCode}');
+        throw Exception('Gagal memuat produk: ${response.statusCode}');
       }
     } on DioException catch (e) {
       // Network failure — try to return stale cache if available.
@@ -129,7 +129,7 @@ class ProductService {
               .toList();
         }
       }
-      throw Exception('Network error: ${e.message}');
+      throw Exception('Kesalahan jaringan: ${e.message}');
     } catch (e) {
       rethrow;
     }
@@ -141,7 +141,7 @@ class ProductService {
     try {
       final token = await _getToken();
       if (token == null) {
-        throw Exception('No authentication token found');
+        throw Exception('Token autentikasi tidak ditemukan');
       }
 
       final response = await _dio.get(
@@ -156,10 +156,10 @@ class ProductService {
         return Product.fromJson(data);
       } else {
         throw Exception(
-            'Failed to load product detail: ${response.statusCode}');
+            'Gagal memuat detail produk: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      throw Exception('Network error: ${e.message}');
+      throw Exception('Kesalahan jaringan: ${e.message}');
     } catch (e) {
       rethrow;
     }

@@ -109,7 +109,7 @@ class AuthService {
           final errorData = e.response?.data;
           final remainingAttempts = errorData?['remainingAttempts'];
           return AuthResult.failure(
-            errorData?['error'] ?? 'Invalid credentials',
+            errorData?['error'] ?? 'Username atau password salah',
             remainingAttempts: remainingAttempts,
           );
         } else if (e.response?.statusCode == 429) {
@@ -226,15 +226,15 @@ class AuthService {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
-          return 'Connection timeout. Please check your internet connection.';
+          return 'Koneksi timeout. Periksa koneksi internet Anda.';
         case DioExceptionType.badResponse:
-          return 'Server error. Please try again later.';
+          return 'Terjadi kesalahan pada server. Coba lagi nanti.';
         case DioExceptionType.cancel:
-          return 'Request was cancelled.';
+          return 'Permintaan dibatalkan.';
         case DioExceptionType.unknown:
-          return 'Network error. Please check your connection.';
+          return 'Gagal terhubung ke jaringan. Periksa koneksi Anda.';
         default:
-          return 'An unexpected error occurred.';
+          return 'Terjadi kesalahan yang tidak terduga.';
       }
     }
     return error.toString();

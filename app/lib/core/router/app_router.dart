@@ -3,6 +3,8 @@ import 'package:gg_store_cashier/core/router/transition_factory.dart';
 import 'package:gg_store_cashier/core/router/auth_guard.dart';
 import 'package:gg_store_cashier/features/devices/presentation/pages/printer_devices_page.dart';
 import 'package:gg_store_cashier/features/devices/presentation/pages/scanner_devices_page.dart';
+import 'package:gg_store_cashier/features/devices/presentation/pages/device_manager_page.dart';
+import 'package:gg_store_cashier/features/settings/presentation/pages/receipt_editor_page.dart';
 import 'package:gg_store_cashier/features/inventory/presentation/pages/inventory_add_item_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/appearance_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/branch_edit_page.dart';
@@ -30,6 +32,8 @@ mixin AppRouter {
   static const String apprearance = '/appearance';
   static const String scannerDevices = '/devices/scanner';
   static const String printerDevices = '/devices/printer';
+  static const String deviceManager = '/devices/manager';
+  static const String receiptEditor = '/settings/receipt-editor';
   static const String settings = '/settings';
   static const String userManagement = '/users';
   static const String branchEdit = '/branch/edit/:id';
@@ -113,6 +117,22 @@ mixin AppRouter {
             context: context,
             state: state,
             child: const PrinterDevicesPage()),
+      ),
+      GoRoute(
+        path: deviceManager,
+        name: 'deviceManager',
+        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
+            context: context,
+            state: state,
+            child: const DeviceManagerPage()),
+      ),
+      GoRoute(
+        path: receiptEditor,
+        name: 'receiptEditor',
+        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
+            context: context,
+            state: state,
+            child: const ReceiptEditorPage()),
       ),
       GoRoute(
         path: userManagement,

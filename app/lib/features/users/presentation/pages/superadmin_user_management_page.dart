@@ -76,7 +76,7 @@ class _SuperAdminUserManagementPageState
             children: [
               const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
-              Text('SuperAdmin Access Only',
+              Text('Akses SuperAdmin Saja',
                   style: Theme.of(context).textTheme.headlineSmall),
             ],
           ),
@@ -175,7 +175,7 @@ class _SuperAdminUserManagementPageState
                     _buildRefreshButton(state),
                     const SizedBox(width: 12),
                     CustomButton(
-                      text: 'Add User',
+                      text: 'Tambah Pengguna',
                       icon: Icons.add,
                       onPressed: () => _showUserForm(),
                       variant: ButtonVariant.primary,
@@ -191,7 +191,7 @@ class _SuperAdminUserManagementPageState
               children: [
                 Expanded(
                   child: CustomButton(
-                    text: 'Add User',
+                    text: 'Tambah Pengguna',
                     icon: Icons.add,
                     onPressed: () => _showUserForm(),
                     variant: ButtonVariant.primary,
@@ -358,7 +358,7 @@ class _SuperAdminUserManagementPageState
             const Icon(Icons.error_outline,
                 size: 64, color: AppTheme.destructive),
             const SizedBox(height: 16),
-            Text('Error loading users',
+            Text('Gagal memuat pengguna',
                 style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(state.error!,
@@ -366,7 +366,7 @@ class _SuperAdminUserManagementPageState
                     color: cs.onSurface.withOpacity(0.6))),
             const SizedBox(height: 24),
             CustomButton(
-              text: 'Retry',
+              text: 'Coba Lagi',
               onPressed: () =>
                   ref.read(userManagementProvider.notifier).loadUsers(),
             ),
@@ -387,7 +387,7 @@ class _SuperAdminUserManagementPageState
                 style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 24),
             CustomButton(
-              text: 'Add User',
+              text: 'Tambah Pengguna',
               icon: Icons.add,
               onPressed: () => _showUserForm(),
             ),
