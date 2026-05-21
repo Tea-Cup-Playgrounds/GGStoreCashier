@@ -2,10 +2,14 @@
   "name": "ggkasirdashboard",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "start": "node API/src/server.js",
     "sync-env": "node API/scripts/sync-env.js",
-    "dev": "npm run sync-env && concurrently \"nodemon API/src/server.js\" \"npm run ngrok\"",
+    "dev": "nodemon API/src/server.js",
     "hash-passwords": "node API/scripts/hash_passwords.js",
     "create-test-user": "node API/scripts/create_test_user.js",
     "test-server": "node API/scripts/test_server.js",
@@ -16,21 +20,21 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@ngrok/ngrok": "^1.7.0",
-    "bcrypt": "^6.0.0",
-    "concurrently": "^9.2.1",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.2",
-    "express": "^5.1.0",
-    "express-rate-limit": "^8.1.0",
-    "express-validator": "^7.3.1",
-    "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.1",
-    "multer": "^2.0.2",
-    "mysql2": "^3.15.0",
-    "nodemon": "^3.1.10",
-    "socket.io": "^4.8.3"
+    "@ngrok/ngrok": "1.7.0",
+    "bcrypt": "6.0.0",
+    "concurrently": "9.2.1",
+    "cookie-parser": "1.4.7",
+    "cors": "2.8.5",
+    "dotenv": "17.2.2",
+    "express": "5.1.0",
+    "express-rate-limit": "8.1.0",
+    "express-validator": "7.3.1",
+    "helmet": "8.1.0",
+    "jsonwebtoken": "9.0.2",
+    "morgan": "1.10.1",
+    "multer": "2.0.2",
+    "mysql2": "3.15.0",
+    "nodemon": "3.1.10",
+    "socket.io": "4.8.3"
   }
 }

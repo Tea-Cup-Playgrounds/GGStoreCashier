@@ -107,8 +107,7 @@ class ProductService {
         final data = response.data['product'] ?? response.data;
         return Product.fromJson(data);
       } else {
-        throw Exception(
-            'Failed to load product detail: ${response.statusCode}');
+        throw Exception('Failed to load product detail: ${response.statusCode}');
       }
     } on DioException catch (e) {
       throw Exception('Network error: ${e.message}');
@@ -116,7 +115,8 @@ class ProductService {
       rethrow;
     }
   }
-static Future<Product> updateProduct({
+
+  static Future<Product> updateProduct({
     required Product product, // Ubah parameter jadi objek Product utuh
     required String name,
     String? barcode,
@@ -157,6 +157,19 @@ static Future<Product> updateProduct({
       return Product.fromJson(response.data['product'] ?? response.data);
     } catch (e) {
       throw Exception('Network error updating product: $e');
+    }
+  }
+
+  static Future<void> deleteProduct(int productId) async {
+    _initializeDio();
+    try {
+      final token = await _getToken();
+      await _dio.delete(
+        '/api/products/$productId',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+    } catch (e) {
+      throw Exception('Network error deleting product: $e');
     }
   }
 }

@@ -18,6 +18,7 @@ class AuthService {
 
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_data';
+  static const String _rememberMeKey = 'remember_me';
 
   // Initialize dio with interceptors for logging
   static void _initializeDio() {
@@ -38,9 +39,9 @@ class AuthService {
   }
 
   // Login method
-  static Future<AuthResult> login(String username, String password) async {
+  static Future<AuthResult> login(String username, String password, {bool rememberMe = false}) async {
     _initializeDio(); // Initialize logging
-    
+
     try {
       if (ApiConfig.enableLogging) {
         print('=== LOGIN ATTEMPT ===');
@@ -48,7 +49,7 @@ class AuthService {
         print('API URL: ${ApiConfig.apiUrl}');
         print('Login Endpoint: ${ApiConfig.loginEndpoint}');
       }
-      
+
       final response = await _dio.post(
         '/api/auth/login',
         data: {
@@ -77,7 +78,7 @@ class AuthService {
         final token = data['token'];
 
         // Store token and user data
-        await _storeAuthData(token, user);
+        await _storeAuthData(token, user, rememberMe: rememberMe);
 
         // Connect to Socket.IO for real-time updates
         SocketService.connect(token, user.branchId ?? 0);
@@ -90,34 +91,43 @@ class AuthService {
         return AuthResult.success(user);
       } else {
         final errorData = response.data;
-        return AuthResult.failure(errorData?['error'] ?? 'Login failed');
+        final remaining = errorData?['remainingAttempts'];
+        final locked = errorData?['lockedUntil'];
+        final isLockedOut = response.statusCode == 429;
+        return AuthResult.failure(
+          errorData?['error'] ?? 'Login failed',
+          remainingAttempts: remaining is int ? remaining : int.tryParse(remaining?.toString() ?? ''),
+          isLockedOut: isLockedOut,
+          lockedUntil: locked is int ? locked : int.tryParse(locked?.toString() ?? ''),
+        );
       }
     } catch (e) {
       if (ApiConfig.enableLogging) {
         print('=== LOGIN ERROR ===');
         print('Error: $e');
       }
-      
+
       if (e is DioException) {
         if (ApiConfig.enableLogging) {
           print('DioException type: ${e.type}');
           print('DioException message: ${e.message}');
           print('Response: ${e.response?.data}');
         }
-        
+
         if (e.response?.statusCode == 401) {
           final errorData = e.response?.data;
-          final remainingAttempts = errorData?['remainingAttempts'];
+          final remaining = errorData?['remainingAttempts'];
           return AuthResult.failure(
             errorData?['error'] ?? 'Invalid credentials',
-            remainingAttempts: remainingAttempts,
+            remainingAttempts: remaining is int ? remaining : int.tryParse(remaining?.toString() ?? ''),
           );
         } else if (e.response?.statusCode == 429) {
           final errorData = e.response?.data;
+          final locked = errorData?['lockedUntil'];
           return AuthResult.failure(
             errorData?['error'] ?? 'Too many attempts',
             isLockedOut: true,
-            lockedUntil: errorData?['lockedUntil'],
+            lockedUntil: locked is int ? locked : int.tryParse(locked?.toString() ?? ''),
           );
         }
       }
@@ -131,7 +141,6 @@ class AuthService {
       final token = await getToken();
       if (token == null) return false;
 
-      // Verify token with server
       final response = await _dio.get(
         '/api/auth/me',
         options: Options(
@@ -144,7 +153,6 @@ class AuthService {
 
       return response.statusCode == 200;
     } catch (e) {
-      // If token is invalid, clear stored data
       await logout();
       return false;
     }
@@ -155,9 +163,7 @@ class AuthService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userJson = prefs.getString(_userKey);
-      if (userJson != null) {
-        return User.fromJson(json.decode(userJson));
-      }
+      if (userJson != null) return User.fromJson(json.decode(userJson));
       return null;
     } catch (e) {
       return null;
@@ -195,17 +201,19 @@ class AuthService {
     } finally {
       // Disconnect Socket.IO
       SocketService.disconnect();
-      
+
       // Clear local storage
       await _clearAuthData();
     }
   }
 
-  // Store authentication data
-  static Future<void> _storeAuthData(String token, User user) async {
+  // Store authentication data — token always persisted, rememberMe controls
+  // whether it survives the next cold start
+  static Future<void> _storeAuthData(String token, User user, {bool rememberMe = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_userKey, json.encode(user.toJson()));
+    await prefs.setBool(_rememberMeKey, rememberMe);
   }
 
   // Clear authentication data
@@ -213,6 +221,17 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userKey);
+    await prefs.remove(_rememberMeKey);
+  }
+
+  // Call this on app startup — clears session if remember me was off
+  static Future<void> clearSessionIfNotRemembered() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remembered = prefs.getBool(_rememberMeKey) ?? false;
+    if (!remembered) {
+      await prefs.remove(_tokenKey);
+      await prefs.remove(_userKey);
+    }
   }
 
   // Get error message from exception
@@ -221,7 +240,7 @@ class AuthService {
       if (error.response?.data != null && error.response?.data['error'] != null) {
         return error.response!.data['error'];
       }
-      
+
       switch (error.type) {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:

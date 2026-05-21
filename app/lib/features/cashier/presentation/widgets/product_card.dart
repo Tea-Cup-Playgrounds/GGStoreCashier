@@ -17,23 +17,36 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = cs.brightness == Brightness.dark;
     const double infoHeight = 96.0;
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondary,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        border: Border.all(
+          color: cs.outlineVariant,
+          width: isDark ? 0.8 : 1.0,
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final imageHeight = (constraints.maxHeight - infoHeight)
-              .clamp(40.0, constraints.maxWidth.toDouble());
+          final imageHeight = (constraints.maxHeight - infoHeight).clamp(40.0, constraints.maxWidth.toDouble());
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product Image
+              // ── Image ────────────────────────────────────────────────────
               ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(16),
@@ -45,17 +58,18 @@ class ProductCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
+                      // Background tint
+                      Container(
+                        color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F4F0),
+                      ),
                       product.image != null && product.image!.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: ProductService.getProductImageUrl(product.image),
                               fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: AppTheme.muted.withOpacity(0.3),
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.gold,
-                                  ),
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppTheme.gold,
                                 ),
                               ),
                               errorWidget: (context, url, error) => Image.asset(
@@ -74,20 +88,17 @@ class ProductCard extends StatelessWidget {
                           top: 8,
                           right: 8,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                             decoration: BoxDecoration(
-                              color: product.isOutOfStock
-                                  ? AppTheme.destructive
-                                  : AppTheme.warning,
+                              color: product.isOutOfStock ? AppTheme.destructive : AppTheme.warning,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              product.isOutOfStock ? 'Out of Stock' : 'Low Stock',
+                              product.isOutOfStock ? 'Habis' : 'Stok Tipis',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -99,20 +110,28 @@ class ProductCard extends StatelessWidget {
                           top: 8,
                           left: 8,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.55),
+                              color: Colors.black.withValues(alpha: 0.55),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               product.category!,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
+                                fontSize: 9,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+                          ),
+                        ),
+
+                      // Out of stock overlay
+                      if (product.isOutOfStock)
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          child: const Center(
+                            child: Icon(Icons.block, color: Colors.white54, size: 32),
                           ),
                         ),
                     ],
@@ -120,7 +139,7 @@ class ProductCard extends StatelessWidget {
                 ),
               ),
 
-              // Product Info — fixed height
+              // ── Info ─────────────────────────────────────────────────────
               SizedBox(
                 height: infoHeight,
                 child: Padding(
@@ -144,10 +163,7 @@ class ProductCard extends StatelessWidget {
                             child: Text(
                               CurrencyFormatter.formatToRupiah(product.sellPrice),
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                     color: AppTheme.gold,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -155,20 +171,27 @@ class ProductCard extends StatelessWidget {
                           ),
                           GestureDetector(
                             onTap: product.isOutOfStock ? null : onAdd,
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: product.isOutOfStock
-                                    ? AppTheme.mutedForeground
-                                    : AppTheme.gold,
+                                color: product.isOutOfStock ? cs.outlineVariant : AppTheme.gold,
                                 shape: BoxShape.circle,
+                                boxShadow: product.isOutOfStock
+                                    ? null
+                                    : [
+                                        BoxShadow(
+                                          color: AppTheme.gold.withValues(alpha: 0.4),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                               ),
                               child: Icon(
                                 Icons.add,
                                 size: 15,
-                                color: product.isOutOfStock
-                                    ? AppTheme.surface
-                                    : AppTheme.background,
+                                color:
+                                    product.isOutOfStock ? cs.onSurfaceVariant : (isDark ? Colors.black : Colors.white),
                               ),
                             ),
                           ),

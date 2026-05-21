@@ -6,6 +6,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/constants/app_constants.dart';
+import 'core/services/auth_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
@@ -15,19 +16,20 @@ Future<void> main() async {
     DeviceOrientation.portraitUp,
   ]);
 
-  // Set system UI overlay style
+  // Neutral transparent system UI — AnnotatedRegion in the widget tree
+  // handles light/dark icons reactively based on the active theme
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: AppTheme.background,
-      systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
 
   await dotenv.load(fileName: ".env").catchError((_) {
     // .env not found — app will use fallback values from ApiConfig
   });
+
+  // Clear non-persistent session if user didn't check "remember me"
+  await AuthService.clearSessionIfNotRemembered();
 
   runApp(
     const ProviderScope(
@@ -44,11 +46,15 @@ class GGStoreCashierApp extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
 
     final isDark = themeMode == ThemeMode.dark ||
-        (themeMode == ThemeMode.system &&
-            MediaQuery.of(context).platformBrightness == Brightness.dark);
+        (themeMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: isDark ? AppTheme.background : AppTheme.lightBackground,
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      ),
       child: MaterialApp.router(
         scaffoldMessengerKey: SnackBarService.messengerKey,
         title: AppConstants.appName,

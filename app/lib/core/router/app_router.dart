@@ -5,6 +5,8 @@ import 'package:gg_store_cashier/features/devices/presentation/pages/printer_dev
 import 'package:gg_store_cashier/features/devices/presentation/pages/scanner_devices_page.dart';
 import 'package:gg_store_cashier/features/inventory/presentation/pages/inventory_add_item_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/appearance_page.dart';
+import 'package:gg_store_cashier/features/inventory/presentation/pages/category_form_page.dart';
+import 'package:gg_store_cashier/features/cashier/presentation/pages/coupon_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/branch_edit_page.dart';
 import 'package:gg_store_cashier/features/users/presentation/pages/user_management_router_page.dart';
 import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_management_page.dart';
@@ -34,8 +36,10 @@ mixin AppRouter {
   static const String userManagement = '/users';
   static const String branchEdit = '/branch/edit/:id';
   static const String voucherManagement = '/vouchers';
-  static const String voucherCreate     = '/vouchers/new';
-  static const String voucherEdit       = '/vouchers/edit/:id';
+  static const String cashierCoupon = '/cashier/coupon';
+  static const String categoryForm = '/inventory/category/form';
+  static const String voucherCreate = '/vouchers/new';
+  static const String voucherEdit = '/vouchers/edit/:id';
 
   static final _rootNavigatorkey = GlobalKey<NavigatorState>();
   static final homeNavKey = GlobalKey<NavigatorState>();
@@ -78,76 +82,57 @@ mixin AppRouter {
           pageBuilder: (context, state) {
             final id = state.pathParameters['id']!;
             return TransitionFactory.getSlideBuilder(
-                context: context,
-                state: state,
-                child: InventoryDetailPage(productId: id));
+                context: context, state: state, child: InventoryDetailPage(productId: id));
           }),
       GoRoute(
         path: inventoryAddItem,
         name: 'inventoryAddItem',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const InventoryAddItemPage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const InventoryAddItemPage()),
       ),
       GoRoute(
         path: apprearance,
         name: 'appearance',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const AppearancePage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const AppearancePage()),
       ),
       GoRoute(
         path: scannerDevices,
         name: 'scannerDevices',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const ScannerDevicesPage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const ScannerDevicesPage()),
       ),
       GoRoute(
         path: printerDevices,
         name: 'printerDevices',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const PrinterDevicesPage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const PrinterDevicesPage()),
       ),
       GoRoute(
         path: userManagement,
         name: 'userManagement',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const UserManagementRouterPage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const UserManagementRouterPage()),
       ),
       GoRoute(
         path: branchEdit,
         name: 'branchEdit',
         pageBuilder: (context, state) {
           final id = int.parse(state.pathParameters['id']!);
-          return TransitionFactory.getSlideBuilder(
-              context: context,
-              state: state,
-              child: BranchEditPage(branchId: id));
+          return TransitionFactory.getSlideBuilder(context: context, state: state, child: BranchEditPage(branchId: id));
         },
       ),
       GoRoute(
         path: voucherManagement,
         name: 'voucherManagement',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const VoucherManagementPage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const VoucherManagementPage()),
       ),
       GoRoute(
         path: voucherCreate,
         name: 'voucherCreate',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const VoucherFormPage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const VoucherFormPage()),
       ),
       GoRoute(
         path: voucherEdit,
@@ -155,10 +140,23 @@ mixin AppRouter {
         pageBuilder: (context, state) {
           final voucher = state.extra as Voucher;
           return TransitionFactory.getSlideBuilder(
-              context: context,
-              state: state,
-              child: VoucherFormPage(voucher: voucher));
+              context: context, state: state, child: VoucherFormPage(voucher: voucher));
         },
+      ),
+      GoRoute(
+        path: AppRouter.categoryForm,
+        name: 'categoryForm',
+        pageBuilder: (context, state) {
+          final category = state.extra as Map<String, dynamic>?;
+          return TransitionFactory.getSlideBuilder(
+              context: context, state: state, child: CategoryFormPage(category: category));
+        },
+      ),
+      GoRoute(
+        path: AppRouter.cashierCoupon,
+        name: 'cashierCoupon',
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const CouponPage()),
       ),
       // HALAMAN YANG BUTUH LAYOUT SCAFFOLD + BOTTOM NAV TARUH DI SINI
       StatefulShellRoute.indexedStack(

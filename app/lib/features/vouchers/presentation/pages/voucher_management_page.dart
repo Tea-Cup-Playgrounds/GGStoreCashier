@@ -13,12 +13,10 @@ class VoucherManagementPage extends ConsumerStatefulWidget {
   const VoucherManagementPage({super.key});
 
   @override
-  ConsumerState<VoucherManagementPage> createState() =>
-      _VoucherManagementPageState();
+  ConsumerState<VoucherManagementPage> createState() => _VoucherManagementPageState();
 }
 
-class _VoucherManagementPageState
-    extends ConsumerState<VoucherManagementPage> {
+class _VoucherManagementPageState extends ConsumerState<VoucherManagementPage> {
   List<Voucher> _vouchers = [];
   bool _isLoading = true;
   String? _error;
@@ -36,15 +34,19 @@ class _VoucherManagementPageState
     });
     try {
       final list = await VoucherService.getAll();
-      if (mounted) setState(() {
-        _vouchers = list;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _vouchers = list;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -65,16 +67,18 @@ class _VoucherManagementPageState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Voucher'),
-        content: Text('Delete voucher "${v.code}"? This cannot be undone.'),
+        title: const Text('Hapus Voucher'),
+        content: Text('Hapus voucher "${v.code}"? Tindakan ini tidak dapat dibatalkan.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete',
-                  style: TextStyle(color: AppTheme.destructive))),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
+            child: const Text('Hapus'),
+          ),
         ],
       ),
     );
@@ -96,21 +100,33 @@ class _VoucherManagementPageState
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = cs.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
-        title: const Text('Voucher Management'),
+        title: const Text('Manajemen Voucher'),
         backgroundColor: cs.surface,
         elevation: 0,
+        scrolledUnderElevation: 1,
         surfaceTintColor: Colors.transparent,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: CustomButton(
-              text: 'Add Voucher',
-              icon: Icons.add,
-              onPressed: () => _showForm(),
+            child: SizedBox(
+              height: 36,
+              child: ElevatedButton.icon(
+                onPressed: () => _showForm(),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Tambah'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.gold,
+                  foregroundColor: isDark ? Colors.black : Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
             ),
           ),
         ],
@@ -119,49 +135,45 @@ class _VoucherManagementPageState
           ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
           : _error != null
               ? _buildError()
-              : _buildList(cs),
+              : _buildList(cs, isDark),
     );
   }
 
   Widget _buildError() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
-          const SizedBox(height: 16),
-          Text('Failed to load vouchers',
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(_error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withOpacity(0.6)),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 24),
-          CustomButton(text: 'Retry', icon: Icons.refresh, onPressed: _load),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
+            const SizedBox(height: 16),
+            Text('Gagal memuat voucher', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(_error!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 24),
+            CustomButton(text: 'Coba Lagi', icon: Icons.refresh, onPressed: _load),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildList(ColorScheme cs) {
+  Widget _buildList(ColorScheme cs, bool isDark) {
     if (_vouchers.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.local_offer_outlined,
-                size: 64, color: cs.onSurface.withOpacity(0.3)),
+            Icon(Icons.local_offer_outlined, size: 56, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
-            Text('No vouchers yet',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text('Belum ada voucher', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text('Tap "Add Voucher" to create one.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurface.withOpacity(0.6))),
+            Text('Tap "Tambah" untuk membuat voucher baru.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           ],
         ),
       );
@@ -172,9 +184,10 @@ class _VoucherManagementPageState
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _vouchers.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) => _VoucherTile(
           voucher: _vouchers[i],
+          isDark: isDark,
           onEdit: () => _showForm(_vouchers[i]),
           onDelete: () => _delete(_vouchers[i]),
         ),
@@ -187,11 +200,13 @@ class _VoucherManagementPageState
 
 class _VoucherTile extends StatelessWidget {
   final Voucher voucher;
+  final bool isDark;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _VoucherTile({
     required this.voucher,
+    required this.isDark,
     required this.onEdit,
     required this.onDelete,
   });
@@ -202,13 +217,23 @@ class _VoucherTile extends StatelessWidget {
     final isActive = voucher.isActive;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isActive ? cs.outlineVariant : cs.outlineVariant.withOpacity(0.4),
+          color: isActive ? cs.outlineVariant : cs.outlineVariant.withValues(alpha: 0.4),
+          width: 0.8,
         ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Row(
         children: [
@@ -216,18 +241,16 @@ class _VoucherTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isActive
-                  ? AppTheme.gold.withOpacity(0.1)
-                  : cs.onSurface.withOpacity(0.06),
+              color: isActive ? AppTheme.gold.withValues(alpha: 0.1) : cs.onSurface.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               Icons.local_offer_outlined,
-              color: isActive ? AppTheme.gold : cs.onSurface.withOpacity(0.3),
-              size: 22,
+              color: isActive ? AppTheme.gold : cs.onSurface.withValues(alpha: 0.3),
+              size: 20,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
 
           // Info
           Expanded(
@@ -236,35 +259,48 @@ class _VoucherTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(voucher.code,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: isActive ? AppTheme.gold : cs.onSurface.withOpacity(0.4))),
-                    const SizedBox(width: 8),
-                    _badge(context, voucher.discountLabel,
-                        isActive ? AppTheme.gold : cs.onSurface.withOpacity(0.3)),
+                    Flexible(
+                      child: Text(
+                        voucher.code,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: isActive ? AppTheme.gold : cs.onSurface.withValues(alpha: 0.4),
+                            ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     const SizedBox(width: 6),
                     _badge(
                       context,
-                      isActive ? 'Active' : 'Inactive',
-                      isActive ? AppTheme.success : cs.onSurface.withOpacity(0.3),
+                      voucher.discountLabel,
+                      isActive ? AppTheme.gold : cs.onSurface.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(width: 4),
+                    _badge(
+                      context,
+                      isActive ? 'Aktif' : 'Nonaktif',
+                      isActive ? AppTheme.success : cs.onSurface.withValues(alpha: 0.3),
                     ),
                   ],
                 ),
                 if (voucher.description != null) ...[
-                  const SizedBox(height: 4),
-                  Text(voucher.description!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withOpacity(0.6)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 3),
+                  Text(
+                    voucher.description!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
                 if (voucher.validFrom != null || voucher.validTo != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     '${DateFormatter.format(voucher.validFrom)} → ${DateFormatter.format(voucher.validTo)}',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurface.withOpacity(0.45)),
+                          color: cs.onSurfaceVariant,
+                        ),
                   ),
                 ],
               ],
@@ -275,17 +311,17 @@ class _VoucherTile extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                icon: Icon(Icons.edit_outlined,
-                    size: 20, color: cs.onSurface.withOpacity(0.6)),
-                onPressed: onEdit,
+              _ActionBtn(
+                icon: Icons.edit_outlined,
+                color: cs.onSurfaceVariant,
+                onTap: onEdit,
                 tooltip: 'Edit',
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    size: 20, color: AppTheme.destructive),
-                onPressed: onDelete,
-                tooltip: 'Delete',
+              _ActionBtn(
+                icon: Icons.delete_outline_rounded,
+                color: AppTheme.destructive,
+                onTap: onDelete,
+                tooltip: 'Hapus',
               ),
             ],
           ),
@@ -298,15 +334,53 @@ class _VoucherTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Text(label,
-          style: Theme.of(context)
-              .textTheme
-              .labelSmall
-              ?.copyWith(color: color, fontWeight: FontWeight.w600)),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+}
+
+class _ActionBtn extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _ActionBtn({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 34,
+          height: 34,
+          margin: const EdgeInsets.only(left: 4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.15)),
+          ),
+          child: Icon(icon, size: 17, color: color),
+        ),
+      ),
     );
   }
 }

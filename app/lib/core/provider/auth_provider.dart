@@ -50,7 +50,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // Check authentication status on app start
   Future<void> _checkAuthStatus() async {
     state = state.copyWith(isLoading: true);
-    
+
     try {
       final isAuth = await AuthService.isAuthenticated();
       if (isAuth) {
@@ -78,12 +78,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   // Login method
-  Future<bool> login(String username, String password) async {
+  Future<bool> login(String username, String password, {bool rememberMe = false}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final result = await AuthService.login(username, password);
-      
+      final result = await AuthService.login(username, password, rememberMe: rememberMe);
+
       if (result.isSuccess) {
         state = state.copyWith(
           isAuthenticated: true,
@@ -125,7 +125,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // Logout method
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
-    
+
     try {
       await AuthService.logout();
       state = const AuthState();

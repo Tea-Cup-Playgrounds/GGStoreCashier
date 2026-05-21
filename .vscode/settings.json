@@ -1,6 +1,46 @@
 {
-    "dart.flutterSdkPath": "app/.fvm/flutter_sdk",
+    // Flutter / Dart
+    "dart.flutterSdkPath": "C:\\Users\\LENOVO\\fvm\\versions\\3.38.5",
     "dart.analysisIncludedFolders": [
         "app"
     ],
+    "dart.lineLength": 120,
+    "dart.previewFlutterUiGuides": true,
+    "dart.previewFlutterUiGuidesCustomTracking": true,
+    "dart.debugExternalPackageLibraries": false,
+    "dart.debugSdkLibraries": false,
+    // Node / JS
+    "javascript.preferences.importModuleSpecifier": "relative",
+    "node.defaultVersion": "lts",
+    // Editor
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit"
+    },
+    "[dart]": {
+        "editor.formatOnSave": true,
+        "editor.selectionHighlight": false,
+        "editor.suggest.snippetsPreventQuickSuggestions": false,
+        "editor.suggestSelection": "first",
+        "editor.tabCompletion": "onlySnippets",
+        "editor.wordBasedSuggestions": "off"
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    // File exclusions (keep explorer clean)
+    "files.exclude": {
+        "**/.git": true,
+        "**/node_modules": true,
+        "app/.dart_tool": true,
+        "app/build": true,
+        "app/.fvm": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "app/.dart_tool": true,
+        "app/build": true,
+        "app/.fvm": true
+    }
 }

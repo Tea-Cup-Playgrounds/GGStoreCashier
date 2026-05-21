@@ -25,7 +25,7 @@ class SnackBarService {
   }
 
   static void success(String message) {
-    show(message, backgroundColor: AppTheme.gold );
+    show(message, backgroundColor: AppTheme.success);
   }
 
   static void error(String message) {

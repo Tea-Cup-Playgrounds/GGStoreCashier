@@ -39,12 +39,13 @@ class TextInput extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
+          padding: const EdgeInsets.only(left: 2.0, bottom: 4.0),
           child: Text(
             label,
-            style: Theme.of(context).textTheme.titleMedium!.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         TextFormField(
@@ -58,6 +59,8 @@ class TextInput extends StatelessWidget {
           validator: validator,
           inputFormatters: inputFormatters,
           scrollPadding: const EdgeInsets.only(bottom: 120),
+          // Scroll horizontally when text overflows (single line fields)
+          scrollPhysics: maxLines == 1 ? const BouncingScrollPhysics() : null,
           style: Theme.of(context).textTheme.bodyMedium,
           decoration: InputDecoration(
             hintText: hintText,
@@ -67,6 +70,9 @@ class TextInput extends StatelessWidget {
               horizontal: 16,
               vertical: 12,
             ),
+            errorStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
           ),
         ),
       ],

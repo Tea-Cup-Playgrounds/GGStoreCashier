@@ -78,14 +78,10 @@ class CustomButton extends StatelessWidget {
       };
 
   EdgeInsets _getPadding() => switch (size) {
-        ButtonSize.small =>
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        ButtonSize.medium =>
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ButtonSize.large =>
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        ButtonSize.extraLarge =>
-          const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        ButtonSize.small => const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        ButtonSize.medium => const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ButtonSize.large => const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        ButtonSize.extraLarge => const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       };
 
   TextStyle _getTextStyle() {
@@ -134,11 +130,24 @@ class CustomButton extends StatelessWidget {
     switch (variant) {
       case ButtonVariant.primary:
         return baseStyle.copyWith(
-          backgroundColor: WidgetStateProperty.all(colorScheme.primary),
-          foregroundColor: WidgetStateProperty.all(colorScheme.onPrimary),
-          side: WidgetStateProperty.all(
-            border(colorScheme.primary),
-          ),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return colorScheme.primary.withOpacity(0.4);
+            }
+            return colorScheme.primary;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return colorScheme.onPrimary.withOpacity(0.6);
+            }
+            return colorScheme.onPrimary;
+          }),
+          side: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return border(colorScheme.primary.withOpacity(0.4));
+            }
+            return border(colorScheme.primary);
+          }),
         );
 
       case ButtonVariant.secondary:

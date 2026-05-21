@@ -2,18 +2,51 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Flutter (Mobile App via FVM)",
+            "name": "Flutter",
             "cwd": "app",
             "request": "launch",
             "type": "dart",
-            "program": "lib/main.dart"
+            "program": "lib/main.dart",
+            "flutterMode": "debug",
+            "args": [
+                "--dart-define-from-file=.env"
+            ]
         },
         {
-            "name": "Express API",
+            "name": "Express API (dev)",
             "request": "launch",
             "type": "node",
-            "program": "API/src/server.js", 
-            "console": "integratedTerminal"
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "name": "Express API (start)",
+            "request": "launch",
+            "type": "node",
+            "program": "${workspaceFolder}/API/src/server.js",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full Stack (Flutter + API)",
+            "configurations": [
+                "Flutter (Mobile App via FVM)",
+                "Express API (dev)"
+            ]
         }
     ]
 }

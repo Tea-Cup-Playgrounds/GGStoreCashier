@@ -30,6 +30,8 @@ class SearchableDropdown<T> extends StatefulWidget {
 class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -37,59 +39,51 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
           Text(
             widget.label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.foreground,
-              fontWeight: FontWeight.w500,
-            ),
+                  fontWeight: FontWeight.w500,
+                ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
         ],
         Autocomplete<DropdownItem<T>>(
           initialValue: widget.value != null
               ? TextEditingValue(
                   text: widget.items
-                      .firstWhere(
-                        (item) => item.value == widget.value,
-                        orElse: () => DropdownItem(value: widget.value as T, label: ''),
-                      )
-                      .label,
+                          .cast<DropdownItem<T>?>()
+                          .firstWhere(
+                            (item) => item?.value == widget.value,
+                            orElse: () => null,
+                          )
+                          ?.label ??
+                      '',
                 )
               : null,
           optionsBuilder: (TextEditingValue textEditingValue) {
-            if (textEditingValue.text.isEmpty) {
-              return widget.items;
-            }
-            return widget.items.where((item) {
-              return item.label
-                  .toLowerCase()
-                  .contains(textEditingValue.text.toLowerCase());
-            });
+            if (textEditingValue.text.isEmpty) return widget.items;
+            return widget.items.where((item) => item.label.toLowerCase().contains(textEditingValue.text.toLowerCase()));
           },
-          displayStringForOption: (DropdownItem<T> option) => option.label,
-          onSelected: (DropdownItem<T> selection) {
-            widget.onChanged(selection.value);
-          },
-          fieldViewBuilder: (
-            BuildContext context,
-            TextEditingController textEditingController,
-            FocusNode focusNode,
-            VoidCallback onFieldSubmitted,
-          ) {
+          displayStringForOption: (option) => option.label,
+          onSelected: (selection) => widget.onChanged(selection.value),
+          fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
             return TextFormField(
-              controller: textEditingController,
+              controller: textController,
               focusNode: focusNode,
               enabled: widget.enabled,
+              style: Theme.of(context).textTheme.bodyMedium,
               decoration: InputDecoration(
                 hintText: widget.hintText,
-                hintStyle: TextStyle(color: AppTheme.mutedForeground.withOpacity(0.6)),
                 filled: true,
-                fillColor: widget.enabled ? AppTheme.surface : AppTheme.muted,
+                fillColor: widget.enabled ? cs.surface : cs.surfaceContainerHighest,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppTheme.border),
+                  borderSide: BorderSide(color: cs.outlineVariant),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppTheme.border),
+                  borderSide: BorderSide(color: cs.outlineVariant),
+                ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -103,84 +97,81 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: AppTheme.destructive, width: 2),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                prefixIcon: widget.prefixIcon != null
-                    ? Icon(widget.prefixIcon, color: AppTheme.mutedForeground)
-                    : null,
-                suffixIcon: textEditingController.text.isNotEmpty && widget.enabled
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                prefixIcon:
+                    widget.prefixIcon != null ? Icon(widget.prefixIcon, color: cs.onSurfaceVariant, size: 20) : null,
+                suffixIcon: textController.text.isNotEmpty && widget.enabled
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: AppTheme.mutedForeground),
+                        icon: Icon(Icons.clear, color: cs.onSurfaceVariant, size: 18),
                         onPressed: () {
-                          textEditingController.clear();
+                          textController.clear();
                           widget.onChanged(null);
                         },
                       )
                     : null,
               ),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.foreground,
-              ),
               validator: widget.validator != null
                   ? (String? value) {
-                      // Find the matching item by label
-                      final matchingItem = widget.items.firstWhere(
-                        (item) => item.label == value,
-                        orElse: () => DropdownItem(value: widget.value as T, label: ''),
-                      );
-                      return widget.validator!(matchingItem.value);
+                      // If field is empty/no match, pass null to the validator
+                      final matchingItem = widget.items.cast<DropdownItem<T>?>().firstWhere(
+                            (item) => item?.label == value,
+                            orElse: () => null,
+                          );
+                      return widget.validator!(matchingItem?.value);
                     }
                   : null,
             );
           },
-          optionsViewBuilder: (
-            BuildContext context,
-            AutocompleteOnSelected<DropdownItem<T>> onSelected,
-            Iterable<DropdownItem<T>> options,
-          ) {
+          optionsViewBuilder: (context, onSelected, options) {
+            final cs = Theme.of(context).colorScheme;
+            final isDark = cs.brightness == Brightness.dark;
+
             return Align(
               alignment: Alignment.topLeft,
               child: Material(
-                elevation: 4,
+                elevation: isDark ? 2 : 6,
                 borderRadius: BorderRadius.circular(12),
-                color: AppTheme.surface,
-                child: ConstrainedBox(
+                color: cs.surface,
+                shadowColor: Colors.black.withValues(alpha: 0.15),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: cs.outlineVariant, width: 0.8),
+                  ),
                   constraints: BoxConstraints(
                     maxHeight: 200,
                     maxWidth: MediaQuery.of(context).size.width - 48,
                   ),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      final option = options.elementAt(index);
-                      return InkWell(
-                        onTap: () => onSelected(option),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              if (option.icon != null) ...[
-                                Icon(option.icon, size: 20, color: AppTheme.mutedForeground),
-                                const SizedBox(width: 12),
-                              ],
-                              Expanded(
-                                child: Text(
-                                  option.label,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppTheme.foreground,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (context, index) {
+                        final option = options.elementAt(index);
+                        return InkWell(
+                          onTap: () => onSelected(option),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                if (option.icon != null) ...[
+                                  Icon(option.icon, size: 18, color: cs.onSurfaceVariant),
+                                  const SizedBox(width: 12),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    option.label,
+                                    style: Theme.of(context).textTheme.bodyMedium,
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),

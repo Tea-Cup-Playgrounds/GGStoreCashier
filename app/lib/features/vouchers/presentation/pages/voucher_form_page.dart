@@ -15,9 +15,7 @@ import '../../../../shared/utils/snackbar_service.dart';
 import 'package:go_router/go_router.dart';
 
 class VoucherFormPage extends StatefulWidget {
-  /// Pass an existing voucher to edit, or null to create.
   final Voucher? voucher;
-
   const VoucherFormPage({super.key, this.voucher});
 
   @override
@@ -25,26 +23,23 @@ class VoucherFormPage extends StatefulWidget {
 }
 
 class _VoucherFormPageState extends State<VoucherFormPage> {
-  final _formKey     = GlobalKey<FormState>();
-  final _codeCtrl    = TextEditingController();
-  final _descCtrl    = TextEditingController();
-  final _valueCtrl   = TextEditingController();
-  // Display controllers show dd-MM-yy; _fromApi/_toApi hold yyyy-MM-dd for the API
-  final _fromCtrl    = TextEditingController();
-  final _toCtrl      = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _codeCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _valueCtrl = TextEditingController();
+  final _fromCtrl = TextEditingController();
+  final _toCtrl = TextEditingController();
   String? _fromApi;
   String? _toApi;
 
-  String  _discountType = 'percent';
-  bool    _isActive     = true;
-  bool    _isSaving     = false;
+  String _discountType = 'percent';
+  bool _isActive = true;
+  bool _isSaving = false;
 
-  // target
   String? _targetType;
-  int?    _selectedTargetId;
-
-  List<DropdownItem<int>> _targetItems    = [];
-  bool    _isLoadingTargets = false;
+  int? _selectedTargetId;
+  List<DropdownItem<int>> _targetItems = [];
+  bool _isLoadingTargets = false;
   String? _targetLoadError;
 
   bool get _isEditing => widget.voucher != null;
@@ -54,17 +49,16 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     super.initState();
     if (_isEditing) {
       final v = widget.voucher!;
-      _codeCtrl.text  = v.code;
-      _descCtrl.text  = v.description ?? '';
-      _discountType   = v.discountType;
-      _valueCtrl.text = v.discountValue
-          .toStringAsFixed(v.discountType == 'percent' ? 0 : 2);
-      _fromCtrl.text  = DateFormatter.format(v.validFrom);
-      _fromApi        = v.validFrom;
-      _toCtrl.text    = DateFormatter.format(v.validTo);
-      _toApi          = v.validTo;
-      _isActive       = v.isActive;
-      _targetType     = v.targetType;
+      _codeCtrl.text = v.code;
+      _descCtrl.text = v.description ?? '';
+      _discountType = v.discountType;
+      _valueCtrl.text = v.discountValue.toStringAsFixed(v.discountType == 'percent' ? 0 : 2);
+      _fromCtrl.text = DateFormatter.format(v.validFrom);
+      _fromApi = v.validFrom != null ? DateFormatter.toApiDate(DateTime.parse(v.validFrom!)) : null;
+      _toCtrl.text = DateFormatter.format(v.validTo);
+      _toApi = v.validTo != null ? DateFormatter.toApiDate(DateTime.parse(v.validTo!)) : null;
+      _isActive = v.isActive;
+      _targetType = v.targetType;
       _selectedTargetId = v.targetId;
       if (v.targetType != null) _loadTargets(v.targetType!);
     }
@@ -83,26 +77,21 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   Future<void> _loadTargets(String type) async {
     setState(() {
       _isLoadingTargets = true;
-      _targetLoadError  = null;
-      _targetItems      = [];
+      _targetLoadError = null;
+      _targetItems = [];
     });
-
     try {
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
-        headers: {
-          'Authorization': 'Bearer $token',
-          ...ApiConfig.defaultHeaders,
-        },
+        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
         connectTimeout: ApiConfig.connectTimeout,
         receiveTimeout: ApiConfig.receiveTimeout,
       ));
 
       List<DropdownItem<int>> items;
-
       if (type == 'categories') {
-        final res  = await dio.get('/api/categories');
+        final res = await dio.get('/api/categories');
         final list = res.data['categories'] as List;
         items = list
             .map((e) => DropdownItem<int>(
@@ -122,23 +111,21 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
             .toList();
       }
 
-      if (mounted) {
+      if (mounted)
         setState(() {
-          _targetItems      = items;
+          _targetItems = items;
           _isLoadingTargets = false;
         });
-      }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         setState(() {
-          _targetLoadError  = e.toString();
+          _targetLoadError = e.toString();
           _isLoadingTargets = false;
         });
-      }
     }
   }
 
-  Future<void> _pickDate(TextEditingController displayCtrl, bool isFrom) async {
+  Future<void> _pickDate(TextEditingController ctrl, bool isFrom) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -146,14 +133,11 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       lastDate: DateTime(2035),
     );
     if (picked != null) {
-      final apiVal = DateFormatter.toApiDate(picked);
-      final display = DateFormatter.format(picked);
-      displayCtrl.text = display;
-      if (isFrom) {
-        _fromApi = apiVal;
-      } else {
-        _toApi = apiVal;
-      }
+      ctrl.text = DateFormatter.format(picked);
+      if (isFrom)
+        _fromApi = DateFormatter.toApiDate(picked);
+      else
+        _toApi = DateFormatter.toApiDate(picked);
     }
   }
 
@@ -162,33 +146,31 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_targetType != null && _selectedTargetId == null) {
-      SnackBarService.error('Please select a target item');
+      SnackBarService.error('Pilih item target terlebih dahulu');
       return;
     }
 
     setState(() => _isSaving = true);
 
     final data = {
-      'code':           _codeCtrl.text.trim().toUpperCase(),
-      'description':    _descCtrl.text.trim().isEmpty
-                            ? null
-                            : _descCtrl.text.trim(),
-      'discount_type':  _discountType,
+      'code': _codeCtrl.text.trim().toUpperCase(),
+      'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+      'discount_type': _discountType,
       'discount_value': double.parse(_valueCtrl.text.trim()),
-      'target_type':    _targetType,
-      'target_id':      _selectedTargetId,
-      'valid_from':     _fromApi,
-      'valid_to':       _toApi,
-      'is_active':      _isActive ? 1 : 0,
+      'target_type': _targetType,
+      'target_id': _selectedTargetId,
+      'valid_from': _fromApi,
+      'valid_to': _toApi,
+      'is_active': _isActive ? 1 : 0,
     };
 
     try {
       if (_isEditing) {
         await VoucherService.update(widget.voucher!.id, data);
-        SnackBarService.success('Voucher updated');
+        SnackBarService.success('Voucher berhasil diperbarui');
       } else {
         await VoucherService.create(data);
-        SnackBarService.success('Voucher created');
+        SnackBarService.success('Voucher berhasil dibuat');
       }
       if (mounted) context.pop(true);
     } catch (e) {
@@ -208,72 +190,63 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
         title: Text(
-          _isEditing ? 'Edit Voucher' : 'New Voucher',
+          _isEditing ? 'Edit Voucher' : 'Buat Voucher',
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: cs.surface,
         elevation: 0,
-        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 1,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-            16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 32),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 32),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Voucher Code ───────────────────────────────────────────────
+              // ── Kode Voucher ───────────────────────────────────────────
               w.TextInput(
-                label: 'Voucher Code *',
-                hintText: 'e.g. SUMMER20',
+                label: 'Kode Voucher *',
+                hintText: 'Contoh: DISKON20',
                 controller: _codeCtrl,
                 prefixIcon: Icons.local_offer_outlined,
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9_\-]')),
                   LengthLimitingTextInputFormatter(50),
                 ],
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Voucher code is required'
-                    : null,
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Kode voucher wajib diisi' : null,
               ),
               const SizedBox(height: 16),
 
-              // ── Description ────────────────────────────────────────────────
+              // ── Deskripsi ──────────────────────────────────────────────
               w.TextInput(
-                label: 'Description',
-                hintText: 'e.g. Summer sale discount',
+                label: 'Deskripsi',
+                hintText: 'Contoh: Diskon akhir tahun',
                 controller: _descCtrl,
                 prefixIcon: Icons.notes_outlined,
               ),
               const SizedBox(height: 16),
 
-              // ── Discount Type + Value ──────────────────────────────────────
+              // ── Tipe & Nilai Diskon ────────────────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: SearchableDropdown<String>(
-                      label: 'Discount Type *',
-                      hintText: 'Select type',
+                      label: 'Tipe Diskon *',
+                      hintText: 'Pilih tipe',
                       value: _discountType,
                       prefixIcon: Icons.percent,
                       items: [
-                        DropdownItem(
-                            value: 'percent',
-                            label: 'Percent (%)',
-                            icon: Icons.percent),
-                        DropdownItem(
-                            value: 'fixed',
-                            label: 'Fixed (Rp)',
-                            icon: Icons.money),
+                        DropdownItem(value: 'percent', label: 'Persen (%)', icon: Icons.percent),
+                        DropdownItem(value: 'fixed', label: 'Nominal (Rp)', icon: Icons.money),
                       ],
                       onChanged: (v) {
                         if (v != null) setState(() => _discountType = v);
@@ -283,22 +256,19 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: w.TextInput(
-                      label: 'Value *',
-                      hintText: _discountType == 'percent' ? '1–100' : 'Amount',
+                      label: 'Nilai *',
+                      hintText: _discountType == 'percent' ? '1–100' : 'Nominal',
                       controller: _valueCtrl,
                       prefixIcon: Icons.money,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                       ],
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (v == null || v.trim().isEmpty) return 'Wajib diisi';
                         final n = double.tryParse(v.trim());
-                        if (n == null || n <= 0) return 'Must be > 0';
-                        if (_discountType == 'percent' && n > 100) {
-                          return 'Max 100%';
-                        }
+                        if (n == null || n <= 0) return 'Harus > 0';
+                        if (_discountType == 'percent' && n > 100) return 'Maks 100%';
                         return null;
                       },
                     ),
@@ -307,48 +277,42 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
               ),
               const SizedBox(height: 16),
 
-              // ── Applies To (target type) ───────────────────────────────────
+              // ── Berlaku Untuk ──────────────────────────────────────────
               SearchableDropdown<String>(
-                label: 'Applies To',
-                hintText: 'All products (no restriction)',
+                label: 'Berlaku Untuk',
+                hintText: 'Semua produk (tanpa batasan)',
                 value: _targetType,
                 prefixIcon: Icons.filter_alt_outlined,
                 items: [
-                  DropdownItem(
-                      value: 'categories',
-                      label: 'Specific Category',
-                      icon: Icons.category_outlined),
-                  DropdownItem(
-                      value: 'product',
-                      label: 'Specific Product',
-                      icon: Icons.inventory_2_outlined),
+                  DropdownItem(value: 'categories', label: 'Kategori Tertentu', icon: Icons.category_outlined),
+                  DropdownItem(value: 'product', label: 'Produk Tertentu', icon: Icons.inventory_2_outlined),
                 ],
                 onChanged: (v) {
                   setState(() {
-                    _targetType       = v;
+                    _targetType = v;
                     _selectedTargetId = null;
-                    _targetItems      = [];
-                    _targetLoadError  = null;
+                    _targetItems = [];
+                    _targetLoadError = null;
                   });
                   if (v != null) _loadTargets(v);
                 },
               ),
               const SizedBox(height: 16),
 
-              // ── Target Item picker ─────────────────────────────────────────
+              // ── Pilih Target ───────────────────────────────────────────
               if (_targetType != null) ...[
                 _buildTargetPicker(cs),
                 const SizedBox(height: 16),
               ],
 
-              // ── Valid From / To ────────────────────────────────────────────
+              // ── Berlaku Dari / Sampai ──────────────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: w.TextInput(
-                      label: 'Valid From',
-                      hintText: 'YYYY-MM-DD',
+                      label: 'Berlaku Dari',
+                      hintText: 'Pilih tanggal',
                       controller: _fromCtrl,
                       prefixIcon: Icons.calendar_today_outlined,
                       readOnly: true,
@@ -358,8 +322,8 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: w.TextInput(
-                      label: 'Valid To',
-                      hintText: 'YYYY-MM-DD',
+                      label: 'Berlaku Sampai',
+                      hintText: 'Pilih tanggal',
                       controller: _toCtrl,
                       prefixIcon: Icons.event_outlined,
                       readOnly: true,
@@ -370,22 +334,21 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
               ),
               const SizedBox(height: 8),
 
-              // ── Active toggle ──────────────────────────────────────────────
+              // ── Status Aktif ───────────────────────────────────────────
               SwitchListTile.adaptive(
                 value: _isActive,
                 onChanged: (v) => setState(() => _isActive = v),
-                title: const Text('Active'),
-                subtitle: Text(_isActive
-                    ? 'Voucher can be used at checkout'
-                    : 'Voucher is disabled'),
+                title: const Text('Aktif'),
+                subtitle: Text(_isActive ? 'Voucher dapat digunakan saat checkout' : 'Voucher dinonaktifkan'),
                 contentPadding: EdgeInsets.zero,
-                activeColor: AppTheme.gold,
+                activeThumbColor: AppTheme.gold,
+                activeTrackColor: AppTheme.gold.withValues(alpha: 0.3),
               ),
               const SizedBox(height: 24),
 
-              // ── Submit ─────────────────────────────────────────────────────
+              // ── Simpan ─────────────────────────────────────────────────
               CustomButton(
-                text: _isEditing ? 'Save Changes' : 'Create Voucher',
+                text: _isEditing ? 'Simpan Perubahan' : 'Buat Voucher',
                 icon: _isEditing ? Icons.save_outlined : Icons.add,
                 size: ButtonSize.large,
                 fullWidth: true,
@@ -399,9 +362,8 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     );
   }
 
-  // ── Target item picker ─────────────────────────────────────────────────────
   Widget _buildTargetPicker(ColorScheme cs) {
-    final label = _targetType == 'categories' ? 'Category' : 'Product';
+    final label = _targetType == 'categories' ? 'Kategori' : 'Produk';
 
     if (_isLoadingTargets) {
       return Container(
@@ -415,11 +377,10 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
             SizedBox(
               width: 18,
               height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppTheme.gold),
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold),
             ),
             SizedBox(width: 12),
-            Text('Loading options...'),
+            Text('Memuat pilihan...'),
           ],
         ),
       );
@@ -429,23 +390,23 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppTheme.destructive.withOpacity(0.08),
-          border: Border.all(color: AppTheme.destructive.withOpacity(0.3)),
+          color: AppTheme.destructive.withValues(alpha: 0.08),
+          border: Border.all(color: AppTheme.destructive.withValues(alpha: 0.3)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline,
-                color: AppTheme.destructive, size: 18),
+            const Icon(Icons.error_outline, color: AppTheme.destructive, size: 18),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('Failed to load $label options',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.destructive)),
+              child: Text(
+                'Gagal memuat pilihan $label',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.destructive),
+              ),
             ),
             TextButton(
               onPressed: () => _loadTargets(_targetType!),
-              child: const Text('Retry'),
+              child: const Text('Coba Lagi'),
             ),
           ],
         ),
@@ -453,16 +414,13 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     }
 
     return SearchableDropdown<int>(
-      label: 'Select $label *',
-      hintText: 'Search and select a $label',
+      label: 'Pilih $label *',
+      hintText: 'Cari dan pilih $label',
       value: _selectedTargetId,
-      prefixIcon: _targetType == 'categories'
-          ? Icons.category_outlined
-          : Icons.inventory_2_outlined,
+      prefixIcon: _targetType == 'categories' ? Icons.category_outlined : Icons.inventory_2_outlined,
       items: _targetItems,
       onChanged: (v) => setState(() => _selectedTargetId = v),
-      validator: (v) =>
-          v == null ? 'Please select a $label' : null,
+      validator: (v) => v == null ? 'Pilih $label terlebih dahulu' : null,
     );
   }
 }

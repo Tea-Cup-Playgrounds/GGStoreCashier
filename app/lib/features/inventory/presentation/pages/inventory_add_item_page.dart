@@ -28,11 +28,11 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
   final TextEditingController _barcodeController = TextEditingController();
   final TextEditingController _stockController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  
+
   File? _productImage;
   bool _isLoading = false;
   bool _isLoadingData = true;
-  
+
   List<Map<String, dynamic>> _branches = [];
   List<Map<String, dynamic>> _categories = [];
   int? _selectedBranchId;
@@ -46,7 +46,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
   Future<void> _loadInitialData() async {
     setState(() => _isLoadingData = true);
-    
+
     try {
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
@@ -59,46 +59,42 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
       final categoriesResponse = await dio.get('/api/categories');
 
       setState(() {
-        _branches = List<Map<String, dynamic>>.from(
-          branchesResponse.data['branches'].map((b) => {
-            'id': b['id'],
-            'name': b['name'],
-          })
-        );
-        
-        _categories = List<Map<String, dynamic>>.from(
-          categoriesResponse.data['categories'].map((c) => {
-            'id': c['id'],
-            'name': c['name'],
-          })
-        );
+        _branches = List<Map<String, dynamic>>.from(branchesResponse.data['branches'].map((b) => {
+              'id': b['id'],
+              'name': b['name'],
+            }));
+
+        _categories = List<Map<String, dynamic>>.from(categoriesResponse.data['categories'].map((c) => {
+              'id': c['id'],
+              'name': c['name'],
+            }));
 
         // Set default branch for admin/karyawan
         final user = ref.read(authProvider).user;
         if (user != null && user.role != 'superadmin' && user.branchId != null) {
           _selectedBranchId = user.branchId;
         }
-        
+
         _isLoadingData = false;
       });
     } catch (e) {
       setState(() => _isLoadingData = false);
       if (mounted) {
-        SnackBarService.error('Failed to load data: ${e.toString()}');
+        SnackBarService.error('Gagal memuat data: ${e.toString()}');
       }
     }
   }
 
   Future<void> _submitForm() async {
     FocusScope.of(context).unfocus();
-    
+
     if (!_formKey.currentState!.validate()) {
       debugPrint('[AddProduct] form validation failed');
       return;
     }
 
     if (_selectedBranchId == null) {
-      SnackBarService.error('Please select a branch');
+      SnackBarService.error('Pilih cabang terlebih dahulu');
       return;
     }
 
@@ -139,7 +135,8 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
       // Prepare form data
       final formData = FormData.fromMap({
         'name': _productNameController.text.trim(),
-        'barcode': _barcodeController.text.trim(),
+        // Send null instead of empty string to avoid UNIQUE constraint on barcode
+        if (_barcodeController.text.trim().isNotEmpty) 'barcode': _barcodeController.text.trim(),
         'category_id': _selectedCategoryId,
         'sell_price': RupiahInputFormatter.parseRupiahAsDouble(_priceController.text) ?? 0,
         'stock': int.parse(_stockController.text.trim()),
@@ -170,7 +167,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
       if (response.statusCode == 201) {
         if (mounted) {
-          SnackBarService.success('Product added successfully');
+          SnackBarService.success('Produk berhasil ditambahkan');
           context.pop();
         }
       }
@@ -183,7 +180,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
         debugPrint('[AddProduct] response data: ${e.response?.data}');
       }
       if (mounted) {
-        String errorMessage = 'Failed to add product';
+        String errorMessage = 'Gagal menambahkan produk';
         if (e is DioException && e.response?.data != null) {
           errorMessage = e.response!.data['error'] ?? errorMessage;
         }
@@ -218,7 +215,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
           icon: const Icon(Icons.arrow_back),
         ),
         title: const Text(
-          "Add Product",
+          'Tambah Produk',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -233,94 +230,91 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Product Image
+                    // Gambar Produk
                     ImageInput(
                       file: _productImage,
-                      label: "Product Image",
+                      label: 'Gambar Produk',
                       onChanged: (img) => setState(() => _productImage = img),
                     ),
                     const SizedBox(height: 24),
 
-                    // Product Name
+                    // Nama Produk
                     TextInput(
-                      label: 'Product Name',
-                      hintText: "Enter product name",
+                      label: 'Nama Produk',
+                      hintText: 'Masukkan nama produk',
                       controller: _productNameController,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Product name is required';
+                          return 'Nama produk wajib diisi';
                         }
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
 
-                    // Barcode (optional - will be auto-generated if empty)
+                    // Barcode (opsional)
                     TextInput(
-                      label: 'Barcode (Optional)',
-                      hintText: "Leave empty for auto-generate",
+                      label: 'Barcode (Opsional)',
+                      hintText: 'Kosongkan untuk generate otomatis',
                       controller: _barcodeController,
                     ),
                     const SizedBox(height: 16),
 
-                    // Branch Dropdown (disabled for admin/karyawan)
+                    // Cabang
                     SearchableDropdown<int>(
-                      label: 'Branch',
-                      hintText: 'Select branch',
+                      label: 'Cabang',
+                      hintText: 'Pilih cabang',
                       value: _selectedBranchId,
-                      items: _branches.map((branch) {
-                        return DropdownItem<int>(
-                          value: branch['id'],
-                          label: branch['name'],
-                          icon: Icons.store,
-                        );
-                      }).toList(),
-                      onChanged: isSuperAdmin
-                          ? (value) => setState(() => _selectedBranchId = value)
-                          : (value) {}, // Disabled for non-superadmin
+                      items: _branches
+                          .where((b) => b['id'] != 0) // exclude branch 0
+                          .map((branch) => DropdownItem<int>(
+                                value: branch['id'],
+                                label: branch['name'],
+                                icon: Icons.store,
+                              ))
+                          .toList(),
+                      onChanged: isSuperAdmin ? (value) => setState(() => _selectedBranchId = value) : (value) {},
                       enabled: isSuperAdmin,
                       prefixIcon: Icons.store,
                       validator: (value) {
-                        if (value == null) {
-                          return 'Please select a branch';
-                        }
+                        if (value == null) return 'Pilih cabang terlebih dahulu';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
 
-                    // Category Dropdown
+                    // Kategori
                     SearchableDropdown<int>(
-                      label: 'Category (Optional)',
-                      hintText: 'Select category',
+                      label: 'Kategori (Opsional)',
+                      hintText: 'Pilih kategori',
                       value: _selectedCategoryId,
-                      items: _categories.map((category) {
-                        return DropdownItem<int>(
-                          value: category['id'],
-                          label: category['name'],
-                          icon: Icons.category,
-                        );
-                      }).toList(),
+                      items: _categories
+                          .map((category) => DropdownItem<int>(
+                                value: category['id'],
+                                label: category['name'],
+                                icon: Icons.category,
+                              ))
+                          .toList(),
                       onChanged: (value) => setState(() => _selectedCategoryId = value),
                       prefixIcon: Icons.category,
                     ),
                     const SizedBox(height: 16),
 
-                    // Stock and Price Row
+                    // Stok & Harga
                     Row(
                       children: [
                         Expanded(
                           child: TextInput(
-                            label: 'Stock Quantity',
-                            hintText: "Enter quantity",
+                            label: 'Jumlah Stok',
+                            hintText: 'Masukkan jumlah',
                             controller: _stockController,
                             keyboardType: TextInputType.number,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Stock is required';
+                                return 'Stok wajib diisi';
                               }
                               if (int.tryParse(value) == null) {
-                                return 'Invalid number';
+                                return 'Angka tidak valid';
                               }
                               return null;
                             },
@@ -329,18 +323,18 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: TextInput(
-                            label: 'Sell Price',
-                            hintText: "Rp0",
+                            label: 'Harga Jual',
+                            hintText: 'Rp0',
                             controller: _priceController,
                             keyboardType: TextInputType.number,
                             inputFormatters: [RupiahInputFormatter()],
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Price is required';
+                                return 'Harga wajib diisi';
                               }
                               final price = RupiahInputFormatter.parseRupiahAsDouble(value);
                               if (price == null || price <= 0) {
-                                return 'Invalid price';
+                                return 'Harga tidak valid';
                               }
                               return null;
                             },
@@ -350,9 +344,9 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Submit Button
+                    // Tombol Simpan
                     CustomButton(
-                      text: "Add Product",
+                      text: 'Tambah Produk',
                       size: ButtonSize.large,
                       onPressed: _isLoading ? null : _submitForm,
                       isLoading: _isLoading,
