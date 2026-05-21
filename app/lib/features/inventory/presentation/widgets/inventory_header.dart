@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart';
+import '../../../../core/models/product.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_search_bar.dart';
 
@@ -52,6 +53,7 @@ class InventoryHeader extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: color, size: 18),
             const SizedBox(height: 6),
@@ -135,6 +137,7 @@ class InventoryHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           CustomSearchBar(
             controller: searchController,

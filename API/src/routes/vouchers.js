@@ -14,7 +14,7 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         res.json({ vouchers: rows });
     } catch (err) {
         console.error('List vouchers error:', err);
-        res.status(500).json({ error: 'Failed to fetch vouchers' });
+        res.status(500).json({ error: 'Gagal mengambil data voucher' });
     }
 });
 
@@ -35,13 +35,13 @@ router.get('/validate/:code', async (req, res) => {
         );
 
         if (rows.length === 0) {
-            return res.status(404).json({ error: 'Invalid or expired voucher code' });
+            return res.status(404).json({ error: 'Kode voucher tidak valid atau sudah kadaluarsa' });
         }
 
         res.json({ voucher: rows[0] });
     } catch (err) {
         console.error('Validate voucher error:', err);
-        res.status(500).json({ error: 'Failed to validate voucher' });
+        res.status(500).json({ error: 'Gagal memvalidasi voucher' });
     }
 });
 
@@ -58,14 +58,14 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
 
         if (!code || !discount_type || discount_value == null) {
             return res.status(400).json({
-                error: 'code, discount_type, and discount_value are required'
+                error: 'Kode, tipe diskon, dan nilai diskon wajib diisi'
             });
         }
         if (!['percent', 'fixed'].includes(discount_type)) {
-            return res.status(400).json({ error: 'discount_type must be percent or fixed' });
+            return res.status(400).json({ error: 'Tipe diskon harus percent atau fixed' });
         }
         if (discount_type === 'percent' && (discount_value <= 0 || discount_value > 100)) {
-            return res.status(400).json({ error: 'Percent discount must be between 1 and 100' });
+            return res.status(400).json({ error: 'Diskon persen harus antara 1 dan 100' });
         }
 
         const [result] = await pool.execute(
@@ -85,13 +85,13 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
             ]
         );
 
-        res.status(201).json({ message: 'Voucher created', voucherId: result.insertId });
+        res.status(201).json({ message: 'Voucher berhasil dibuat', voucherId: result.insertId });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ error: 'Voucher code already exists' });
+            return res.status(409).json({ error: 'Kode voucher sudah digunakan' });
         }
         console.error('Create voucher error:', err);
-        res.status(500).json({ error: 'Failed to create voucher' });
+        res.status(500).json({ error: 'Gagal membuat voucher' });
     }
 });
 
@@ -107,7 +107,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
 
         if (!code || !discount_type || discount_value == null) {
             return res.status(400).json({
-                error: 'code, discount_type, and discount_value are required'
+                error: 'Kode, tipe diskon, dan nilai diskon wajib diisi'
             });
         }
 
@@ -132,15 +132,15 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Voucher not found' });
+            return res.status(404).json({ error: 'Voucher tidak ditemukan' });
         }
-        res.json({ message: 'Voucher updated' });
+        res.json({ message: 'Voucher berhasil diperbarui' });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ error: 'Voucher code already exists' });
+            return res.status(409).json({ error: 'Kode voucher sudah digunakan' });
         }
         console.error('Update voucher error:', err);
-        res.status(500).json({ error: 'Failed to update voucher' });
+        res.status(500).json({ error: 'Gagal memperbarui voucher' });
     }
 });
 
@@ -152,12 +152,12 @@ router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => 
             [req.params.id]
         );
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Voucher not found' });
+            return res.status(404).json({ error: 'Voucher tidak ditemukan' });
         }
-        res.json({ message: 'Voucher deleted' });
+        res.json({ message: 'Voucher berhasil dihapus' });
     } catch (err) {
         console.error('Delete voucher error:', err);
-        res.status(500).json({ error: 'Failed to delete voucher' });
+        res.status(500).json({ error: 'Gagal menghapus voucher' });
     }
 });
 

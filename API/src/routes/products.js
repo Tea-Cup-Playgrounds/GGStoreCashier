@@ -44,7 +44,7 @@ router.get('/', filterByBranch, async (req, res) => {
 
     } catch (error) {
         console.error('Get products error:', error);
-        res.status(500).json({ error: 'Failed to fetch products' });
+        res.status(500).json({ error: 'Gagal mengambil data produk' });
     }
 });
 
@@ -61,14 +61,14 @@ router.get('/:id', async (req, res) => {
         );
 
         if (products.length === 0) {
-            return res.status(404).json({ error: 'Product not found' });
+            return res.status(404).json({ error: 'Produk tidak ditemukan' });
         }
 
         // Check branch ownership for non-superadmin users
         if (req.user.role !== 'superadmin') {
             if (products[0].branch_id !== req.user.branch_id) {
                 return res.status(403).json({ 
-                    error: 'You can only view products from your own branch' 
+                    error: 'Anda hanya dapat melihat produk dari cabang Anda sendiri' 
                 });
             }
         }
@@ -77,7 +77,7 @@ router.get('/:id', async (req, res) => {
 
     } catch (error) {
         console.error('Get product error:', error);
-        res.status(500).json({ error: 'Failed to fetch product' });
+        res.status(500).json({ error: 'Gagal mengambil data produk' });
     }
 });
 
@@ -94,7 +94,10 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
             filename: req.file.filename,
         } : 'no file');
 
-        const { name, barcode, category_id, sell_price, stock, branch_id } = req.body;
+        const { name, barcode, category_id, sell_price, stock } = req.body;
+        // For multipart requests, filterByBranch can't inject branch_id before multer runs.
+        // Fall back to req.userBranchId (set by filterByBranch for non-superadmin users).
+        const branch_id = req.body.branch_id || req.userBranchId;
 
         if (!name || !sell_price) {
             // Delete uploaded file if validation fails
@@ -102,7 +105,7 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
                 deleteFile(`API/uploads/products/${req.file.filename}`);
             }
             return res.status(400).json({ 
-                error: 'Name and sell price are required' 
+                error: 'Nama produk dan harga jual wajib diisi' 
             });
         }
 
@@ -116,7 +119,7 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
             } catch (error) {
                 console.error('[POST /api/products] image validation failed:', error.message);
                 return res.status(400).json({ 
-                    error: error.message || 'Invalid image file' 
+                    error: error.message || 'File gambar tidak valid' 
                 });
             }
         }
@@ -156,7 +159,7 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
         }
 
         res.status(201).json({ 
-            message: 'Product created successfully',
+            message: 'Produk berhasil ditambahkan',
             productId: result.insertId,
             product: products[0]
         });
@@ -169,9 +172,9 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
         
         console.error('Create product error:', error);
         if (error.code === 'ER_DUP_ENTRY') {
-            res.status(400).json({ error: 'Barcode already exists' });
+            res.status(400).json({ error: 'Barcode sudah digunakan' });
         } else {
-            res.status(500).json({ error: 'Failed to create product' });
+            res.status(500).json({ error: 'Gagal menambahkan produk' });
         }
     }
 });
@@ -179,7 +182,8 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
 // Update product (admin/superadmin only, with branch filtering and ownership validation)
 router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadProduct.single('product_image'), async (req, res) => {
     try {
-        const { name, barcode, category_id, sell_price, stock, branch_id } = req.body;
+        const { name, barcode, category_id, sell_price, stock } = req.body;
+        const branch_id = req.body.branch_id || req.userBranchId;
 
         // Get old product data to verify ownership and delete old image if new one is uploaded
         const [oldProducts] = await pool.execute(
@@ -191,7 +195,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
             if (req.file) {
                 deleteFile(`API/uploads/products/${req.file.filename}`);
             }
-            return res.status(404).json({ error: 'Product not found' });
+            return res.status(404).json({ error: 'Produk tidak ditemukan' });
         }
 
         // Check branch ownership for non-superadmin users
@@ -201,7 +205,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
                     deleteFile(`API/uploads/products/${req.file.filename}`);
                 }
                 return res.status(403).json({ 
-                    error: 'You can only update products from your own branch' 
+                    error: 'Anda hanya dapat mengubah produk dari cabang Anda sendiri' 
                 });
             }
         }
@@ -213,7 +217,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
                 validateUploadedImage(filePath, req.file.mimetype);
             } catch (error) {
                 return res.status(400).json({ 
-                    error: error.message || 'Invalid image file' 
+                    error: error.message || 'File gambar tidak valid' 
                 });
             }
         }
@@ -232,7 +236,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
             if (req.file) {
                 deleteFile(`uploads/products/${req.file.filename}`);
             }
-            return res.status(404).json({ error: 'Product not found' });
+            return res.status(404).json({ error: 'Produk tidak ditemukan' });
         }
 
         // Delete old image if new one was uploaded
@@ -260,7 +264,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
         }
 
         res.json({ 
-            message: 'Product updated successfully',
+            message: 'Produk berhasil diperbarui',
             product: products[0]
         });
 
@@ -271,9 +275,9 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
         
         console.error('Update product error:', error);
         if (error.code === 'ER_DUP_ENTRY') {
-            res.status(400).json({ error: 'Barcode already exists' });
+            res.status(400).json({ error: 'Barcode sudah digunakan' });
         } else {
-            res.status(500).json({ error: 'Failed to update product' });
+            res.status(500).json({ error: 'Gagal memperbarui produk' });
         }
     }
 });
@@ -288,7 +292,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
         );
 
         if (products.length === 0) {
-            return res.status(404).json({ error: 'Product not found' });
+            return res.status(404).json({ error: 'Produk tidak ditemukan' });
         }
 
         const product = products[0];
@@ -299,7 +303,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
         );
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Product not found' });
+            return res.status(404).json({ error: 'Produk tidak ditemukan' });
         }
 
         // Delete product image if exists
@@ -316,11 +320,11 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
             io.to('branch-0').emit('product-deleted', { id: req.params.id });
         }
 
-        res.json({ message: 'Product deleted successfully' });
+        res.json({ message: 'Produk berhasil dihapus' });
 
     } catch (error) {
         console.error('Delete product error:', error);
-        res.status(500).json({ error: 'Failed to delete product' });
+        res.status(500).json({ error: 'Gagal menghapus produk' });
     }
 });
 

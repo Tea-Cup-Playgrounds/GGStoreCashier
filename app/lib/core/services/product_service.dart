@@ -4,8 +4,11 @@ import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/product.dart';
+import 'cache_manager.dart';
 
 class ProductService {
+  /// Set to `true` after a call to [getProducts] that returned stale cached data.
+  static bool lastFetchWasStale = false;
   static final _dio = Dio(BaseOptions(
     baseUrl: ApiConfig.apiUrl,
     connectTimeout: ApiConfig.connectTimeout,
@@ -36,6 +39,10 @@ class ProductService {
     return prefs.getString('auth_token');
   }
 
+  /// Cache key scoped to the branch so different users never share cached lists.
+  static String _cacheKey(int? branchId) =>
+      branchId != null ? 'products:branch_$branchId' : 'products:all';
+
   static String getProductImageUrl(String? imageName) {
     if (imageName == null || imageName.isEmpty) {
       return '';
@@ -51,13 +58,33 @@ class ProductService {
     int? branchId,
     int? categoryId,
     String? search,
+    bool forceRefresh = false,
   }) async {
     _initializeDio();
+
+    // Reset stale flag at the start of every call.
+    lastFetchWasStale = false;
+
+    final bool noFilters =
+        categoryId == null && (search == null || search.isEmpty);
+
+    final cacheKey = _cacheKey(branchId);
+
+    // --- Cache read (only when no extra filters are applied) ---
+    if (noFilters && !forceRefresh && CacheManager.isValid(cacheKey)) {
+      final entry = CacheManager.get(cacheKey);
+      if (entry != null) {
+        final cachedList = (entry.data as List)
+            .map((json) => Product.fromJson(Map<String, dynamic>.from(json as Map)))
+            .toList();
+        return cachedList;
+      }
+    }
 
     try {
       final token = await _getToken();
       if (token == null) {
-        throw Exception('No authentication token found');
+        throw Exception('Token autentikasi tidak ditemukan');
       }
 
       final queryParams = <String, dynamic>{};
@@ -76,12 +103,33 @@ class ProductService {
       if (response.statusCode == 200) {
         final data = response.data;
         final productsJson = data['products'] as List;
-        return productsJson.map((json) => Product.fromJson(json)).toList();
+        final products =
+            productsJson.map((json) => Product.fromJson(json)).toList();
+
+        // Store raw JSON in cache (only when no extra filters).
+        if (noFilters) {
+          await CacheManager.put(cacheKey, productsJson);
+        }
+
+        return products;
       } else {
-        throw Exception('Failed to load products: ${response.statusCode}');
+        throw Exception('Gagal memuat produk: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      throw Exception('Network error: ${e.message}');
+      // Network failure — try to return stale cache if available.
+      if (noFilters) {
+        final staleEntry = CacheManager.get(cacheKey);
+        if (staleEntry != null) {
+          lastFetchWasStale = true;
+          staleEntry.isStale = true;
+          await staleEntry.save();
+          return (staleEntry.data as List)
+              .map((json) =>
+                  Product.fromJson(Map<String, dynamic>.from(json as Map)))
+              .toList();
+        }
+      }
+      throw Exception('Kesalahan jaringan: ${e.message}');
     } catch (e) {
       rethrow;
     }
@@ -93,7 +141,7 @@ class ProductService {
     try {
       final token = await _getToken();
       if (token == null) {
-        throw Exception('No authentication token found');
+        throw Exception('Token autentikasi tidak ditemukan');
       }
 
       final response = await _dio.get(
@@ -110,7 +158,7 @@ class ProductService {
         throw Exception('Failed to load product detail: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      throw Exception('Network error: ${e.message}');
+      throw Exception('Kesalahan jaringan: ${e.message}');
     } catch (e) {
       rethrow;
     }

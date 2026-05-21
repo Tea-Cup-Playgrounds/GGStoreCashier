@@ -52,7 +52,7 @@ router.get('/', filterByBranch, async (req, res) => {
 
     } catch (error) {
         console.error('Get transactions error:', error);
-        res.status(500).json({ error: 'Failed to fetch transactions' });
+        res.status(500).json({ error: 'Gagal mengambil data transaksi' });
     }
 });
 
@@ -69,13 +69,13 @@ router.get('/:id', async (req, res) => {
         );
 
         if (transactions.length === 0) {
-            return res.status(404).json({ error: 'Transaction not found' });
+            return res.status(404).json({ error: 'Transaksi tidak ditemukan' });
         }
 
         // Enforce branch access for non-superadmin
         if (req.user.role !== 'superadmin' &&
             transactions[0].branch_id !== req.user.branch_id) {
-            return res.status(403).json({ error: 'Access denied' });
+            return res.status(403).json({ error: 'Akses ditolak' });
         }
 
         const [items] = await pool.execute(
@@ -95,7 +95,7 @@ router.get('/:id', async (req, res) => {
 
     } catch (error) {
         console.error('Get transaction error:', error);
-        res.status(500).json({ error: 'Failed to fetch transaction' });
+        res.status(500).json({ error: 'Gagal mengambil data transaksi' });
     }
 });
 
@@ -108,7 +108,7 @@ router.post('/', async (req, res) => {
 
     if (!branchId || branchId === 0) {
         return res.status(400).json({
-            error: 'branch_id is required for this transaction'
+            error: 'branch_id wajib diisi untuk transaksi ini'
         });
     }
 
@@ -120,16 +120,16 @@ router.post('/', async (req, res) => {
         const { items, discount = 0, payment_method, payment_amount } = req.body;
 
         if (!items || items.length === 0) {
-            return res.status(400).json({ error: 'Transaction items are required' });
+            return res.status(400).json({ error: 'Item transaksi wajib diisi' });
         }
 
         // Validate all product_ids are positive integers
         for (const item of items) {
             if (!item.product_id || item.product_id <= 0) {
-                return res.status(400).json({ error: `Invalid product_id: ${item.product_id}` });
+                return res.status(400).json({ error: `ID produk tidak valid: ${item.product_id}` });
             }
             if (!item.qty || item.qty <= 0) {
-                return res.status(400).json({ error: `Invalid qty for product ${item.product_id}` });
+                return res.status(400).json({ error: `Jumlah tidak valid untuk produk ${item.product_id}` });
             }
         }
 
@@ -141,12 +141,12 @@ router.post('/', async (req, res) => {
             );
             if (rows.length === 0) {
                 await connection.rollback();
-                return res.status(404).json({ error: `Product ${item.product_id} not found` });
+                return res.status(404).json({ error: `Produk dengan ID ${item.product_id} tidak ditemukan` });
             }
             if (rows[0].stock < item.qty) {
                 await connection.rollback();
                 return res.status(400).json({
-                    error: `Insufficient stock for "${rows[0].name}". Available: ${rows[0].stock}, requested: ${item.qty}`
+                    error: `Stok "${rows[0].name}" tidak mencukupi. Tersedia: ${rows[0].stock}, diminta: ${item.qty}`
                 });
             }
         }
@@ -237,7 +237,7 @@ router.post('/', async (req, res) => {
         }
 
         res.status(201).json({
-            message: 'Transaction created successfully',
+            message: 'Transaksi berhasil dibuat',
             transactionId,
             transaction: transactions[0]
         });
@@ -245,7 +245,7 @@ router.post('/', async (req, res) => {
     } catch (error) {
         await connection.rollback();
         console.error('Create transaction error:', error);
-        res.status(500).json({ error: 'Failed to create transaction' });
+        res.status(500).json({ error: 'Gagal membuat transaksi' });
     } finally {
         connection.release();
     }

@@ -19,7 +19,7 @@ class SettingsPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Pengaturan'),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 1,

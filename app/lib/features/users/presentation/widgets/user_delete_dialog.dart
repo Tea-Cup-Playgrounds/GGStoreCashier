@@ -24,7 +24,7 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
           .read(userManagementProvider.notifier)
           .deleteUser(widget.user['id']);
       if (mounted) {
-        SnackBarService.success('User deleted successfully');
+        SnackBarService.success('Pengguna berhasil dihapus');
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -52,7 +52,7 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
       case 'admin':
         return 'Admin';
       case 'karyawan':
-        return 'Employee';
+        return 'Karyawan';
       default:
         return role;
     }
@@ -88,7 +88,7 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
             const SizedBox(height: 20),
 
             Text(
-              'Delete User',
+              'Hapus Pengguna',
               style: Theme.of(context)
                   .textTheme
                   .headlineSmall
@@ -104,13 +104,13 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
                     .bodyMedium
                     ?.copyWith(color: cs.onSurface.withOpacity(0.6)),
                 children: [
-                  const TextSpan(text: 'Are you sure you want to delete '),
+                  const TextSpan(text: 'Apakah Anda yakin ingin menghapus '),
                   TextSpan(
-                    text: widget.user['name']?.toString() ?? 'this user',
+                    text: widget.user['name']?.toString() ?? 'pengguna ini',
                     style: TextStyle(
                         color: cs.onSurface, fontWeight: FontWeight.w600),
                   ),
-                  const TextSpan(text: '? This action cannot be undone.'),
+                  const TextSpan(text: '? Tindakan ini tidak dapat dibatalkan.'),
                 ],
               ),
             ),
@@ -194,7 +194,7 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
               children: [
                 Expanded(
                   child: CustomButton(
-                    text: 'Cancel',
+                    text: 'Batal',
                     variant: ButtonVariant.outline,
                     fullWidth: true,
                     onPressed: () => Navigator.of(context).pop(),
@@ -203,7 +203,7 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: CustomButton(
-                    text: 'Delete',
+                    text: 'Hapus',
                     fullWidth: true,
                     isLoading: _isLoading,
                     onPressed: _handleDelete,

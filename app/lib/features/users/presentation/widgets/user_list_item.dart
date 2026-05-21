@@ -8,6 +8,7 @@ class UserListItem extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final bool isSuperAdmin;
+  final Widget? trailing;
 
   const UserListItem({
     super.key,
@@ -15,6 +16,7 @@ class UserListItem extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.isSuperAdmin = false,
+    this.trailing,
   });
 
   Color _getRoleColor(String role) {
@@ -89,7 +91,7 @@ class UserListItem extends StatelessWidget {
         Expanded(child: _buildRoleBadge(context)),
         const SizedBox(width: 20),
         Expanded(
-          child: Text(user['branch_name']?.toString() ?? 'No Branch',
+          child: Text(user['branch_name']?.toString() ?? 'Tidak ada cabang',
               style: Theme.of(context).textTheme.bodyMedium),
         ),
         const SizedBox(width: 20),
@@ -101,6 +103,7 @@ class UserListItem extends StatelessWidget {
         ),
         const SizedBox(width: 20),
         _buildActions(context, cs),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
       ],
     );
   }
@@ -182,7 +185,7 @@ class UserListItem extends StatelessWidget {
             if (onDelete != null)
               Expanded(
                 child: CustomButton(
-                  text: 'Delete',
+                  text: 'Hapus',
                   icon: Icons.delete,
                   size: ButtonSize.small,
                   variant: ButtonVariant.outline,
@@ -204,6 +207,7 @@ class UserListItem extends StatelessWidget {
                       textAlign: TextAlign.center),
                 ),
               ),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
           ],
         ),
       ],
@@ -262,7 +266,7 @@ class UserListItem extends StatelessWidget {
         if (onEdit != null && onDelete != null) const SizedBox(width: 8),
         if (onDelete != null)
           CustomButton(
-            text: 'Delete',
+            text: 'Hapus',
             icon: Icons.delete,
             size: ButtonSize.small,
             variant: ButtonVariant.outline,
@@ -275,7 +279,7 @@ class UserListItem extends StatelessWidget {
               color: cs.onSurface.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text('View Only',
+            child: Text('Lihat Saja',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: cs.onSurface.withOpacity(0.5))),
           ),

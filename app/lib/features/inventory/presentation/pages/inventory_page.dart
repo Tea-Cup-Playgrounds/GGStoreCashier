@@ -9,6 +9,9 @@ import 'package:gg_store_cashier/core/provider/realtime_provider.dart';
 import 'package:gg_store_cashier/core/services/product_service.dart';
 import 'package:gg_store_cashier/core/models/product.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
+import 'package:gg_store_cashier/core/services/connectivity_monitor.dart';
+import 'package:gg_store_cashier/core/services/error_handler.dart';
+import 'package:gg_store_cashier/shared/widgets/error_page.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/inventory_header.dart';
@@ -30,6 +33,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   List<Product> _products = [];
   bool _isLoadingProducts = true;
   String? _productsError;
+  bool _isDataStale = false;
 
   ProviderSubscription<RealtimeProductState>? _realtimeSub;
 
@@ -49,16 +53,23 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     });
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadProducts({bool forceRefresh = false}) async {
     setState(() {
       _isLoadingProducts = true;
       _productsError = null;
     });
     try {
-      final products = await ProductService.getProducts();
+      final user = ref.read(authProvider).user;
+      // Non-superadmin users only see their branch's products
+      final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+      final products = await ProductService.getProducts(
+        branchId: branchId,
+        forceRefresh: forceRefresh,
+      );
       setState(() {
         _products = products;
         _isLoadingProducts = false;
+        _isDataStale = ProductService.lastFetchWasStale;
       });
     } catch (e) {
       setState(() {
@@ -71,6 +82,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   @override
   void dispose() {
     _realtimeSub?.close();
+    _connectivitySub?.close();
     searchController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -170,6 +182,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   tabs: const [
                     Tab(text: 'Produk'),
                     Tab(text: 'Kategori'),
+                    Tab(text: 'Produk'),
+                    Tab(text: 'Kategori'),
                   ],
                 ),
               ),
@@ -196,7 +210,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     final cs = Theme.of(context).colorScheme;
 
     return PullToRefresh(
-      onRefresh: _loadProducts,
+      onRefresh: () => _loadProducts(forceRefresh: true),
       child: CustomScrollView(
         slivers: [
           // ── Sticky header ──────────────────────────────────────────
@@ -338,6 +352,7 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
 class _ProductTile extends StatelessWidget {
   final Product product;
   final bool isTablet;
+  final VoidCallback? onReturn;
 
   const _ProductTile({required this.product, this.isTablet = false});
 

@@ -88,6 +88,7 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
             child: const Text('Hapus'),
+            child: const Text('Hapus'),
           ),
         ],
       ),
@@ -102,6 +103,7 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
       ));
       await dio.delete('/api/categories/$id');
       if (mounted) {
+        SnackBarService.success('Kategori berhasil dihapus');
         SnackBarService.success('Kategori berhasil dihapus');
         _loadCategories();
       }

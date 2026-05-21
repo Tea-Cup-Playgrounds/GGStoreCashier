@@ -62,7 +62,7 @@ router.post('/login', async (req, res) => {
         if (!username || !password) {
             console.log('Login failed: Missing credentials');
             return res.status(400).json({ 
-                error: 'Username and password are required' 
+                error: 'Username dan password wajib diisi' 
             });
         }
 
@@ -72,7 +72,7 @@ router.post('/login', async (req, res) => {
             const timeLeft = Math.ceil((attempts.lockedUntil - Date.now()) / 1000 / 60);
             console.log(`Login blocked: User ${username} is locked out for ${timeLeft} minutes`);
             return res.status(429).json({ 
-                error: `Too many failed attempts. Try again in ${timeLeft} minutes.`,
+                error: `Terlalu banyak percobaan gagal. Coba lagi dalam ${timeLeft} menit.`,
                 lockedUntil: attempts.lockedUntil
             });
         }
@@ -91,7 +91,7 @@ router.post('/login', async (req, res) => {
             const remainingAttempts = MAX_ATTEMPTS - attempts.count;
             
             return res.status(401).json({ 
-                error: 'Invalid credentials',
+                error: 'Username atau password salah',
                 remainingAttempts: remainingAttempts > 0 ? remainingAttempts : 0
             });
         }
@@ -108,7 +108,7 @@ router.post('/login', async (req, res) => {
             const remainingAttempts = MAX_ATTEMPTS - attempts.count;
             
             return res.status(401).json({ 
-                error: 'Invalid credentials',
+                error: 'Username atau password salah',
                 remainingAttempts: remainingAttempts > 0 ? remainingAttempts : 0
             });
         }
@@ -137,7 +137,7 @@ router.post('/login', async (req, res) => {
         });
 
         res.json({
-            message: 'Login successful',
+            message: 'Login berhasil',
             user: {
                 id: user.id,
                 name: user.name,
@@ -150,14 +150,14 @@ router.post('/login', async (req, res) => {
 
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Terjadi kesalahan pada server' });
     }
 });
 
 // Logout endpoint
 router.post('/logout', (req, res) => {
     res.clearCookie('token');
-    res.json({ message: 'Logged out successfully' });
+    res.json({ message: 'Berhasil keluar' });
 });
 
 // Get current user endpoint
@@ -166,7 +166,7 @@ router.get('/me', async (req, res) => {
         const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
         
         if (!token) {
-            return res.status(401).json({ error: 'No token provided' });
+            return res.status(401).json({ error: 'Token tidak ditemukan' });
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -177,14 +177,14 @@ router.get('/me', async (req, res) => {
         );
 
         if (users.length === 0) {
-            return res.status(401).json({ error: 'User not found' });
+            return res.status(401).json({ error: 'Pengguna tidak ditemukan' });
         }
 
         res.json({ user: users[0] });
 
     } catch (error) {
         console.error('Get user error:', error);
-        res.status(401).json({ error: 'Invalid token' });
+        res.status(401).json({ error: 'Token tidak valid' });
     }
 });
 

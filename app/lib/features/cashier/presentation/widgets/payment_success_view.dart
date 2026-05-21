@@ -147,7 +147,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                   child: Column(
                     children: [
                       Text(
-                        'Payment Successful',
+                        'Pembayaran Berhasil',
                         style:
                             Theme.of(context).textTheme.displaySmall?.copyWith(
                                   fontWeight: FontWeight.bold,
@@ -156,7 +156,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Transaction completed successfully',
+                        'Transaksi berhasil diselesaikan',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: AppTheme.mutedForeground,
                             ),
@@ -185,7 +185,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                     child: Column(
                       children: [
                         Text(
-                          'Total Paid',
+                          'Total Dibayar',
                           style:
                               Theme.of(context).textTheme.bodyLarge?.copyWith(
                                     color: AppTheme.mutedForeground,
@@ -212,7 +212,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              '${widget.appliedCoupon!['discount']}% off applied (${widget.appliedCoupon!['code']})',
+                              '${widget.appliedCoupon!['discount']}% diskon diterapkan (${widget.appliedCoupon!['code']})',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -226,7 +226,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                         if (widget.transactionId != null) ...[
                           const SizedBox(height: 12),
                           Text(
-                            'Transaction #${widget.transactionId}',
+                            'Transaksi #${widget.transactionId}',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: AppTheme.mutedForeground,
                                 ),
@@ -248,14 +248,14 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                   child: Column(
                     children: [
                       CustomButton(
-                        text: 'New Transaction',
+                        text: 'Transaksi Baru',
                         onPressed: widget.onNewTransaction,
                         fullWidth: true,
                         size: ButtonSize.extraLarge,
                       ),
                       const SizedBox(height: 12),
                       CustomButton(
-                        text: 'Back to Home',
+                        text: 'Kembali ke Beranda',
                         variant: ButtonVariant.outline,
                         icon: Icons.home_outlined,
                         onPressed: () => context.go('/home'),

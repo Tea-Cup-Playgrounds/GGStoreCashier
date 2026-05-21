@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:gg_store_cashier/core/config/api_config.dart';
+import 'package:gg_store_cashier/core/services/auth_service.dart';
 import 'package:gg_store_cashier/core/config/api_config.dart';
 import 'package:gg_store_cashier/core/services/auth_service.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
@@ -117,6 +120,9 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
 
     setState(() => _isSaving = true);
     try {
+      final updatedProduct = _currentProduct!.copyWith(
+        categoryId: _selectedCategoryId,
+      );
       await ProductService.updateProduct(
         product: _currentProduct!.copyWith(categoryId: _selectedCategoryId),
         name: _productNameController.text.trim(),

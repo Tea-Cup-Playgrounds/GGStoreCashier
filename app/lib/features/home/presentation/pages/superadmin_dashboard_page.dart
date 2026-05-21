@@ -1,13 +1,17 @@
 // ignore_for_file: library_private_types_in_public_api
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/analytics_service.dart';
+import '../../../../core/services/connectivity_monitor.dart';
+import '../../../../core/services/location_service.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/helper/date_formatter.dart';
 import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/live_clock.dart';
 
 const _palette = [
   Color(0xFFD4AF37), Color(0xFF6366F1), Color(0xFF10B981),
@@ -36,16 +40,34 @@ class SuperAdminDashboardPage extends ConsumerStatefulWidget {
 
 class _DashState extends ConsumerState<SuperAdminDashboardPage> {
   bool _loading = true;
+  bool _isDataStale = false;
   String? _error;
   Map<String, dynamic>? _summary;
   List<Map<String, dynamic>> _trend = [], _branch = [], _cat = [], _top = [];
   int _trendDays = 30, _catDays = 30;
   String _branchDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
+  StreamSubscription<ConnectivityStatus>? _connectivitySub;
+  ConnectivityStatus? _lastConnectivity;
+
   @override
   void initState() {
     super.initState();
     _load();
+    LocationService.requestPermission();
+    _connectivitySub = ConnectivityMonitor.instance.statusStream.listen((status) {
+      if (_lastConnectivity == ConnectivityStatus.offline &&
+          status == ConnectivityStatus.online) {
+        _load();
+      }
+      _lastConnectivity = status;
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -64,25 +86,33 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
         _branch  = r[2] as List<Map<String, dynamic>>;
         _cat     = r[3] as List<Map<String, dynamic>>;
         _top     = r[4] as List<Map<String, dynamic>>;
+        _isDataStale = false;
         _loading = false;
       });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        if (_summary != null) {
+          // We have previous data — show it as stale instead of error
+          setState(() { _isDataStale = true; _loading = false; });
+        } else {
+          setState(() { _error = e.toString(); _loading = false; });
+        }
+      }
     }
   }
 
   Future<void> _reloadTrend() async {
-    final d = await AnalyticsService.getRevenueTrend(_trendDays);
+    final d = await AnalyticsService.getRevenueTrend(_trendDays, forceRefresh: true);
     if (mounted) setState(() => _trend = d);
   }
 
   Future<void> _reloadBranch() async {
-    final d = await AnalyticsService.getBranchRevenue(_branchDate);
+    final d = await AnalyticsService.getBranchRevenue(_branchDate, forceRefresh: true);
     if (mounted) setState(() => _branch = d);
   }
 
   Future<void> _reloadCat() async {
-    final d = await AnalyticsService.getCategorySales(_catDays);
+    final d = await AnalyticsService.getCategorySales(_catDays, forceRefresh: true);
     if (mounted) setState(() => _cat = d);
   }
 
@@ -99,13 +129,13 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
           const SizedBox(height: 16),
-          Text('Failed to load analytics', style: Theme.of(context).textTheme.titleLarge),
+          Text('Gagal memuat analitik', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(_error!, textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
           const SizedBox(height: 24),
-          ElevatedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Retry')),
+          ElevatedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Coba Lagi')),
         ]),
       ));
     }
@@ -127,8 +157,8 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
                   _buildKpiGrid(),
                   const SizedBox(height: 24),
                   _buildCard(
-                    title: 'Revenue Trend',
-                    subtitle: 'Daily revenue — all branches',
+                    title: 'Tren Pendapatan',
+                    subtitle: 'Pendapatan harian — semua cabang',
                     trailing: _periodDrop(_trendDays, (v) {
                       setState(() => _trendDays = v);
                       _reloadTrend();
@@ -136,40 +166,40 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
                     child: SizedBox(
                       height: 220,
                       child: _trend.isEmpty
-                          ? _emptyState('No revenue data for this period')
+                          ? _emptyState('Tidak ada data pendapatan untuk periode ini')
                           : _TrendChart(data: _trend),
                     ),
                   ),
                   const SizedBox(height: 24),
                   _buildCard(
-                    title: 'Branch Revenue',
-                    subtitle: 'Revenue per branch on selected date',
+                    title: 'Pendapatan per Cabang',
+                    subtitle: 'Pendapatan per cabang pada tanggal yang dipilih',
                     trailing: _datePick(),
                     child: SizedBox(
                       height: 240,
                       child: _branch.isEmpty
-                          ? _emptyState('No branch data')
+                          ? _emptyState('Tidak ada data cabang')
                           : _BranchChart(data: _branch),
                     ),
                   ),
                   const SizedBox(height: 24),
                   _buildCard(
-                    title: 'Sales by Category',
-                    subtitle: 'Most purchased categories',
+                    title: 'Penjualan per Kategori',
+                    subtitle: 'Kategori yang paling banyak dibeli',
                     trailing: _periodDrop(_catDays, (v) {
                       setState(() => _catDays = v);
                       _reloadCat();
                     }),
                     child: _cat.isEmpty
-                        ? SizedBox(height: 160, child: _emptyState('No category data'))
+                        ? SizedBox(height: 160, child: _emptyState('Tidak ada data kategori'))
                         : _PieChart(data: _cat),
                   ),
                   const SizedBox(height: 24),
                   _buildCard(
-                    title: 'Top Products',
-                    subtitle: 'Best sellers — last 30 days',
+                    title: 'Produk Terlaris',
+                    subtitle: 'Penjualan terbaik — 30 hari terakhir',
                     child: _top.isEmpty
-                        ? SizedBox(height: 160, child: _emptyState('No product data'))
+                        ? SizedBox(height: 160, child: _emptyState('Tidak ada data produk'))
                         : _TopChart(data: _top),
                   ),
                 ]),
@@ -184,30 +214,37 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
   Widget _buildHeader(String name) {
     return Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Analytics Dashboard',
+        Text('Dashboard Analitik',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-        Text('Welcome back, $name',
+        Text('Selamat datang, $name',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
       ])),
-      IconButton(onPressed: _load, icon: const Icon(Icons.refresh), tooltip: 'Refresh all'),
+      const LiveClock(),
+      const SizedBox(width: 4),
+      if (_isDataStale)
+        const Tooltip(
+          message: 'Data mungkin tidak terbaru',
+          child: Icon(Icons.cloud_off, size: 14, color: Colors.orange),
+        ),
+      IconButton(onPressed: _load, icon: const Icon(Icons.refresh), tooltip: 'Perbarui semua'),
     ]);
   }
 
   Widget _buildKpiGrid() {
     if (_summary == null) return const SizedBox.shrink();
-    final today = _summary!['today'] as Map;
-    final month = _summary!['month'] as Map;
-    final all   = _summary!['allTime'] as Map;
+    final today = Map<String, dynamic>.from(_summary!['today'] as Map);
+    final month = Map<String, dynamic>.from(_summary!['month'] as Map);
+    final all   = Map<String, dynamic>.from(_summary!['allTime'] as Map);
     final act   = _summary!['activeBranchesToday'];
 
     final items = [
-      _KpiData("Today's Revenue",  CurrencyFormatter.formatToCompactRupiah(_d(today['revenue'])),  Icons.today,                 _palette[0]),
-      _KpiData("Today's Tx",       '${today['transactions']}',                                      Icons.receipt_outlined,      _palette[1]),
-      _KpiData("Month Revenue",    CurrencyFormatter.formatToCompactRupiah(_d(month['revenue'])),   Icons.calendar_month,        _palette[2]),
-      _KpiData("Active Branches",  '$act',                                                           Icons.store_outlined,        _palette[3]),
-      _KpiData("All-time Revenue", CurrencyFormatter.formatToCompactRupiah(_d(all['revenue'])),     Icons.bar_chart,             _palette[5]),
-      _KpiData("All-time Tx",      '${all['transactions']}',                                         Icons.shopping_bag_outlined, _palette[6]),
+      _KpiData("Pendapatan Hari Ini",  CurrencyFormatter.formatToCompactRupiah(_d(today['revenue'])),  Icons.today,                 _palette[0]),
+      _KpiData("Transaksi Hari Ini",   '${today['transactions']}',                                      Icons.receipt_outlined,      _palette[1]),
+      _KpiData("Pendapatan Bulan Ini", CurrencyFormatter.formatToCompactRupiah(_d(month['revenue'])),   Icons.calendar_month,        _palette[2]),
+      _KpiData("Cabang Aktif",         '$act',                                                           Icons.store_outlined,        _palette[3]),
+      _KpiData("Total Pendapatan",     CurrencyFormatter.formatToCompactRupiah(_d(all['revenue'])),     Icons.bar_chart,             _palette[5]),
+      _KpiData("Total Transaksi",      '${all['transactions']}',                                         Icons.shopping_bag_outlined, _palette[6]),
     ];
 
     return GridView.builder(

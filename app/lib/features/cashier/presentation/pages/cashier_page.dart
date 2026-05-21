@@ -4,11 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
 import '../../../../core/models/cart_item.dart';
+import '../../../../core/models/transaction_model.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/services/product_service.dart';
 import '../../../../core/services/voucher_service.dart';
+import '../../../../core/services/connectivity_monitor.dart';
+import '../../../../core/services/offline_queue.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/provider/auth_provider.dart';
@@ -43,6 +46,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   bool _isProcessingPayment = false;
   int? _lastTransactionId;
   String _selectedPaymentMethod = 'cash';
+  String _transactionUuid = const Uuid().v4();
 
   // Products state
   List<Product> _products = [];
@@ -52,13 +56,16 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   late AnimationController _viewAnimationController;
   ProviderSubscription<RealtimeProductState>? _realtimeSub;
 
-  // Payment methods — only cash is active for now
-  final List<Map<String, dynamic>> _paymentMethods = [
-    {'value': 'cash', 'label': 'Cash', 'icon': Icons.payments_outlined, 'enabled': true},
-    {'value': 'card', 'label': 'Card', 'icon': Icons.credit_card, 'enabled': false},
-    {'value': 'transfer', 'label': 'Bank Transfer', 'icon': Icons.account_balance, 'enabled': false},
-    {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet, 'enabled': false},
-  ];
+  // Payment methods — cash always enabled; card/transfer/e-wallet require connectivity
+  List<Map<String, dynamic>> get _paymentMethods {
+    final isOffline = ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
+    return [
+      {'value': 'cash', 'label': 'Tunai', 'icon': Icons.payments_outlined, 'enabled': true},
+      {'value': 'card', 'label': 'Kartu', 'icon': Icons.credit_card, 'enabled': !isOffline},
+      {'value': 'transfer', 'label': 'Transfer Bank', 'icon': Icons.account_balance, 'enabled': !isOffline},
+      {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet, 'enabled': !isOffline},
+    ];
+  }
 
   @override
   void initState() {
@@ -78,14 +85,19 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     });
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadProducts({bool forceRefresh = false}) async {
     setState(() {
       _isLoadingProducts = true;
       _productsError = null;
     });
 
     try {
-      final products = await ProductService.getProducts();
+      final user = ref.read(authProvider).user;
+      final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+      final products = await ProductService.getProducts(
+        branchId: branchId,
+        forceRefresh: forceRefresh,
+      );
       setState(() {
         _products = products;
         _isLoadingProducts = false;
@@ -98,6 +110,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            content: Text('Gagal memuat produk: $e'),
             content: Text('Gagal memuat produk: $e'),
             backgroundColor: AppTheme.destructive,
             behavior: SnackBarBehavior.floating,
@@ -212,11 +225,14 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     setState(() {
       final index = _cart.indexWhere((item) => item.id == id);
       if (index >= 0) {
-        final newQuantity = _cart[index].quantity + delta;
+        final item = _cart[index];
+        final newQuantity = item.quantity + delta;
         if (newQuantity <= 0) {
           _cart.removeAt(index);
         } else {
-          _cart[index] = _cart[index].copyWith(quantity: newQuantity);
+          // Cap at available stock
+          final capped = newQuantity.clamp(1, item.product.stock);
+          _cart[index] = item.copyWith(quantity: capped);
         }
       }
     });
@@ -249,7 +265,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
           _currentView = CashierView.cart;
         });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Voucher $code applied!'),
+          content: Text('Voucher $code berhasil diterapkan!'),
           backgroundColor: AppTheme.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -260,8 +276,8 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
         setState(() => _isApplyingCoupon = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e is DioException
-              ? (e.response?.data?['error'] ?? 'Invalid or expired voucher')
-              : 'Invalid or expired voucher'),
+              ? (e.response?.data?['error'] ?? 'Voucher tidak valid atau sudah kadaluarsa')
+              : 'Voucher tidak valid atau sudah kadaluarsa'),
           backgroundColor: AppTheme.destructive,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -278,12 +294,56 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       final pid = int.tryParse(item.product.id);
       if (pid == null || pid <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Invalid product ID for "${item.product.name}"'),
+          content: Text('ID produk tidak valid untuk "${item.product.name}"'),
           backgroundColor: AppTheme.destructive,
           behavior: SnackBarBehavior.floating,
         ));
         return;
       }
+    }
+
+    // Check connectivity — route offline transactions to the local queue
+    if (ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline) {
+      final user = ref.read(authProvider).user;
+      final items = _cart
+          .map((item) => {
+                'product_id': int.parse(item.product.id),
+                'qty': item.quantity,
+                'price': item.price,
+              })
+          .toList();
+
+      final branchId = user?.isSuperAdmin == true
+          ? _cart.first.product.branchId
+          : user?.branchId;
+
+      final transaction = TransactionModel(
+        uuid: _transactionUuid,
+        items: items,
+        discount: _discount,
+        paymentMethod: method,
+        total: _total,
+        branchId: branchId,
+        createdAt: DateTime.now(),
+      );
+
+      final entry = OfflineTransactionEntry()
+        ..uuid = transaction.uuid
+        ..payload = transaction.toHiveMap()
+        ..createdAt = transaction.createdAt
+        ..retryCount = 0
+        ..status = 'pending';
+
+      await OfflineQueue.enqueue(entry);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Transaksi disimpan — akan dikirim saat online'),
+          behavior: SnackBarBehavior.floating,
+        ));
+        _resetTransaction();
+      }
+      return;
     }
 
     setState(() => _isProcessingPayment = true);
@@ -335,7 +395,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessingPayment = false);
-        String msg = 'Payment failed';
+        String msg = 'Pembayaran gagal';
         if (e is DioException && e.response?.data != null) {
           msg = e.response!.data['error'] ?? msg;
         }
@@ -354,6 +414,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       _appliedCoupon = null;
       _couponController.clear();
       _currentView = CashierView.products;
+      _transactionUuid = const Uuid().v4();
     });
   }
 
@@ -385,6 +446,18 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   Widget build(BuildContext context) {
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
+
+    // Watch connectivity — triggers rebuild when status changes and gates payment methods
+    final connectivityAsync = ref.watch(connectivityProvider);
+    final connectivityStatus = connectivityAsync.valueOrNull ?? ConnectivityMonitor.instance.currentStatus;
+
+    // If offline and an online-only method is selected, reset to cash
+    if (connectivityStatus == ConnectivityStatus.offline &&
+        _selectedPaymentMethod != 'cash') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedPaymentMethod = 'cash');
+      });
+    }
 
     if (_currentView == CashierView.success) {
       return PaymentSuccessView(
@@ -479,6 +552,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                       controller: _searchController,
                       decoration: const InputDecoration(
                         hintText: 'Cari produk...',
+                        hintText: 'Cari produk...',
                         prefixIcon: Icon(Icons.search),
                       ),
                       onChanged: (value) => setState(() {}),
@@ -493,7 +567,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                               children: [
                                 CircularProgressIndicator(color: AppTheme.gold),
                                 SizedBox(height: 16),
-                                Text('Loading products...'),
+                                Text('Memuat produk...'),
                               ],
                             ),
                           )
@@ -509,8 +583,10 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                                     ),
                                     const SizedBox(height: 16),
                                     const Text('Gagal memuat produk'),
+                                    const Text('Gagal memuat produk'),
                                     const SizedBox(height: 16),
                                     CustomButton(
+                                      text: 'Coba Lagi',
                                       text: 'Coba Lagi',
                                       icon: Icons.refresh,
                                       onPressed: _loadProducts,
@@ -542,7 +618,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                                     ),
                                   )
                                 : PullToRefresh(
-                                    onRefresh: _loadProducts,
+                                    onRefresh: () => _loadProducts(forceRefresh: true),
                                     child: GridView.builder(
                                       padding: const EdgeInsets.all(16),
                                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -591,13 +667,14 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                       children: [
                         Text(
                           'Ringkasan Pesanan',
+                          'Ringkasan Pesanan',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
                         if (_cart.isNotEmpty)
                           Text(
-                            '${_cart.fold(0, (sum, item) => sum + item.quantity)} items',
+                            '${_cart.fold(0, (sum, item) => sum + item.quantity)} item',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: AppTheme.mutedForeground,
                                 ),
@@ -640,6 +717,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                                 onIncrease: (id) => _updateCartItemQuantity(id, 1),
                                 onDecrease: (id) => _updateCartItemQuantity(id, -1),
                                 onRemove: _removeFromCart,
+                                maxQuantity: item.product.stock,
                               );
                             },
                           ),
@@ -705,7 +783,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         const Text(
-                                          'Discount',
+                                          'Diskon',
                                           style: TextStyle(color: AppTheme.success),
                                         ),
                                         Text(
@@ -799,6 +877,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                             // Tombol Proses Pembayaran
                             CustomButton(
                               text: 'Proses Pembayaran',
+                              text: 'Proses Pembayaran',
                               icon: Icons.check_circle_outline,
                               onPressed: _isProcessingPayment ? null : () => _processPayment(_selectedPaymentMethod),
                               isLoading: _isProcessingPayment,
@@ -834,9 +913,12 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
         return 'Penjualan Baru';
       case CashierView.cart:
         return 'Keranjang';
+        return 'Keranjang';
       case CashierView.coupon:
         return 'Terapkan Voucher';
+        return 'Terapkan Voucher';
       case CashierView.success:
+        return 'Pembayaran Berhasil';
         return 'Pembayaran Berhasil';
     }
   }
@@ -954,7 +1036,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     }
 
     return PullToRefresh(
-      onRefresh: _loadProducts,
+      onRefresh: () => _loadProducts(forceRefresh: true),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: GridView.builder(
@@ -982,21 +1064,21 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       children: [
         Expanded(
           child: _cart.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.shopping_cart_outlined,
                         size: 64,
-                        color: AppTheme.mutedForeground,
+                        color: AppTheme.mutedForeground.withOpacity(0.5),
                       ),
                       SizedBox(height: 16),
                       Text(
                         'Keranjang kosong',
                         style: TextStyle(
                           color: AppTheme.mutedForeground,
-                          fontSize: 16,
+                          fontSize: 18,
                         ),
                       ),
                     ],
@@ -1005,6 +1087,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: _cart.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
                   separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = _cart[index];
@@ -1024,11 +1107,11 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                     );
                   },
                 ),
-        ),
-        if (_cart.isNotEmpty) _buildCartSummary(),
-      ],
-    );
-  }
+          ),
+          if (_cart.isNotEmpty) _buildCartSummary(),
+        ],
+      );
+    }
 
   Widget _buildCartSummary() {
     final cs = Theme.of(context).colorScheme;

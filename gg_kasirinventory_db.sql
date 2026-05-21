@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Apr 02, 2026 at 11:22 AM
+-- Generation Time: Apr 03, 2026 at 02:20 AM
 -- Server version: 8.0.30
 -- PHP Version: 8.1.10
 
@@ -140,6 +140,7 @@ CREATE TABLE `stock_movements` (
 
 CREATE TABLE `transactions` (
   `id` int NOT NULL,
+  `uuid` varchar(255) DEFAULT NULL,
   `user_id` int NOT NULL,
   `branch_id` int NOT NULL,
   `total_amount` decimal(12,2) NOT NULL,
@@ -193,7 +194,7 @@ INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `branch_id`, 
 (4, 'Kroco 1', 'kroco1', '$2b$12$0pZIlcdAgmXOgpaM2jLYX.MMizLVAJDTwdsf3HZpG6qHTLHs8s8mu', 'karyawan', 1, '2025-09-26 11:04:07', '2026-02-03 15:47:53'),
 (5, 'Kroco 2', 'kroco2', '$2b$12$UGJzu61DCfmxl.e8U9vRfuy0VVKH0n4i4iJWiCy9b/JtypulmcLza', 'karyawan', 2, '2025-09-26 11:04:07', '2026-02-03 15:47:53'),
 (6, 'Karyawan Testing', 'karyawantesting1', '$2b$12$W3YaLIp4M2devPpicLbNYuSl97Vm3XG/kaQFZx6AhQTCZTnexu46K', 'karyawan', 1, '2026-02-06 10:52:23', '2026-02-06 16:29:42'),
-(7, 'papa zola', 'PapaZola', '$2b$12$mIWpwRTT7HeiDNb6XaPgx.bOzuAKevDsZ5ekXuY/gGRg9CGYUi.Uq', 'karyawan', 2, '2026-03-30 18:41:56', '2026-03-30 18:43:58');
+(7, 'papa zola', 'PapaZola', '$2b$12$mIWpwRTT7HeiDNb6XaPgx.bOzuAKevDsZ5ekXuY/gGRg9CGYUi.Uq', 'admin', 2, '2026-03-30 18:41:56', '2026-04-03 08:33:42');
 
 -- --------------------------------------------------------
 
@@ -277,6 +278,7 @@ ALTER TABLE `stock_movements`
 --
 ALTER TABLE `transactions`
   ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uuid` (`uuid`),
   ADD KEY `idx_transactions_user` (`user_id`),
   ADD KEY `idx_transactions_branch` (`branch_id`);
 

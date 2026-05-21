@@ -81,6 +81,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
       setState(() => _isLoadingData = false);
       if (mounted) {
         SnackBarService.error('Gagal memuat data: ${e.toString()}');
+        SnackBarService.error('Gagal memuat data: ${e.toString()}');
       }
     }
   }
@@ -94,6 +95,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
     }
 
     if (_selectedBranchId == null) {
+      SnackBarService.error('Pilih cabang terlebih dahulu');
       SnackBarService.error('Pilih cabang terlebih dahulu');
       return;
     }
@@ -168,6 +170,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
       if (response.statusCode == 201) {
         if (mounted) {
           SnackBarService.success('Produk berhasil ditambahkan');
+          SnackBarService.success('Produk berhasil ditambahkan');
           context.pop();
         }
       }
@@ -180,6 +183,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
         debugPrint('[AddProduct] response data: ${e.response?.data}');
       }
       if (mounted) {
+        String errorMessage = 'Gagal menambahkan produk';
         String errorMessage = 'Gagal menambahkan produk';
         if (e is DioException && e.response?.data != null) {
           errorMessage = e.response!.data['error'] ?? errorMessage;
@@ -246,6 +250,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Nama produk wajib diisi';
+                          return 'Nama produk wajib diisi';
                         }
                         return null;
                       },
@@ -287,6 +292,8 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                     SearchableDropdown<int>(
                       label: 'Kategori (Opsional)',
                       hintText: 'Pilih kategori',
+                      label: 'Kategori (Opsional)',
+                      hintText: 'Pilih kategori',
                       value: _selectedCategoryId,
                       items: _categories
                           .map((category) => DropdownItem<int>(
@@ -312,8 +319,10 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Stok wajib diisi';
+                                return 'Stok wajib diisi';
                               }
                               if (int.tryParse(value) == null) {
+                                return 'Angka tidak valid';
                                 return 'Angka tidak valid';
                               }
                               return null;
@@ -331,9 +340,11 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Harga wajib diisi';
+                                return 'Harga wajib diisi';
                               }
                               final price = RupiahInputFormatter.parseRupiahAsDouble(value);
                               if (price == null || price <= 0) {
+                                return 'Harga tidak valid';
                                 return 'Harga tidak valid';
                               }
                               return null;
