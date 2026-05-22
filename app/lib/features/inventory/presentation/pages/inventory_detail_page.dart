@@ -1,9 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:gg_store_cashier/core/config/api_config.dart';
-import 'package:gg_store_cashier/core/services/auth_service.dart';
 import 'package:gg_store_cashier/core/config/api_config.dart';
 import 'package:gg_store_cashier/core/services/auth_service.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
@@ -19,11 +16,7 @@ class InventoryDetailPage extends StatefulWidget {
   final String productId;
   final bool isNewItem;
 
-  const InventoryDetailPage({
-    super.key,
-    required this.productId,
-    this.isNewItem = false,
-  });
+  const InventoryDetailPage({super.key, required this.productId, this.isNewItem = false});
 
   @override
   State<InventoryDetailPage> createState() => _InventoryDetailPageState();
@@ -39,7 +32,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   bool _isDeleting = false;
   Product? _currentProduct;
 
-  // Category dropdown
   List<DropdownItem<int>> _categoryItems = [];
   int? _selectedCategoryId;
   bool _isLoadingCategories = false;
@@ -58,7 +50,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     _stockController = TextEditingController();
     _priceController = TextEditingController();
     _descriptionController = TextEditingController();
-
     _loadCategories();
     if (!widget.isNewItem) {
       _loadProductData();
@@ -77,18 +68,17 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
       ));
       final res = await dio.get('/api/categories');
       final list = res.data['categories'] as List;
-      setState(() {
-        _categoryItems = list
-            .map((e) => DropdownItem<int>(
-                  value: e['id'] as int,
-                  label: e['name'].toString(),
-                  icon: Icons.category_outlined,
-                ))
-            .toList();
-        _isLoadingCategories = false;
-      });
+      if (mounted) {
+        setState(() {
+          _categoryItems = list
+              .map((e) =>
+                  DropdownItem<int>(value: e['id'] as int, label: e['name'].toString(), icon: Icons.category_outlined))
+              .toList();
+          _isLoadingCategories = false;
+        });
+      }
     } catch (_) {
-      setState(() => _isLoadingCategories = false);
+      if (mounted) setState(() => _isLoadingCategories = false);
     }
   }
 
@@ -96,19 +86,21 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     try {
       setState(() => _isLoading = true);
       final product = await ProductService.getProductDetail(int.parse(widget.productId));
-      setState(() {
-        _currentProduct = product;
-        _productNameController.text = product.name;
-        _skuController.text = product.barcode ?? '';
-        _stockController.text = product.stock.toString();
-        _priceController.text = product.sellPrice.toString();
-        _descriptionController.text = product.description ?? '';
-        _imageUrl = ProductService.getProductImageUrl(product.image);
-        _selectedCategoryId = product.categoryId;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _currentProduct = product;
+          _productNameController.text = product.name;
+          _skuController.text = product.barcode ?? '';
+          _stockController.text = product.stock.toString();
+          _priceController.text = product.sellPrice.toString();
+          _descriptionController.text = product.description ?? '';
+          _imageUrl = ProductService.getProductImageUrl(product.image);
+          _selectedCategoryId = product.categoryId;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       SnackBarService.error('Gagal memuat detail produk: $e');
       if (mounted) Navigator.of(context).pop();
     }
@@ -120,9 +112,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
 
     setState(() => _isSaving = true);
     try {
-      final updatedProduct = _currentProduct!.copyWith(
-        categoryId: _selectedCategoryId,
-      );
       await ProductService.updateProduct(
         product: _currentProduct!.copyWith(categoryId: _selectedCategoryId),
         name: _productNameController.text.trim(),
@@ -143,17 +132,13 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
 
   Future<void> _confirmDelete() async {
     if (_currentProduct == null) return;
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Hapus Produk'),
         content: Text('Hapus "${_currentProduct!.name}"? Tindakan ini tidak dapat dibatalkan.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
@@ -162,7 +147,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
         ],
       ),
     );
-
     if (confirmed != true || !mounted) return;
 
     setState(() => _isDeleting = true);
@@ -194,14 +178,9 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     return Scaffold(
       backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          widget.isNewItem ? 'Tambah Produk' : 'Edit Produk',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.of(context).pop()),
+        title: Text(widget.isNewItem ? 'Tambah Produk' : 'Edit Produk',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600)),
         backgroundColor: cs.surface,
         elevation: 0,
         scrolledUnderElevation: 1,
@@ -211,16 +190,13 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                 ? const Padding(
                     padding: EdgeInsets.all(12),
                     child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.destructive),
-                    ),
-                  )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.destructive)))
                 : IconButton(
                     icon: const Icon(Icons.delete_outline, color: AppTheme.destructive),
                     tooltip: 'Hapus Produk',
-                    onPressed: _confirmDelete,
-                  ),
+                    onPressed: _confirmDelete),
           const SizedBox(width: 4),
         ],
       ),
@@ -233,59 +209,43 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Gambar ──────────────────────────────────────────
                     ImageInput(
-                      file: _pickedImage,
-                      imageUrl: _imageUrl,
-                      label: 'Gambar Produk',
-                      onChanged: (file) => setState(() => _pickedImage = file),
-                    ),
+                        file: _pickedImage,
+                        imageUrl: _imageUrl,
+                        label: 'Gambar Produk',
+                        onChanged: (file) => setState(() => _pickedImage = file)),
                     const SizedBox(height: 24),
-
-                    // ── Nama Produk ──────────────────────────────────────
                     TextInput(
                       label: 'Nama Produk *',
                       hintText: 'Masukkan nama produk',
                       controller: _productNameController,
                       prefixIcon: Icons.inventory_2_outlined,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Nama produk wajib diisi';
-                        }
+                        if (v == null || v.trim().isEmpty) return 'Nama produk wajib diisi';
                         if (v.trim().length < 2) return 'Minimal 2 karakter';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    // ── SKU ──────────────────────────────────────────────
                     TextInput(
-                      label: 'SKU / Barcode',
-                      hintText: 'Masukkan SKU',
-                      controller: _skuController,
-                      prefixIcon: Icons.qr_code_outlined,
-                    ),
+                        label: 'SKU / Barcode',
+                        hintText: 'Masukkan SKU',
+                        controller: _skuController,
+                        prefixIcon: Icons.qr_code_outlined),
                     const SizedBox(height: 16),
-
-                    // ── Kategori (dropdown) ──────────────────────────────
                     _isLoadingCategories
                         ? Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              border: Border.all(color: cs.outlineVariant),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Row(
-                              children: [
-                                SizedBox(
+                                border: Border.all(color: cs.outlineVariant), borderRadius: BorderRadius.circular(12)),
+                            child: const Row(children: [
+                              SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold),
-                                ),
-                                SizedBox(width: 10),
-                                Text('Memuat kategori...'),
-                              ],
-                            ),
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold)),
+                              SizedBox(width: 10),
+                              Text('Memuat kategori...')
+                            ]),
                           )
                         : SearchableDropdown<int>(
                             label: 'Kategori (Opsional)',
@@ -296,8 +256,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                             onChanged: (v) => setState(() => _selectedCategoryId = v),
                           ),
                     const SizedBox(height: 16),
-
-                    // ── Stok & Harga ─────────────────────────────────────
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -309,12 +267,8 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                             controller: _stockController,
                             prefixIcon: Icons.numbers_outlined,
                             validator: (v) {
-                              if (v == null || v.trim().isEmpty) {
-                                return 'Stok wajib diisi';
-                              }
-                              if (int.tryParse(v.trim()) == null) {
-                                return 'Angka tidak valid';
-                              }
+                              if (v == null || v.trim().isEmpty) return 'Stok wajib diisi';
+                              if (int.tryParse(v.trim()) == null) return 'Angka tidak valid';
                               return null;
                             },
                           ),
@@ -328,13 +282,9 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                             controller: _priceController,
                             prefixIcon: Icons.attach_money_outlined,
                             validator: (v) {
-                              if (v == null || v.trim().isEmpty) {
-                                return 'Harga wajib diisi';
-                              }
+                              if (v == null || v.trim().isEmpty) return 'Harga wajib diisi';
                               final n = double.tryParse(v.trim());
-                              if (n == null || n < 0) {
-                                return 'Harga tidak valid';
-                              }
+                              if (n == null || n < 0) return 'Harga tidak valid';
                               return null;
                             },
                           ),
@@ -342,25 +292,19 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    // ── Deskripsi ────────────────────────────────────────
                     TextInput(
-                      label: 'Deskripsi (Opsional)',
-                      hintText: 'Tambahkan deskripsi produk',
-                      controller: _descriptionController,
-                      maxLines: 4,
-                      prefixIcon: Icons.description_outlined,
-                    ),
+                        label: 'Deskripsi (Opsional)',
+                        hintText: 'Tambahkan deskripsi produk',
+                        controller: _descriptionController,
+                        maxLines: 4,
+                        prefixIcon: Icons.description_outlined),
                     const SizedBox(height: 32),
-
-                    // ── Simpan ───────────────────────────────────────────
                     CustomButton(
-                      text: 'Simpan Perubahan',
-                      size: ButtonSize.large,
-                      isLoading: _isSaving,
-                      onPressed: _isSaving ? null : _saveChanges,
-                      fullWidth: true,
-                    ),
+                        text: 'Simpan Perubahan',
+                        size: ButtonSize.large,
+                        isLoading: _isSaving,
+                        onPressed: _isSaving ? null : _saveChanges,
+                        fullWidth: true),
                   ],
                 ),
               ),

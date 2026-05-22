@@ -69,8 +69,6 @@ class _VoucherManagementPageState extends ConsumerState<VoucherManagementPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Hapus Voucher'),
         content: Text('Hapus voucher "${v.code}"? Tindakan ini tidak dapat dibatalkan.'),
-        title: const Text('Hapus Voucher'),
-        content: Text('Hapus voucher "${v.code}"? Tindakan ini tidak dapat dibatalkan.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -107,7 +105,6 @@ class _VoucherManagementPageState extends ConsumerState<VoucherManagementPage> {
     return Scaffold(
       backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
-        title: const Text('Manajemen Voucher'),
         title: const Text('Manajemen Voucher'),
         backgroundColor: cs.surface,
         elevation: 0,

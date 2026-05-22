@@ -136,24 +136,13 @@ class AuthService {
   }
 
   // Check if user is authenticated
+  // Uses local token check only — fast and offline-safe.
+  // Background token validation happens via AuthGuard on navigation.
   static Future<bool> isAuthenticated() async {
     try {
       final token = await getToken();
-      if (token == null) return false;
-
-      final response = await _dio.get(
-        '/api/auth/me',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-      );
-
-      return response.statusCode == 200;
+      return token != null;
     } catch (e) {
-      await logout();
       return false;
     }
   }

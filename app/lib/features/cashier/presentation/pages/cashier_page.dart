@@ -25,6 +25,7 @@ import '../widgets/cart_item_widget.dart';
 import '../widgets/coupon_card.dart';
 import '../widgets/payment_success_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 enum CashierView { products, cart, coupon, success }
 
@@ -110,7 +111,6 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal memuat produk: $e'),
             content: Text('Gagal memuat produk: $e'),
             backgroundColor: AppTheme.destructive,
             behavior: SnackBarBehavior.floating,
@@ -313,9 +313,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
               })
           .toList();
 
-      final branchId = user?.isSuperAdmin == true
-          ? _cart.first.product.branchId
-          : user?.branchId;
+      final branchId = user?.isSuperAdmin == true ? _cart.first.product.branchId : user?.branchId;
 
       final transaction = TransactionModel(
         uuid: _transactionUuid,
@@ -452,8 +450,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     final connectivityStatus = connectivityAsync.valueOrNull ?? ConnectivityMonitor.instance.currentStatus;
 
     // If offline and an online-only method is selected, reset to cash
-    if (connectivityStatus == ConnectivityStatus.offline &&
-        _selectedPaymentMethod != 'cash') {
+    if (connectivityStatus == ConnectivityStatus.offline && _selectedPaymentMethod != 'cash') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _selectedPaymentMethod = 'cash');
       });
@@ -552,7 +549,6 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                       controller: _searchController,
                       decoration: const InputDecoration(
                         hintText: 'Cari produk...',
-                        hintText: 'Cari produk...',
                         prefixIcon: Icon(Icons.search),
                       ),
                       onChanged: (value) => setState(() {}),
@@ -583,10 +579,8 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                                     ),
                                     const SizedBox(height: 16),
                                     const Text('Gagal memuat produk'),
-                                    const Text('Gagal memuat produk'),
                                     const SizedBox(height: 16),
                                     CustomButton(
-                                      text: 'Coba Lagi',
                                       text: 'Coba Lagi',
                                       icon: Icons.refresh,
                                       onPressed: _loadProducts,
@@ -667,7 +661,6 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                       children: [
                         Text(
                           'Ringkasan Pesanan',
-                          'Ringkasan Pesanan',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -717,7 +710,6 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                                 onIncrease: (id) => _updateCartItemQuantity(id, 1),
                                 onDecrease: (id) => _updateCartItemQuantity(id, -1),
                                 onRemove: _removeFromCart,
-                                maxQuantity: item.product.stock,
                               );
                             },
                           ),
@@ -877,7 +869,6 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                             // Tombol Proses Pembayaran
                             CustomButton(
                               text: 'Proses Pembayaran',
-                              text: 'Proses Pembayaran',
                               icon: Icons.check_circle_outline,
                               onPressed: _isProcessingPayment ? null : () => _processPayment(_selectedPaymentMethod),
                               isLoading: _isProcessingPayment,
@@ -913,12 +904,9 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
         return 'Penjualan Baru';
       case CashierView.cart:
         return 'Keranjang';
-        return 'Keranjang';
       case CashierView.coupon:
         return 'Terapkan Voucher';
-        return 'Terapkan Voucher';
       case CashierView.success:
-        return 'Pembayaran Berhasil';
         return 'Pembayaran Berhasil';
     }
   }
@@ -1071,10 +1059,10 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                       Icon(
                         Icons.shopping_cart_outlined,
                         size: 64,
-                        color: AppTheme.mutedForeground.withOpacity(0.5),
+                        color: AppTheme.mutedForeground.withValues(alpha: 0.5),
                       ),
-                      SizedBox(height: 16),
-                      Text(
+                      const SizedBox(height: 16),
+                      const Text(
                         'Keranjang kosong',
                         style: TextStyle(
                           color: AppTheme.mutedForeground,
@@ -1087,7 +1075,6 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: _cart.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
                   separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = _cart[index];
@@ -1107,11 +1094,11 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                     );
                   },
                 ),
-          ),
-          if (_cart.isNotEmpty) _buildCartSummary(),
-        ],
-      );
-    }
+        ),
+        if (_cart.isNotEmpty) _buildCartSummary(),
+      ],
+    );
+  }
 
   Widget _buildCartSummary() {
     final cs = Theme.of(context).colorScheme;

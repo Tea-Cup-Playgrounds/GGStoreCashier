@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart';
-import '../../../../core/models/product.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_search_bar.dart';
 

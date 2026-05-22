@@ -9,9 +9,6 @@ import 'package:gg_store_cashier/core/provider/realtime_provider.dart';
 import 'package:gg_store_cashier/core/services/product_service.dart';
 import 'package:gg_store_cashier/core/models/product.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
-import 'package:gg_store_cashier/core/services/connectivity_monitor.dart';
-import 'package:gg_store_cashier/core/services/error_handler.dart';
-import 'package:gg_store_cashier/shared/widgets/error_page.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/inventory_header.dart';
@@ -33,7 +30,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   List<Product> _products = [];
   bool _isLoadingProducts = true;
   String? _productsError;
-  bool _isDataStale = false;
 
   ProviderSubscription<RealtimeProductState>? _realtimeSub;
 
@@ -53,36 +49,32 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     });
   }
 
-  Future<void> _loadProducts({bool forceRefresh = false}) async {
+  Future<void> _loadProducts() async {
     setState(() {
       _isLoadingProducts = true;
       _productsError = null;
     });
     try {
-      final user = ref.read(authProvider).user;
-      // Non-superadmin users only see their branch's products
-      final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
-      final products = await ProductService.getProducts(
-        branchId: branchId,
-        forceRefresh: forceRefresh,
-      );
-      setState(() {
-        _products = products;
-        _isLoadingProducts = false;
-        _isDataStale = ProductService.lastFetchWasStale;
-      });
+      final products = await ProductService.getProducts();
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _isLoadingProducts = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _productsError = e.toString();
-        _isLoadingProducts = false;
-      });
+      if (mounted) {
+        setState(() {
+          _productsError = e.toString();
+          _isLoadingProducts = false;
+        });
+      }
     }
   }
 
   @override
   void dispose() {
     _realtimeSub?.close();
-    _connectivitySub?.close();
     searchController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -128,14 +120,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
           constraints: const BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
           child: Column(
             children: [
-              // ── App bar ──────────────────────────────────────────────
               Container(
                 padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 8),
                 decoration: BoxDecoration(
                   color: cs.surface,
-                  border: Border(
-                    bottom: BorderSide(color: cs.outlineVariant, width: 0.8),
-                  ),
+                  border: Border(bottom: BorderSide(color: cs.outlineVariant, width: 0.8)),
                 ),
                 child: SafeArea(
                   bottom: false,
@@ -143,9 +132,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                     children: [
                       Text(
                         'Inventory',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const Spacer(),
                       if (!isKaryawan)
@@ -169,8 +156,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   ),
                 ),
               ),
-
-              // ── Tab bar ──────────────────────────────────────────────
               Container(
                 color: cs.surface,
                 child: TabBar(
@@ -182,13 +167,9 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   tabs: const [
                     Tab(text: 'Produk'),
                     Tab(text: 'Kategori'),
-                    Tab(text: 'Produk'),
-                    Tab(text: 'Kategori'),
                   ],
                 ),
               ),
-
-              // ── Tab views ────────────────────────────────────────────
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
@@ -210,10 +191,9 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     final cs = Theme.of(context).colorScheme;
 
     return PullToRefresh(
-      onRefresh: () => _loadProducts(forceRefresh: true),
+      onRefresh: _loadProducts,
       child: CustomScrollView(
         slivers: [
-          // ── Sticky header ──────────────────────────────────────────
           SliverPersistentHeader(
             pinned: true,
             delegate: _HeaderDelegate(
@@ -228,8 +208,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
               ),
             ),
           ),
-
-          // ── Loading ────────────────────────────────────────────────
           if (_isLoadingProducts)
             SliverFillRemaining(
               child: Center(
@@ -238,18 +216,12 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   children: [
                     const CircularProgressIndicator(color: AppTheme.gold),
                     const SizedBox(height: 16),
-                    Text(
-                      'Memuat produk...',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                    ),
+                    Text('Memuat produk...',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                   ],
                 ),
               ),
             )
-
-          // ── Error ──────────────────────────────────────────────────
           else if (_productsError != null)
             SliverFillRemaining(
               child: Center(
@@ -262,13 +234,9 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                       const SizedBox(height: 16),
                       Text('Gagal memuat produk', style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      Text(
-                        _productsError!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
+                      Text(_productsError!,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          textAlign: TextAlign.center),
                       const SizedBox(height: 20),
                       ElevatedButton.icon(
                         onPressed: _loadProducts,
@@ -281,64 +249,44 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                 ),
               ),
             )
-
-          // ── Empty ──────────────────────────────────────────────────
           else if (filtered.isEmpty)
             SliverFillRemaining(
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: 56,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.4),
-                    ),
+                    Icon(Icons.inventory_2_outlined, size: 56, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
                     const SizedBox(height: 16),
                     Text(
                       searchController.text.isNotEmpty ? 'Produk tidak ditemukan' : 'Belum ada produk',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
             )
-
-          // ── List ───────────────────────────────────────────────────
           else
             SliverPadding(
               padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => _ProductTile(
-                    product: filtered[index],
-                    isTablet: screenType == ScreenType.tablet,
-                  ),
+                  (context, index) => _ProductTile(product: filtered[index], isTablet: screenType == ScreenType.tablet),
                   childCount: filtered.length,
                 ),
               ),
             ),
-
-          SliverToBoxAdapter(
-            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
-          ),
+          SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80)),
         ],
       ),
     );
   }
 }
 
-// ── Sliver header delegate ────────────────────────────────────────────────────
-
 class _HeaderDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
   const _HeaderDelegate({required this.child});
-
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => child;
-
   @override
   double get maxExtent => 220;
   @override
@@ -347,13 +295,9 @@ class _HeaderDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(covariant SliverPersistentHeaderDelegate old) => true;
 }
 
-// ── Product tile ──────────────────────────────────────────────────────────────
-
 class _ProductTile extends StatelessWidget {
   final Product product;
   final bool isTablet;
-  final VoidCallback? onReturn;
-
   const _ProductTile({required this.product, this.isTablet = false});
 
   @override
@@ -361,13 +305,11 @@ class _ProductTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = cs.brightness == Brightness.dark;
     final imgSize = isTablet ? 60.0 : 52.0;
-
     final stockColor = product.isOutOfStock
         ? AppTheme.destructive
         : product.isLowStock
             ? AppTheme.warning
             : AppTheme.success;
-
     final stockLabel = product.isOutOfStock
         ? 'Habis'
         : product.isLowStock
@@ -387,60 +329,36 @@ class _ProductTile extends StatelessWidget {
             border: Border.all(color: cs.outlineVariant, width: 0.8),
             boxShadow: isDark
                 ? null
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))],
           ),
           child: Row(
             children: [
-              // ── Image ──────────────────────────────────────────────
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: SizedBox(
                   width: imgSize,
                   height: imgSize,
                   child: product.image != null && product.image!.isNotEmpty
-                      ? Image.network(
-                          ProductService.getProductImageUrl(product.image),
+                      ? Image.network(ProductService.getProductImageUrl(product.image),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Image.asset(
-                            ProductService.getPlaceholderImage(),
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : Image.asset(
-                          ProductService.getPlaceholderImage(),
-                          fit: BoxFit.cover,
-                        ),
+                          errorBuilder: (_, __, ___) =>
+                              Image.asset(ProductService.getPlaceholderImage(), fit: BoxFit.cover))
+                      : Image.asset(ProductService.getPlaceholderImage(), fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(width: 12),
-
-              // ── Info ───────────────────────────────────────────────
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      product.name,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(product.name,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     if (product.barcode != null) ...[
                       const SizedBox(height: 2),
-                      Text(
-                        'SKU: ${product.barcode}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                      ),
+                      Text('SKU: ${product.barcode}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                     ],
                     const SizedBox(height: 4),
                     Row(
@@ -452,23 +370,18 @@ class _ProductTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: stockColor.withValues(alpha: 0.25)),
                           ),
-                          child: Text(
-                            stockLabel,
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: stockColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
+                          child: Text(stockLabel,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(color: stockColor, fontWeight: FontWeight.w600)),
                         ),
                         if (product.category != null) ...[
                           const SizedBox(width: 6),
                           Flexible(
-                            child: Text(
-                              product.category!,
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                              child: Text(product.category!,
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                                  overflow: TextOverflow.ellipsis)),
                         ],
                       ],
                     ),
@@ -476,18 +389,14 @@ class _ProductTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-
-              // ── Price + chevron ────────────────────────────────────
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    CurrencyFormatter.formatToRupiah(product.sellPrice),
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppTheme.gold,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
+                  Text(CurrencyFormatter.formatToRupiah(product.sellPrice),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(color: AppTheme.gold, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurfaceVariant),
                 ],
