@@ -27,9 +27,7 @@ class CouponCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isApplied
-              ? AppTheme.success.withOpacity(0.1)
-              : Theme.of(context).cardTheme.color,
+          color: isApplied ? AppTheme.success.withValues(alpha: 0.1) : Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isApplied ? AppTheme.success : AppTheme.border,
@@ -40,9 +38,7 @@ class CouponCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isApplied
-                    ? AppTheme.success.withOpacity(0.2)
-                    : AppTheme.gold.withOpacity(0.1),
+                color: isApplied ? AppTheme.success.withValues(alpha: 0.2) : AppTheme.gold.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -60,19 +56,14 @@ class CouponCard extends StatelessWidget {
                     children: [
                       Text(
                         code,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color:
-                                  isApplied ? AppTheme.success : AppTheme.gold,
+                              color: isApplied ? AppTheme.success : AppTheme.gold,
                             ),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: isApplied ? AppTheme.success : AppTheme.gold,
                           borderRadius: BorderRadius.circular(4),
@@ -88,8 +79,7 @@ class CouponCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(description,
-                      style: Theme.of(context).textTheme.bodySmall),
+                  Text(description, style: Theme.of(context).textTheme.bodySmall),
                   if (expiresAt != null) ...[
                     const SizedBox(height: 4),
                     Text(

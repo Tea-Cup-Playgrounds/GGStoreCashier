@@ -111,17 +111,19 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
             .toList();
       }
 
-      if (mounted)
+      if (mounted) {
         setState(() {
           _targetItems = items;
           _isLoadingTargets = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _targetLoadError = e.toString();
           _isLoadingTargets = false;
         });
+      }
     }
   }
 
@@ -134,10 +136,11 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     );
     if (picked != null) {
       ctrl.text = DateFormatter.format(picked);
-      if (isFrom)
+      if (isFrom) {
         _fromApi = DateFormatter.toApiDate(picked);
-      else
+      } else {
         _toApi = DateFormatter.toApiDate(picked);
+      }
     }
   }
 
@@ -146,7 +149,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_targetType != null && _selectedTargetId == null) {
-      SnackBarService.error('Pilih item target terlebih dahulu');
       SnackBarService.error('Pilih item target terlebih dahulu');
       return;
     }
@@ -169,10 +171,8 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       if (_isEditing) {
         await VoucherService.update(widget.voucher!.id, data);
         SnackBarService.success('Voucher berhasil diperbarui');
-        SnackBarService.success('Voucher berhasil diperbarui');
       } else {
         await VoucherService.create(data);
-        SnackBarService.success('Voucher berhasil dibuat');
         SnackBarService.success('Voucher berhasil dibuat');
       }
       if (mounted) context.pop(true);
@@ -245,8 +245,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                     child: SearchableDropdown<String>(
                       label: 'Tipe Diskon *',
                       hintText: 'Pilih tipe',
-                      label: 'Tipe Diskon *',
-                      hintText: 'Pilih tipe',
                       value: _discountType,
                       prefixIcon: Icons.percent,
                       items: [
@@ -271,7 +269,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                       ],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Wajib diisi';
-                        if (v == null || v.trim().isEmpty) return 'Wajib diisi';
                         final n = double.tryParse(v.trim());
                         if (n == null || n <= 0) return 'Harus > 0';
                         if (_discountType == 'percent' && n > 100) return 'Maks 100%';
@@ -285,8 +282,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
 
               // ── Berlaku Untuk ──────────────────────────────────────────
               SearchableDropdown<String>(
-                label: 'Berlaku Untuk',
-                hintText: 'Semua produk (tanpa batasan)',
                 label: 'Berlaku Untuk',
                 hintText: 'Semua produk (tanpa batasan)',
                 value: _targetType,
@@ -357,7 +352,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
               // ── Simpan ─────────────────────────────────────────────────
               CustomButton(
                 text: _isEditing ? 'Simpan Perubahan' : 'Buat Voucher',
-                text: _isEditing ? 'Simpan Perubahan' : 'Buat Voucher',
                 icon: _isEditing ? Icons.save_outlined : Icons.add,
                 size: ButtonSize.large,
                 fullWidth: true,
@@ -372,7 +366,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   }
 
   Widget _buildTargetPicker(ColorScheme cs) {
-    final label = _targetType == 'categories' ? 'Kategori' : 'Produk';
     final label = _targetType == 'categories' ? 'Kategori' : 'Produk';
 
     if (_isLoadingTargets) {
@@ -390,7 +383,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
               child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold),
             ),
             SizedBox(width: 12),
-            Text('Memuat pilihan...'),
             Text('Memuat pilihan...'),
           ],
         ),
@@ -418,7 +410,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
             TextButton(
               onPressed: () => _loadTargets(_targetType!),
               child: const Text('Coba Lagi'),
-              child: const Text('Coba Lagi'),
             ),
           ],
         ),
@@ -426,8 +417,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     }
 
     return SearchableDropdown<int>(
-      label: 'Pilih $label *',
-      hintText: 'Cari dan pilih $label',
       label: 'Pilih $label *',
       hintText: 'Cari dan pilih $label',
       value: _selectedTargetId,

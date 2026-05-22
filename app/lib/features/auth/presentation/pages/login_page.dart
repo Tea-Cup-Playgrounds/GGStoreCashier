@@ -117,7 +117,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
               padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 24),
               child: ConstrainedBox(
                 // Ensure content fills the screen so Spacers work for centering
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                constraints: BoxConstraints(minHeight: (constraints.maxHeight - 48).clamp(0.0, double.infinity)),
                 child: IntrinsicHeight(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

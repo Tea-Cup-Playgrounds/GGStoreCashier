@@ -66,10 +66,7 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
   }
 
   Future<void> _openForm({Map<String, dynamic>? category}) async {
-    final result = await context.push<bool>(
-      AppRouter.categoryForm,
-      extra: category,
-    );
+    final result = await context.push<bool>(AppRouter.categoryForm, extra: category);
     if (result == true) _loadCategories();
   }
 
@@ -88,7 +85,6 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
             child: const Text('Hapus'),
-            child: const Text('Hapus'),
           ),
         ],
       ),
@@ -103,7 +99,6 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
       ));
       await dio.delete('/api/categories/$id');
       if (mounted) {
-        SnackBarService.success('Kategori berhasil dihapus');
         SnackBarService.success('Kategori berhasil dihapus');
         _loadCategories();
       }
@@ -132,17 +127,13 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
     }
 
     if (_categories.isEmpty) {
-      return _EmptyState(
-        canAdd: canAddEdit,
-        onAdd: () => _openForm(),
-      );
+      return _EmptyState(canAdd: canAddEdit, onAdd: () => _openForm());
     }
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerLow,
       body: Column(
         children: [
-          // ── Search bar ───────────────────────────────────────────────
           Container(
             color: cs.surface,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -163,16 +154,11 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
                     : null,
                 filled: true,
                 fillColor: cs.surfaceContainerHighest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
             ),
           ),
-
-          // ── List ─────────────────────────────────────────────────────
           Expanded(
             child: _filtered.isEmpty
                 ? Center(
@@ -181,10 +167,8 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
                       children: [
                         Icon(Icons.search_off_rounded, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
                         const SizedBox(height: 12),
-                        Text(
-                          'Kategori tidak ditemukan',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                        ),
+                        Text('Kategori tidak ditemukan',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                       ],
                     ),
                   )
@@ -218,19 +202,15 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
   final bool canAdd;
   final VoidCallback onAdd;
-
   const _EmptyState({required this.canAdd, required this.onAdd});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = cs.brightness == Brightness.dark;
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -241,25 +221,18 @@ class _EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppTheme.gold.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
-              ),
+                  color: AppTheme.gold.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2))),
               child: const Icon(Icons.category_outlined, size: 36, color: AppTheme.gold),
             ),
             const SizedBox(height: 20),
-            Text(
-              'Belum ada kategori',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
+            Text('Belum ada kategori',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text(
-              'Tambahkan kategori untuk mengelompokkan produk Anda.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-            ),
+            Text('Tambahkan kategori untuk mengelompokkan produk Anda.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
             if (canAdd) ...[
               const SizedBox(height: 28),
               SizedBox(
@@ -269,11 +242,10 @@ class _EmptyState extends StatelessWidget {
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Tambah Kategori Pertama', style: TextStyle(fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.gold,
-                    foregroundColor: isDark ? Colors.black : Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+                      backgroundColor: AppTheme.gold,
+                      foregroundColor: isDark ? Colors.black : Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 ),
               ),
             ],
@@ -284,8 +256,6 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ── Category tile ─────────────────────────────────────────────────────────────
-
 class _CategoryTile extends StatelessWidget {
   final Map<String, dynamic> category;
   final bool canEdit;
@@ -293,13 +263,12 @@ class _CategoryTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const _CategoryTile({
-    required this.category,
-    required this.canEdit,
-    required this.canDelete,
-    required this.onEdit,
-    required this.onDelete,
-  });
+  const _CategoryTile(
+      {required this.category,
+      required this.canEdit,
+      required this.canDelete,
+      required this.onEdit,
+      required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -314,80 +283,52 @@ class _CategoryTile extends StatelessWidget {
         border: Border.all(color: cs.outlineVariant, width: 0.8),
         boxShadow: isDark
             ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // ── Image ──────────────────────────────────────────────────
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: SizedBox(
                 width: 56,
                 height: 56,
                 child: category['category_image'] != null
-                    ? Image.network(
-                        '${ApiConfig.apiUrl}/uploads/categories/${category['category_image']}',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _placeholder(cs),
-                      )
+                    ? Image.network('${ApiConfig.apiUrl}/uploads/categories/${category['category_image']}',
+                        fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder(cs))
                     : _placeholder(cs),
               ),
             ),
             const SizedBox(width: 14),
-
-            // ── Text ───────────────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    category['name'],
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
+                  Text(category['name'],
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   if (category['description'] != null && (category['description'] as String).isNotEmpty) ...[
                     const SizedBox(height: 3),
-                    Text(
-                      category['description'],
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(category['description'],
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ],
               ),
             ),
-
-            // ── Actions ────────────────────────────────────────────────
             if (canEdit || canDelete)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (canEdit)
-                    _ActionBtn(
-                      icon: Icons.edit_outlined,
-                      color: cs.onSurfaceVariant,
-                      onTap: onEdit,
-                      tooltip: 'Edit',
-                    ),
+                    _ActionBtn(icon: Icons.edit_outlined, color: cs.onSurfaceVariant, onTap: onEdit, tooltip: 'Edit'),
                   if (canDelete)
                     _ActionBtn(
-                      icon: Icons.delete_outline_rounded,
-                      color: AppTheme.destructive,
-                      onTap: onDelete,
-                      tooltip: 'Hapus',
-                    ),
+                        icon: Icons.delete_outline_rounded,
+                        color: AppTheme.destructive,
+                        onTap: onDelete,
+                        tooltip: 'Hapus'),
                 ],
               ),
           ],
@@ -397,9 +338,7 @@ class _CategoryTile extends StatelessWidget {
   }
 
   Widget _placeholder(ColorScheme cs) => Container(
-        color: cs.surfaceContainerHighest,
-        child: Icon(Icons.category_outlined, color: cs.onSurfaceVariant, size: 26),
-      );
+      color: cs.surfaceContainerHighest, child: Icon(Icons.category_outlined, color: cs.onSurfaceVariant, size: 26));
 }
 
 class _ActionBtn extends StatelessWidget {
@@ -407,13 +346,7 @@ class _ActionBtn extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   final String tooltip;
-
-  const _ActionBtn({
-    required this.icon,
-    required this.color,
-    required this.onTap,
-    required this.tooltip,
-  });
+  const _ActionBtn({required this.icon, required this.color, required this.onTap, required this.tooltip});
 
   @override
   Widget build(BuildContext context) {
@@ -427,10 +360,9 @@ class _ActionBtn extends StatelessWidget {
           height: 36,
           margin: const EdgeInsets.only(left: 4),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withValues(alpha: 0.15)),
-          ),
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.15))),
           child: Icon(icon, size: 18, color: color),
         ),
       ),

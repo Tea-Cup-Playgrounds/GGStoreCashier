@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -46,41 +45,31 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
   Future<void> _loadInitialData() async {
     setState(() => _isLoadingData = true);
-
     try {
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
         headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
       ));
-
-      // Load branches
       final branchesResponse = await dio.get('/api/branches');
       final categoriesResponse = await dio.get('/api/categories');
 
-      setState(() {
-        _branches = List<Map<String, dynamic>>.from(branchesResponse.data['branches'].map((b) => {
-              'id': b['id'],
-              'name': b['name'],
-            }));
-
-        _categories = List<Map<String, dynamic>>.from(categoriesResponse.data['categories'].map((c) => {
-              'id': c['id'],
-              'name': c['name'],
-            }));
-
-        // Set default branch for admin/karyawan
-        final user = ref.read(authProvider).user;
-        if (user != null && user.role != 'superadmin' && user.branchId != null) {
-          _selectedBranchId = user.branchId;
-        }
-
-        _isLoadingData = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingData = false);
       if (mounted) {
-        SnackBarService.error('Gagal memuat data: ${e.toString()}');
+        setState(() {
+          _branches = List<Map<String, dynamic>>.from(
+              branchesResponse.data['branches'].map((b) => {'id': b['id'], 'name': b['name']}));
+          _categories = List<Map<String, dynamic>>.from(
+              categoriesResponse.data['categories'].map((c) => {'id': c['id'], 'name': c['name']}));
+          final user = ref.read(authProvider).user;
+          if (user != null && user.role != 'superadmin' && user.branchId != null) {
+            _selectedBranchId = user.branchId;
+          }
+          _isLoadingData = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingData = false);
         SnackBarService.error('Gagal memuat data: ${e.toString()}');
       }
     }
@@ -88,36 +77,17 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
 
   Future<void> _submitForm() async {
     FocusScope.of(context).unfocus();
-
-    if (!_formKey.currentState!.validate()) {
-      debugPrint('[AddProduct] form validation failed');
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     if (_selectedBranchId == null) {
       SnackBarService.error('Pilih cabang terlebih dahulu');
-      SnackBarService.error('Pilih cabang terlebih dahulu');
       return;
-    }
-
-    debugPrint('[AddProduct] submitting form...');
-    debugPrint('[AddProduct] name: ${_productNameController.text.trim()}');
-    debugPrint('[AddProduct] branch_id: $_selectedBranchId');
-    debugPrint('[AddProduct] category_id: $_selectedCategoryId');
-    debugPrint('[AddProduct] has image: ${_productImage != null}');
-    if (_productImage != null) {
-      debugPrint('[AddProduct] image path: ${_productImage!.path}');
-      debugPrint('[AddProduct] image exists: ${await _productImage!.exists()}');
-      debugPrint('[AddProduct] image size: ${await _productImage!.length()} bytes');
     }
 
     setState(() => _isLoading = true);
 
     try {
       final token = await AuthService.getToken();
-      debugPrint('[AddProduct] token present: ${token != null}');
-      debugPrint('[AddProduct] API URL: ${ApiConfig.apiUrl}');
-
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.apiUrl,
         headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
@@ -125,19 +95,8 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
         receiveTimeout: ApiConfig.receiveTimeout,
       ));
 
-      // Add logging interceptor
-      dio.interceptors.add(LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        requestHeader: true,
-        error: true,
-        logPrint: (o) => debugPrint('[AddProduct][DIO] $o'),
-      ));
-
-      // Prepare form data
       final formData = FormData.fromMap({
         'name': _productNameController.text.trim(),
-        // Send null instead of empty string to avoid UNIQUE constraint on barcode
         if (_barcodeController.text.trim().isNotEmpty) 'barcode': _barcodeController.text.trim(),
         'category_id': _selectedCategoryId,
         'sell_price': RupiahInputFormatter.parseRupiahAsDouble(_priceController.text) ?? 0,
@@ -145,45 +104,25 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
         'branch_id': _selectedBranchId,
       });
 
-      // Add image if selected
       if (_productImage != null) {
         final filename = _productImage!.path.split('/').last;
         final ext = filename.split('.').last.toLowerCase();
         final mimeType = ext == 'png' ? 'image/png' : 'image/jpeg';
-
-        debugPrint('[AddProduct] attaching image: $filename, mime: $mimeType');
         formData.files.add(MapEntry(
           'product_image',
-          await MultipartFile.fromFile(
-            _productImage!.path,
-            filename: filename,
-            contentType: http_parser.MediaType.parse(mimeType),
-          ),
+          await MultipartFile.fromFile(_productImage!.path,
+              filename: filename, contentType: http_parser.MediaType.parse(mimeType)),
         ));
       }
 
-      debugPrint('[AddProduct] sending POST /api/products');
       final response = await dio.post('/api/products', data: formData);
-      debugPrint('[AddProduct] response status: ${response.statusCode}');
-      debugPrint('[AddProduct] response data: ${response.data}');
 
-      if (response.statusCode == 201) {
-        if (mounted) {
-          SnackBarService.success('Produk berhasil ditambahkan');
-          SnackBarService.success('Produk berhasil ditambahkan');
-          context.pop();
-        }
+      if (response.statusCode == 201 && mounted) {
+        SnackBarService.success('Produk berhasil ditambahkan');
+        context.pop();
       }
     } catch (e) {
-      debugPrint('[AddProduct] ERROR: $e');
-      if (e is DioException) {
-        debugPrint('[AddProduct] DioException type: ${e.type}');
-        debugPrint('[AddProduct] DioException message: ${e.message}');
-        debugPrint('[AddProduct] response status: ${e.response?.statusCode}');
-        debugPrint('[AddProduct] response data: ${e.response?.data}');
-      }
       if (mounted) {
-        String errorMessage = 'Gagal menambahkan produk';
         String errorMessage = 'Gagal menambahkan produk';
         if (e is DioException && e.response?.data != null) {
           errorMessage = e.response!.data['error'] ?? errorMessage;
@@ -191,9 +130,7 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
         SnackBarService.error(errorMessage);
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -214,14 +151,8 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back),
-        ),
-        title: const Text(
-          'Tambah Produk',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
+        leading: IconButton(onPressed: () => context.pop(), icon: const Icon(Icons.arrow_back)),
+        title: const Text('Tambah Produk', style: TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
       ),
@@ -234,80 +165,48 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Gambar Produk
                     ImageInput(
-                      file: _productImage,
-                      label: 'Gambar Produk',
-                      onChanged: (img) => setState(() => _productImage = img),
-                    ),
+                        file: _productImage,
+                        label: 'Gambar Produk',
+                        onChanged: (img) => setState(() => _productImage = img)),
                     const SizedBox(height: 24),
-
-                    // Nama Produk
                     TextInput(
                       label: 'Nama Produk',
                       hintText: 'Masukkan nama produk',
                       controller: _productNameController,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Nama produk wajib diisi';
-                          return 'Nama produk wajib diisi';
-                        }
-                        return null;
-                      },
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama produk wajib diisi' : null,
                     ),
                     const SizedBox(height: 16),
-
-                    // Barcode (opsional)
                     TextInput(
-                      label: 'Barcode (Opsional)',
-                      hintText: 'Kosongkan untuk generate otomatis',
-                      controller: _barcodeController,
-                    ),
+                        label: 'Barcode (Opsional)',
+                        hintText: 'Kosongkan untuk generate otomatis',
+                        controller: _barcodeController),
                     const SizedBox(height: 16),
-
-                    // Cabang
                     SearchableDropdown<int>(
                       label: 'Cabang',
                       hintText: 'Pilih cabang',
                       value: _selectedBranchId,
                       items: _branches
-                          .where((b) => b['id'] != 0) // exclude branch 0
-                          .map((branch) => DropdownItem<int>(
-                                value: branch['id'],
-                                label: branch['name'],
-                                icon: Icons.store,
-                              ))
+                          .where((b) => b['id'] != 0)
+                          .map((b) => DropdownItem<int>(value: b['id'], label: b['name'], icon: Icons.store))
                           .toList(),
-                      onChanged: isSuperAdmin ? (value) => setState(() => _selectedBranchId = value) : (value) {},
+                      onChanged: isSuperAdmin ? (v) => setState(() => _selectedBranchId = v) : (v) {},
                       enabled: isSuperAdmin,
                       prefixIcon: Icons.store,
-                      validator: (value) {
-                        if (value == null) return 'Pilih cabang terlebih dahulu';
-                        return null;
-                      },
+                      validator: (v) => v == null ? 'Pilih cabang terlebih dahulu' : null,
                     ),
                     const SizedBox(height: 16),
-
-                    // Kategori
                     SearchableDropdown<int>(
-                      label: 'Kategori (Opsional)',
-                      hintText: 'Pilih kategori',
                       label: 'Kategori (Opsional)',
                       hintText: 'Pilih kategori',
                       value: _selectedCategoryId,
                       items: _categories
-                          .map((category) => DropdownItem<int>(
-                                value: category['id'],
-                                label: category['name'],
-                                icon: Icons.category,
-                              ))
+                          .map((c) => DropdownItem<int>(value: c['id'], label: c['name'], icon: Icons.category))
                           .toList(),
-                      onChanged: (value) => setState(() => _selectedCategoryId = value),
+                      onChanged: (v) => setState(() => _selectedCategoryId = v),
                       prefixIcon: Icons.category,
                     ),
                     const SizedBox(height: 16),
-
-                    // Stok & Harga
                     Row(
                       children: [
                         Expanded(
@@ -316,15 +215,9 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                             hintText: 'Masukkan jumlah',
                             controller: _stockController,
                             keyboardType: TextInputType.number,
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Stok wajib diisi';
-                                return 'Stok wajib diisi';
-                              }
-                              if (int.tryParse(value) == null) {
-                                return 'Angka tidak valid';
-                                return 'Angka tidak valid';
-                              }
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Stok wajib diisi';
+                              if (int.tryParse(v) == null) return 'Angka tidak valid';
                               return null;
                             },
                           ),
@@ -337,16 +230,10 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                             controller: _priceController,
                             keyboardType: TextInputType.number,
                             inputFormatters: [RupiahInputFormatter()],
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Harga wajib diisi';
-                                return 'Harga wajib diisi';
-                              }
-                              final price = RupiahInputFormatter.parseRupiahAsDouble(value);
-                              if (price == null || price <= 0) {
-                                return 'Harga tidak valid';
-                                return 'Harga tidak valid';
-                              }
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Harga wajib diisi';
+                              final price = RupiahInputFormatter.parseRupiahAsDouble(v);
+                              if (price == null || price <= 0) return 'Harga tidak valid';
                               return null;
                             },
                           ),
@@ -354,15 +241,12 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
                       ],
                     ),
                     const SizedBox(height: 24),
-
-                    // Tombol Simpan
                     CustomButton(
-                      text: 'Tambah Produk',
-                      size: ButtonSize.large,
-                      onPressed: _isLoading ? null : _submitForm,
-                      isLoading: _isLoading,
-                      fullWidth: true,
-                    ),
+                        text: 'Tambah Produk',
+                        size: ButtonSize.large,
+                        onPressed: _isLoading ? null : _submitForm,
+                        isLoading: _isLoading,
+                        fullWidth: true),
                   ],
                 ),
               ),

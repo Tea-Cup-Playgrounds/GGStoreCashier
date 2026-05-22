@@ -23,8 +23,7 @@ class PaymentSuccessView extends StatefulWidget {
   State<PaymentSuccessView> createState() => _PaymentSuccessViewState();
 }
 
-class _PaymentSuccessViewState extends State<PaymentSuccessView>
-    with TickerProviderStateMixin {
+class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProviderStateMixin {
   late AnimationController _scaleController;
   late AnimationController _slideController;
   late Animation<double> _scaleAnimation;
@@ -121,7 +120,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.gold.withOpacity(0.4),
+                            color: AppTheme.gold.withValues(alpha: 0.4),
                             blurRadius: 30,
                             spreadRadius: 0,
                           ),
@@ -148,10 +147,9 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                     children: [
                       Text(
                         'Pembayaran Berhasil',
-                        style:
-                            Theme.of(context).textTheme.displaySmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
@@ -186,18 +184,14 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                       children: [
                         Text(
                           'Total Dibayar',
-                          style:
-                              Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: AppTheme.mutedForeground,
-                                  ),
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                color: AppTheme.mutedForeground,
+                              ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           CurrencyFormatter.formatToRupiah(widget.total),
-                          style: Theme.of(context)
-                              .textTheme
-                              .displayMedium
-                              ?.copyWith(
+                          style: Theme.of(context).textTheme.displayMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.gold,
                               ),
@@ -205,18 +199,14 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView>
                         if (widget.appliedCoupon != null) ...[
                           const SizedBox(height: 12),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: AppTheme.success.withOpacity(0.1),
+                              color: AppTheme.success.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               '${widget.appliedCoupon!['discount']}% diskon diterapkan (${widget.appliedCoupon!['code']})',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppTheme.success,
                                     fontWeight: FontWeight.w500,
                                   ),
