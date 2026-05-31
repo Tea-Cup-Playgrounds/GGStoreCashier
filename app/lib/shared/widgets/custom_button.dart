@@ -132,19 +132,19 @@ class CustomButton extends StatelessWidget {
         return baseStyle.copyWith(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return colorScheme.primary.withOpacity(0.4);
+              return colorScheme.primary.withValues(alpha: 0.4);
             }
             return colorScheme.primary;
           }),
           foregroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return colorScheme.onPrimary.withOpacity(0.6);
+              return colorScheme.onPrimary.withValues(alpha: 0.6);
             }
             return colorScheme.onPrimary;
           }),
           side: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return border(colorScheme.primary.withOpacity(0.4));
+              return border(colorScheme.primary.withValues(alpha: 0.4));
             }
             return border(colorScheme.primary);
           }),
@@ -173,7 +173,7 @@ class CustomButton extends StatelessWidget {
           backgroundColor: WidgetStateProperty.all(Colors.transparent),
           foregroundColor: WidgetStateProperty.all(colorScheme.primary),
           side: WidgetStateProperty.all(
-            border(colorScheme.primary.withOpacity(0.4)),
+            border(colorScheme.primary.withValues(alpha: 0.4)),
           ),
         );
     }

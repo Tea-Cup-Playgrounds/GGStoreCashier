@@ -43,41 +43,8 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(const AuthState()) {
-    _checkAuthStatus();
-  }
+  AuthNotifier() : super(const AuthState());
 
-  // Check authentication status on app start
-  Future<void> _checkAuthStatus() async {
-    state = state.copyWith(isLoading: true);
-
-    try {
-      final isAuth = await AuthService.isAuthenticated();
-      if (isAuth) {
-        final user = await AuthService.getCurrentUser();
-        state = state.copyWith(
-          isAuthenticated: true,
-          user: user,
-          isLoading: false,
-        );
-      } else {
-        state = state.copyWith(
-          isAuthenticated: false,
-          user: null,
-          isLoading: false,
-        );
-      }
-    } catch (e) {
-      state = state.copyWith(
-        isAuthenticated: false,
-        user: null,
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  // Login method
   Future<bool> login(String username, String password, {bool rememberMe = false}) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -99,7 +66,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         if (result.lockedUntil != null) {
           lockedUntilDate = DateTime.fromMillisecondsSinceEpoch(result.lockedUntil!);
         }
-
         state = state.copyWith(
           isAuthenticated: false,
           user: null,
@@ -122,31 +88,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  // Logout method
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
-
     try {
       await AuthService.logout();
-      state = const AuthState();
-    } catch (e) {
-      // Even if logout fails on server, clear local state
-      state = const AuthState();
+    } catch (_) {
+      // Continue with local logout even if server call fails.
     }
+    state = const AuthState();
   }
 
-  // Clear error
   void clearError() {
     state = state.copyWith(error: null);
   }
 
-  // Check if lockout has expired
   bool isLockoutExpired() {
     if (!state.isLockedOut || state.lockedUntil == null) return true;
     return DateTime.now().isAfter(state.lockedUntil!);
   }
 
-  // Get remaining lockout time in minutes
   int getRemainingLockoutMinutes() {
     if (!state.isLockedOut || state.lockedUntil == null) return 0;
     final now = DateTime.now();

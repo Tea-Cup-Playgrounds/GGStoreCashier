@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/cashier/presentation/pages/cashier_page.dart';
+import '../../features/inventory/presentation/pages/inventory_page.dart';
+import '../../features/inventory/presentation/pages/inventory_detail_page.dart';
+import '../../features/settings/presentation/pages/settings_page.dart';
 import 'package:gg_store_cashier/core/router/transition_factory.dart';
 import 'package:gg_store_cashier/core/router/auth_guard.dart';
 import 'package:gg_store_cashier/features/devices/presentation/pages/printer_devices_page.dart';
@@ -15,13 +22,6 @@ import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_ma
 import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_form_page.dart';
 import 'package:gg_store_cashier/core/models/voucher.dart';
 import 'package:gg_store_cashier/shared/layout/scaffold_with_bottom_navbar.dart';
-import 'package:go_router/go_router.dart';
-import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/home/presentation/pages/home_page.dart';
-import '../../features/cashier/presentation/pages/cashier_page.dart';
-import '../../features/inventory/presentation/pages/inventory_page.dart';
-import '../../features/inventory/presentation/pages/inventory_detail_page.dart';
-import '../../features/settings/presentation/pages/settings_page.dart';
 
 mixin AppRouter {
   static const String login = '/';
@@ -45,7 +45,7 @@ mixin AppRouter {
   static const String voucherCreate = '/vouchers/new';
   static const String voucherEdit = '/vouchers/edit/:id';
 
-  static final _rootNavigatorkey = GlobalKey<NavigatorState>();
+  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
   static final homeNavKey = GlobalKey<NavigatorState>();
   static final cashierNavKey = GlobalKey<NavigatorState>();
   static final inventoryNavKey = GlobalKey<NavigatorState>();
@@ -53,7 +53,7 @@ mixin AppRouter {
   static final settingsNavKey = GlobalKey<NavigatorState>();
 
   static final GoRouter router = GoRouter(
-    navigatorKey: _rootNavigatorkey,
+    navigatorKey: _rootNavigatorKey,
     initialLocation: login,
     redirect: AuthGuard.redirectLogic,
     errorBuilder: (context, state) => Scaffold(
@@ -74,20 +74,20 @@ mixin AppRouter {
       ),
     ),
     routes: <RouteBase>[
-      //  YG GK KENAK LAYOUT BOTTOM NAVBAR TARUH SINI ATAU DILUAR SHELL
       GoRoute(
         path: login,
         name: 'login',
         builder: (context, state) => const LoginPage(),
       ),
       GoRoute(
-          path: inventoryDetail,
-          name: 'inventoryDetail',
-          pageBuilder: (context, state) {
-            final id = state.pathParameters['id']!;
-            return TransitionFactory.getSlideBuilder(
-                context: context, state: state, child: InventoryDetailPage(productId: id));
-          }),
+        path: inventoryDetail,
+        name: 'inventoryDetail',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return TransitionFactory.getSlideBuilder(
+              context: context, state: state, child: InventoryDetailPage(productId: id));
+        },
+      ),
       GoRoute(
         path: inventoryAddItem,
         name: 'inventoryAddItem',
@@ -115,18 +115,14 @@ mixin AppRouter {
       GoRoute(
         path: deviceManager,
         name: 'deviceManager',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const DeviceManagerPage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const DeviceManagerPage()),
       ),
       GoRoute(
         path: receiptEditor,
         name: 'receiptEditor',
-        pageBuilder: (context, state) => TransitionFactory.getSlideBuilder(
-            context: context,
-            state: state,
-            child: const ReceiptEditorPage()),
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const ReceiptEditorPage()),
       ),
       GoRoute(
         path: userManagement,
@@ -178,41 +174,40 @@ mixin AppRouter {
         pageBuilder: (context, state) =>
             TransitionFactory.getSlideBuilder(context: context, state: state, child: const CouponPage()),
       ),
-      // HALAMAN YANG BUTUH LAYOUT SCAFFOLD + BOTTOM NAV TARUH DI SINI
+      // Pages with bottom nav scaffold
       StatefulShellRoute.indexedStack(
-          builder: (context, state, navigationShell) {
-            return ScaffoldWithBottomNavbar(navigationShell);
-          },
-          branches: [
-            StatefulShellBranch(navigatorKey: homeNavKey, routes: [
-              GoRoute(
-                path: home,
-                name: 'home',
-                builder: (context, state) => const HomePage(),
-              ),
-            ]),
-            StatefulShellBranch(navigatorKey: cashierNavKey, routes: [
-              GoRoute(
-                path: cashier,
-                name: 'cashier',
-                builder: (context, state) => const CashierPage(),
-              ),
-            ]),
-            StatefulShellBranch(navigatorKey: inventoryNavKey, routes: [
-              GoRoute(
-                path: inventory,
-                name: 'inventory',
-                builder: (context, state) => const InventoryPage(),
-              ),
-            ]),
-            StatefulShellBranch(navigatorKey: settingsNavKey, routes: [
-              GoRoute(
-                path: settings,
-                name: 'settings',
-                builder: (context, state) => const SettingsPage(),
-              ),
-            ]),
+        builder: (context, state, navigationShell) => ScaffoldWithBottomNavbar(navigationShell),
+        branches: [
+          StatefulShellBranch(navigatorKey: homeNavKey, routes: [
+            GoRoute(
+              path: home,
+              name: 'home',
+              builder: (context, state) => const HomePage(),
+            ),
           ]),
+          StatefulShellBranch(navigatorKey: cashierNavKey, routes: [
+            GoRoute(
+              path: cashier,
+              name: 'cashier',
+              builder: (context, state) => const CashierPage(),
+            ),
+          ]),
+          StatefulShellBranch(navigatorKey: inventoryNavKey, routes: [
+            GoRoute(
+              path: inventory,
+              name: 'inventory',
+              builder: (context, state) => const InventoryPage(),
+            ),
+          ]),
+          StatefulShellBranch(navigatorKey: settingsNavKey, routes: [
+            GoRoute(
+              path: settings,
+              name: 'settings',
+              builder: (context, state) => const SettingsPage(),
+            ),
+          ]),
+        ],
+      ),
     ],
   );
 }

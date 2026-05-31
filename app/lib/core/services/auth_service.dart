@@ -16,6 +16,14 @@ class AuthService {
     },
   ));
 
+  // Cached SharedPreferences instance — avoids re-initializing on every call.
+  // Populated on first access; all subsequent calls reuse the same instance.
+  static SharedPreferences? _prefs;
+  static Future<SharedPreferences> _getPrefs() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs!;
+  }
+
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_data';
   static const String _rememberMeKey = 'remember_me';
@@ -150,7 +158,7 @@ class AuthService {
   // Get current user
   static Future<User?> getCurrentUser() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final userJson = prefs.getString(_userKey);
       if (userJson != null) return User.fromJson(json.decode(userJson));
       return null;
@@ -162,7 +170,7 @@ class AuthService {
   // Get stored token
   static Future<String?> getToken() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       return prefs.getString(_tokenKey);
     } catch (e) {
       return null;
@@ -196,26 +204,24 @@ class AuthService {
     }
   }
 
-  // Store authentication data — token always persisted, rememberMe controls
-  // whether it survives the next cold start
   static Future<void> _storeAuthData(String token, User user, {bool rememberMe = false}) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _getPrefs();
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_userKey, json.encode(user.toJson()));
     await prefs.setBool(_rememberMeKey, rememberMe);
   }
 
-  // Clear authentication data
   static Future<void> _clearAuthData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _getPrefs();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userKey);
     await prefs.remove(_rememberMeKey);
+    // Invalidate the cache so the next read reflects the cleared state.
+    _prefs = null;
   }
 
-  // Call this on app startup — clears session if remember me was off
   static Future<void> clearSessionIfNotRemembered() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _getPrefs();
     final remembered = prefs.getBool(_rememberMeKey) ?? false;
     if (!remembered) {
       await prefs.remove(_tokenKey);

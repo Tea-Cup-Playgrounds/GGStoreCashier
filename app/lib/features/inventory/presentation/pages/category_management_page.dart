@@ -130,9 +130,9 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
       return _EmptyState(canAdd: canAddEdit, onAdd: () => _openForm());
     }
 
-    return Scaffold(
-      backgroundColor: cs.surfaceContainerLow,
-      body: Column(
+    return ColoredBox(
+      color: cs.surfaceContainerLow,
+      child: Column(
         children: [
           Container(
             color: cs.surface,
@@ -187,17 +187,30 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
                     },
                   ),
           ),
+          // FAB-equivalent as a positioned overlay using Stack isn't needed —
+          // the parent InventoryPage Scaffold provides the FAB slot.
+          // Instead render an inline bottom button for adding categories.
+          if (canAddEdit)
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () => _openForm(),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Tambah Kategori', style: TextStyle(fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.gold,
+                    foregroundColor: isDark ? Colors.black : Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: canAddEdit
-          ? FloatingActionButton(
-              onPressed: () => _openForm(),
-              backgroundColor: AppTheme.gold,
-              foregroundColor: isDark ? Colors.black : Colors.white,
-              child: const Icon(Icons.add_rounded),
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

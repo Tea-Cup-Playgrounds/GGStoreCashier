@@ -14,19 +14,19 @@ class ScaffoldWithBottomNavbar extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
   @override
-  ConsumerState<ScaffoldWithBottomNavbar> createState() =>
-      _ScaffoldWithBottomNavbarState();
+  ConsumerState<ScaffoldWithBottomNavbar> createState() => _ScaffoldWithBottomNavbarState();
 }
 
-class _ScaffoldWithBottomNavbarState
-    extends ConsumerState<ScaffoldWithBottomNavbar> {
+class _ScaffoldWithBottomNavbarState extends ConsumerState<ScaffoldWithBottomNavbar> {
   ProviderSubscription<AsyncValue<ConnectivityStatus>>? _connectivitySub;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _connectivitySub ??=
-        ref.listenManual(connectivityProvider, (previous, next) {
+    // Start connectivity monitoring now that the user is logged in.
+    // This ensures the HTTP probe never runs on the login page.
+    ConnectivityMonitor.instance.start();
+    _connectivitySub ??= ref.listenManual(connectivityProvider, (previous, next) {
       final prev = previous?.valueOrNull;
       final curr = next.valueOrNull;
       if (prev == null || prev == curr) return;
@@ -54,8 +54,7 @@ class _ScaffoldWithBottomNavbarState
 
   @override
   Widget build(BuildContext context) {
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     if (isLandscape) {
       return _LandscapeLayout(
@@ -84,8 +83,7 @@ class _PortraitLayout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pendingCount =
-        ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
+    final pendingCount = ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
     final cs = Theme.of(context).colorScheme;
     final currentIndex = navigationShell.currentIndex;
 
@@ -141,8 +139,7 @@ class _LandscapeLayout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pendingCount =
-        ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
+    final pendingCount = ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
     final cs = Theme.of(context).colorScheme;
     final currentIndex = navigationShell.currentIndex;
     final items = _navItems(pendingCount);
@@ -168,11 +165,9 @@ class _LandscapeLayout extends ConsumerWidget {
                       onDestinationSelected: onTap,
                       backgroundColor: cs.surface,
                       labelType: NavigationRailLabelType.all,
-                      selectedIconTheme:
-                          IconThemeData(color: AppTheme.gold, size: 22),
-                      unselectedIconTheme: IconThemeData(
-                          color: cs.onSurface.withOpacity(0.55), size: 22),
-                      selectedLabelTextStyle: TextStyle(
+                      selectedIconTheme: const IconThemeData(color: AppTheme.gold, size: 22),
+                      unselectedIconTheme: IconThemeData(color: cs.onSurface.withOpacity(0.55), size: 22),
+                      selectedLabelTextStyle: const TextStyle(
                         color: AppTheme.gold,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -225,10 +220,8 @@ class _NavItemData {
 
 List<_NavItemData> _navItems(int pendingCount) => [
       const _NavItemData(Icons.home_outlined, Icons.home, 'Home'),
-      _NavItemData(Icons.shopping_cart_outlined, Icons.shopping_cart, 'Cashier',
-          badge: pendingCount),
-      const _NavItemData(
-          Icons.inventory_2_outlined, Icons.inventory_2, 'Inventory'),
+      _NavItemData(Icons.shopping_cart_outlined, Icons.shopping_cart, 'Cashier', badge: pendingCount),
+      const _NavItemData(Icons.inventory_2_outlined, Icons.inventory_2, 'Inventory'),
       const _NavItemData(Icons.settings_outlined, Icons.settings, 'Settings'),
     ];
 
@@ -259,8 +252,7 @@ class _BottomNavItem extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color:
-              isActive ? AppTheme.gold.withOpacity(0.1) : Colors.transparent,
+          color: isActive ? AppTheme.gold.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -275,12 +267,8 @@ class _BottomNavItem extends StatelessWidget {
                     isActive ? activeIcon : icon,
                     key: ValueKey(isActive),
                     color: isActive
-                        ? Theme.of(context)
-                            .bottomNavigationBarTheme
-                            .selectedItemColor
-                        : Theme.of(context)
-                            .bottomNavigationBarTheme
-                            .unselectedItemColor,
+                        ? Theme.of(context).bottomNavigationBarTheme.selectedItemColor
+                        : Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
                     size: 20,
                   ),
                 ),
@@ -317,12 +305,8 @@ class _BottomNavItem extends StatelessWidget {
                 fontSize: 10,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 color: isActive
-                    ? Theme.of(context)
-                        .bottomNavigationBarTheme
-                        .selectedItemColor
-                    : Theme.of(context)
-                        .bottomNavigationBarTheme
-                        .unselectedItemColor,
+                    ? Theme.of(context).bottomNavigationBarTheme.selectedItemColor
+                    : Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
               ),
             ),
           ],

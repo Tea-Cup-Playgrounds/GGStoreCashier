@@ -7,7 +7,6 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/core/services/cache_manager.dart';
 import 'package:gg_store_cashier/core/services/offline_queue.dart';
 import 'package:gg_store_cashier/core/services/pending_operations_queue.dart';
-import 'package:gg_store_cashier/core/services/notification_service.dart';
 import 'package:gg_store_cashier/core/services/orientation_manager.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
@@ -26,7 +25,6 @@ Future<void> main() async {
   await Hive.openBox<OfflineTransactionEntry>('offline_queue_box');
   await Hive.openBox<PendingOperation>('pending_ops_box');
 
-  await NotificationService.init();
   await OrientationManager.init();
 
   // Neutral transparent system UI — AnnotatedRegion in the widget tree

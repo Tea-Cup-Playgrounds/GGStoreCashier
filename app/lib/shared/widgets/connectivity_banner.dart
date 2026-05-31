@@ -15,6 +15,7 @@ class ConnectivityBanner extends ConsumerStatefulWidget {
 class _ConnectivityBannerState extends ConsumerState<ConnectivityBanner> {
   bool _showOnlineBanner = false;
   Timer? _onlineTimer;
+  StreamSubscription<ConnectivityStatus>? _statusSub;
 
   /// The last status we *acted on* — used to detect genuine transitions.
   /// Null means we haven't seen any status yet (initial state).
@@ -23,14 +24,12 @@ class _ConnectivityBannerState extends ConsumerState<ConnectivityBanner> {
   @override
   void initState() {
     super.initState();
-    // Listen to the stream directly so we only react to real status changes,
-    // not to widget rebuilds.
-    ConnectivityMonitor.instance.statusStream.listen(_onStatusChange);
+    // Store the subscription so we can cancel it in dispose().
+    _statusSub = ConnectivityMonitor.instance.statusStream.listen(_onStatusChange);
   }
 
   void _onStatusChange(ConnectivityStatus status) {
-    if (status == ConnectivityStatus.online &&
-        _lastActedStatus == ConnectivityStatus.offline) {
+    if (status == ConnectivityStatus.online && _lastActedStatus == ConnectivityStatus.offline) {
       if (!mounted) return;
       setState(() => _showOnlineBanner = true);
       _onlineTimer?.cancel();
@@ -48,6 +47,7 @@ class _ConnectivityBannerState extends ConsumerState<ConnectivityBanner> {
   @override
   void dispose() {
     _onlineTimer?.cancel();
+    _statusSub?.cancel();
     super.dispose();
   }
 

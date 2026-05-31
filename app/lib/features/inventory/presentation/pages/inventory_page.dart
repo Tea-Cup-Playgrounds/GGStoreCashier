@@ -190,110 +190,91 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     final filtered = _filteredProducts;
     final cs = Theme.of(context).colorScheme;
 
-    return PullToRefresh(
-      onRefresh: _loadProducts,
-      child: CustomScrollView(
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _HeaderDelegate(
-              child: InventoryHeader(
-                searchController: searchController,
-                onSearchChanged: (_) => setState(() {}),
-                currentFilter: _currentFilter,
-                onFilterChanged: (f) => setState(() => _currentFilter = f),
-                totalItems: _products.length,
-                lowStockItems: _products.where((p) => p.isLowStock && !p.isOutOfStock).length,
-                outOfStockItems: _products.where((p) => p.isOutOfStock).length,
-              ),
-            ),
-          ),
-          if (_isLoadingProducts)
-            SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const CircularProgressIndicator(color: AppTheme.gold),
-                    const SizedBox(height: 16),
-                    Text('Memuat produk...',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-            )
-          else if (_productsError != null)
-            SliverFillRemaining(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
+    return Column(
+      children: [
+        // ── Sticky header (search + filters + summary) ──────────────
+        InventoryHeader(
+          searchController: searchController,
+          onSearchChanged: (_) => setState(() {}),
+          currentFilter: _currentFilter,
+          onFilterChanged: (f) => setState(() => _currentFilter = f),
+          totalItems: _products.length,
+          lowStockItems: _products.where((p) => p.isLowStock && !p.isOutOfStock).length,
+          outOfStockItems: _products.where((p) => p.isOutOfStock).length,
+        ),
+
+        // ── Content area ─────────────────────────────────────────────
+        Expanded(
+          child: _isLoadingProducts
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
+                      const CircularProgressIndicator(color: AppTheme.gold),
                       const SizedBox(height: 16),
-                      Text('Gagal memuat produk', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 8),
-                      Text(_productsError!,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                          textAlign: TextAlign.center),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: _loadProducts,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Coba Lagi'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold),
-                      ),
+                      Text('Memuat produk...',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                     ],
                   ),
-                ),
-              ),
-            )
-          else if (filtered.isEmpty)
-            SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.inventory_2_outlined, size: 56, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
-                    const SizedBox(height: 16),
-                    Text(
-                      searchController.text.isNotEmpty ? 'Produk tidak ditemukan' : 'Belum ada produk',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _ProductTile(product: filtered[index], isTablet: screenType == ScreenType.tablet),
-                  childCount: filtered.length,
-                ),
-              ),
-            ),
-          SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80)),
-        ],
-      ),
+                )
+              : _productsError != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
+                            const SizedBox(height: 16),
+                            Text('Gagal memuat produk', style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            Text(_productsError!,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                textAlign: TextAlign.center),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: _loadProducts,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Coba Lagi'),
+                              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : filtered.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.inventory_2_outlined,
+                                  size: 56, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                              const SizedBox(height: 16),
+                              Text(
+                                searchController.text.isNotEmpty ? 'Produk tidak ditemukan' : 'Belum ada produk',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        )
+                      : PullToRefresh(
+                          onRefresh: _loadProducts,
+                          child: ListView.builder(
+                            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, MediaQuery.of(context).padding.bottom + 80),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) => _ProductTile(
+                              product: filtered[index],
+                              isTablet: screenType == ScreenType.tablet,
+                            ),
+                          ),
+                        ),
+        ),
+      ],
     );
   }
 }
 
-class _HeaderDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-  const _HeaderDelegate({required this.child});
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => child;
-  @override
-  double get maxExtent => 220;
-  @override
-  double get minExtent => 220;
-  @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate old) => true;
-}
+// _HeaderDelegate removed — header is now a plain Column child, no sliver needed.
 
 class _ProductTile extends StatelessWidget {
   final Product product;

@@ -7,19 +7,18 @@ class NotificationService {
   static const String _channelName = 'GG Kasir Connectivity';
   static bool _permissionGranted = false;
 
-  static final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
 
   static bool get permissionGranted => _permissionGranted;
 
   /// Initializes the [FlutterLocalNotificationsPlugin] and creates the
-  /// Android notification channel, then requests permission.
+  /// Android notification channel. Does NOT request permission — call
+  /// [requestPermission] explicitly from the Settings page when the user
+  /// opts in.
   static Future<void> init() async {
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const InitializationSettings initSettings =
-        InitializationSettings(android: androidSettings);
+    const InitializationSettings initSettings = InitializationSettings(android: androidSettings);
 
     await _plugin.initialize(initSettings);
 
@@ -31,11 +30,12 @@ class NotificationService {
     );
 
     await _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
-    await requestPermission();
+    // Check current permission status without prompting.
+    final status = await Permission.notification.status;
+    _permissionGranted = status.isGranted;
   }
 
   /// Checks whether permission has been asked before via [SharedPreferences].
@@ -64,16 +64,14 @@ class NotificationService {
   static Future<void> showOfflineNotification() async {
     if (!_permissionGranted) return;
 
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       _channelId,
       _channelName,
       importance: Importance.high,
       priority: Priority.high,
     );
 
-    const NotificationDetails details =
-        NotificationDetails(android: androidDetails);
+    const NotificationDetails details = NotificationDetails(android: androidDetails);
 
     await _plugin.show(
       1001,
@@ -88,16 +86,14 @@ class NotificationService {
   static Future<void> showOnlineNotification() async {
     if (!_permissionGranted) return;
 
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       _channelId,
       _channelName,
       importance: Importance.high,
       priority: Priority.high,
     );
 
-    const NotificationDetails details =
-        NotificationDetails(android: androidDetails);
+    const NotificationDetails details = NotificationDetails(android: androidDetails);
 
     await _plugin.show(
       1002,

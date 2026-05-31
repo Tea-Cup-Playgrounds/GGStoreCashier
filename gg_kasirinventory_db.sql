@@ -29,7 +29,7 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `absensi` (
   `id` int NOT NULL,
-  `absensi_image` varchar(30) NOT NULL,
+  `absensi_image` varchar(255) NOT NULL,
   `kehadiran` enum('Hadir','Izin','Sakit','Tidak Masuk','Tanpa Keterangan') NOT NULL,
   `users_id` int NOT NULL,
   `branches_id` int NOT NULL,
@@ -188,7 +188,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `branch_id`, `created_at`, `updated_at`) VALUES
-(1, 'King Wahyu', 'superadmin', '$2b$12$P07jhhBCn0QnCyXHQRfYGOVIx/SW16WxSPfuajScCLErrr1vwxGny', 'superadmin', 0, '2025-09-26 11:04:07', '2026-02-06 10:49:48'),
+(1, 'King Wahyu', 'superadmin', '$2b$12$P07jhhBCn0QnCyXHQRfYGOVIx/SW16WxSPfuajScCLErrr1vwxGny', 'superadmin', NULL, '2025-09-26 11:04:07', '2026-02-06 10:49:48'),
 (2, 'Boss Kebun', 'GrowAGarden#1', '$2b$12$kioin3Gy78nh3h/WC60n8uuI.fzQnhQe3J6BXM9kMHONobeej1U5.', 'admin', 1, '2025-09-26 11:04:07', '2026-02-03 15:47:52'),
 (3, 'Boss Ikan', 'mancingmaniamantap', '$2b$12$MHPui3mOe1Me7TbjOTxtkO1uOi0twI0bFin2ITQAzpqE4zXoy7kuS', 'admin', 2, '2025-09-26 11:04:07', '2026-02-03 15:47:52'),
 (4, 'Kroco 1', 'kroco1', '$2b$12$0pZIlcdAgmXOgpaM2jLYX.MMizLVAJDTwdsf3HZpG6qHTLHs8s8mu', 'karyawan', 1, '2025-09-26 11:04:07', '2026-02-03 15:47:53'),

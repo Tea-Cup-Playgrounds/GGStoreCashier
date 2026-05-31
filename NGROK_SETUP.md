@@ -1,26 +1,30 @@
-# Ngrok Setup Guide
+# Panduan Setup Ngrok
 
-Ngrok creates a public URL that tunnels to your local API, allowing you to test the Flutter app on physical devices or share your API with others.
+Ngrok membuat URL publik yang menghubungkan ke API lokal kamu, sehingga kamu bisa menguji aplikasi Flutter di perangkat fisik atau berbagi API dengan orang lain.
 
-## Why Use Ngrok?
+## Kenapa Pakai Ngrok?
 
-- **Physical Device Testing**: Test on real phones without being on the same WiFi
-- **Remote Testing**: Share your API with team members or testers
-- **Webhook Testing**: Receive webhooks from external services
-- **HTTPS**: Get a free HTTPS URL for testing secure connections
+- **Testing di Perangkat Fisik** — Uji di HP sungguhan tanpa harus terhubung ke WiFi yang sama
+- **Testing Jarak Jauh** — Bagikan API ke anggota tim atau tester
+- **Webhook Testing** — Terima webhook dari layanan eksternal
+- **HTTPS** — Dapatkan URL HTTPS gratis untuk testing koneksi aman
 
-## Setup Steps
+---
 
-### 1. Create Ngrok Account
+## Langkah Setup
 
-1. Go to [https://ngrok.com/](https://ngrok.com/)
-2. Sign up for a free account
-3. After login, go to "Your Authtoken" page: [https://dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
-4. Copy your authtoken (looks like: `2abc123def456ghi789jkl0mnop1qrs_2tuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`)
+### 1. Buat Akun Ngrok
 
-### 2. Add Authtoken to `.env`
+1. Buka [https://ngrok.com/](https://ngrok.com/)
+2. Daftar akun gratis
+3. Setelah login, buka halaman "Your Authtoken": [https://dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
+4. Salin authtoken kamu (contoh: `2abc123def456ghi789jkl0mnop1qrs_2tuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`)
 
-Open your `.env` file in the project root and add:
+---
+
+### 2. Tambahkan Authtoken ke `.env`
+
+Buka file `.env` di root proyek dan tambahkan:
 
 ```env
 # Database
@@ -40,13 +44,15 @@ NGROK_AUTHTOKEN=2abc123def456ghi789jkl0mnop1qrs_2tuvwxyzABCDEFGHIJKLMNOPQRSTUVWX
 API_TIMEOUT=30000
 ```
 
-### 3. Run the Server
+---
+
+### 3. Jalankan Server
 
 ```bash
 npm run dev
 ```
 
-You'll see output like:
+Kamu akan melihat output seperti ini:
 
 ```
 Server running on port 3000
@@ -54,26 +60,28 @@ Socket.IO enabled for real-time updates
 API Docs: http://localhost:3000/api/docs
 
 ngrok public URL : https://abc123.ngrok.io
-API Docs           : https://abc123.ngrok.io/api/docs
+API Docs         : https://abc123.ngrok.io/api/docs
 
 ✅ app/.env updated with ngrok URL
 ```
 
-The server automatically:
+Server secara otomatis akan:
 
-1. Starts ngrok tunnel
-2. Gets the public URL
-3. Writes it to `app/.env` so Flutter uses it
+1. Memulai tunnel ngrok
+2. Mendapatkan URL publik
+3. Menulis URL tersebut ke `app/.env` agar Flutter menggunakannya
 
-### 4. Verify It Works
+---
 
-**Test in browser:**
+### 4. Verifikasi
+
+**Test di browser:**
 
 ```
 https://abc123.ngrok.io/api/health
 ```
 
-Should return:
+Seharusnya mengembalikan:
 
 ```json
 {
@@ -82,37 +90,41 @@ Should return:
 }
 ```
 
-**Check Flutter config:**
+**Cek konfigurasi Flutter:**
 
 ```bash
 cat app/.env
 ```
 
-Should show:
+Seharusnya menampilkan:
 
 ```env
 API_BASE_URL=https://abc123.ngrok.io
 API_TIMEOUT=30000
 ```
 
-### 5. Run Flutter App
+---
 
-Now when you run the Flutter app, it will connect via the ngrok URL:
+### 5. Jalankan Flutter
+
+Setelah server berjalan, jalankan aplikasi Flutter — ia akan terhubung via URL ngrok:
 
 ```bash
 cd app
 fvm flutter run
 ```
 
-Or use VS Code Run & Debug → "Flutter (Mobile App via FVM)"
+Atau gunakan VS Code Run & Debug → "Flutter (Mobile App via FVM)"
 
-## Without Ngrok (Emulator Only)
+---
 
-If you don't add `NGROK_AUTHTOKEN`, the server will:
+## Tanpa Ngrok (Emulator Saja)
 
-1. Skip ngrok tunnel
-2. Write `http://10.0.2.2:3000` to `app/.env` (Android emulator localhost)
-3. Work fine for emulator testing
+Jika kamu tidak menambahkan `NGROK_AUTHTOKEN`, server akan:
+
+1. Melewati tunnel ngrok
+2. Menulis `http://10.0.2.2:3000` ke `app/.env` (IP localhost khusus emulator Android)
+3. Tetap berjalan normal untuk testing di emulator
 
 ```bash
 npm run dev
@@ -126,98 +138,106 @@ Server running on port 3000
 ✅ app/.env updated with emulator URL: http://10.0.2.2:3000
 ```
 
-## Ngrok Free Tier Limits
+---
 
-- **1 online ngrok process** at a time
-- **40 connections/minute**
-- **Random URL** each time (e.g., `https://abc123.ngrok.io` changes on restart)
-- **2 hour session limit** (tunnel closes after 2 hours, restart to get new URL)
+## Batas Ngrok Tier Gratis
 
-### Paid Plans ($8/month+):
+- **1 proses ngrok** aktif dalam satu waktu
+- **40 koneksi/menit**
+- **URL acak** setiap kali restart (contoh: `https://abc123.ngrok.io` berubah setiap restart)
+- **Sesi 2 jam** — tunnel otomatis tutup setelah 2 jam, restart untuk mendapatkan URL baru
 
-- Custom subdomain (e.g., `https://myapp.ngrok.io`)
-- Longer sessions
-- More connections
-- Reserved domains
+### Paket Berbayar ($8/bulan ke atas):
+
+- Subdomain kustom (contoh: `https://myapp.ngrok.io`)
+- Sesi lebih lama
+- Lebih banyak koneksi
+- Domain yang bisa dipesan
+
+---
 
 ## Troubleshooting
 
-### "Invalid authtoken" error
+### Error "Invalid authtoken"
 
-- Double-check you copied the full token from ngrok dashboard
-- Make sure there are no extra spaces in `.env`
-- Token should be one long string with no line breaks
+- Pastikan kamu menyalin token lengkap dari dashboard ngrok
+- Pastikan tidak ada spasi ekstra di file `.env`
+- Token harus satu baris panjang tanpa baris baru
 
-### Ngrok URL changes every restart
+### URL ngrok berubah setiap restart
 
-- This is normal on free tier
-- The server auto-updates `app/.env` each time
-- Just restart the Flutter app to pick up the new URL
+- Ini normal di tier gratis
+- Server otomatis memperbarui `app/.env` setiap kali
+- Cukup restart aplikasi Flutter untuk mengambil URL baru
 
-### Flutter still connects to old URL
+### Flutter masih terhubung ke URL lama
 
-1. Stop the Flutter app
-2. Check `app/.env` has the new ngrok URL
-3. Restart Flutter app (hot reload won't pick up .env changes)
+1. Hentikan aplikasi Flutter
+2. Cek `app/.env` sudah berisi URL ngrok yang baru
+3. Restart Flutter (hot reload tidak akan membaca perubahan `.env`)
 
-### "Tunnel not found" in browser
+### "Tunnel not found" di browser
 
-- Make sure the server is running (`npm run dev`)
-- Check the console for the ngrok URL
-- Try the URL in an incognito window (some browsers cache redirects)
+- Pastikan server sedang berjalan (`npm run dev`)
+- Cek konsol untuk URL ngrok terbaru
+- Coba URL di jendela incognito (beberapa browser menyimpan cache redirect)
 
-### Rate limit errors
+### Error rate limit
 
-- Free tier has 40 connections/minute
-- If you hit this, wait a minute or upgrade to paid plan
-- Reduce unnecessary API calls in your Flutter app
+- Tier gratis memiliki batas 40 koneksi/menit
+- Jika mencapai batas, tunggu sebentar atau upgrade ke paket berbayar
+- Kurangi pemanggilan API yang tidak perlu di aplikasi Flutter
 
-## Alternative: Using Your Local IP (No Ngrok)
+---
 
-If you just want to test on a physical device on the same WiFi:
+## Alternatif: Gunakan IP Lokal (Tanpa Ngrok)
 
-1. Find your computer's local IP:
+Jika kamu hanya ingin testing di perangkat fisik yang terhubung ke WiFi yang sama:
+
+1. Cari IP lokal komputermu:
 
    ```bash
    # Windows
    ipconfig
-   # Look for IPv4 Address (e.g., 192.168.1.100)
+   # Cari IPv4 Address (contoh: 192.168.1.100)
 
    # Mac/Linux
    ifconfig | grep "inet "
    ```
 
-2. Manually edit `app/.env`:
+2. Edit `app/.env` secara manual:
 
    ```env
    API_BASE_URL=http://192.168.1.100:3000
    API_TIMEOUT=30000
    ```
 
-3. Make sure Windows Firewall allows port 3000
+3. Pastikan Windows Firewall mengizinkan port 3000
 
-4. Run the server without ngrok:
+4. Jalankan server tanpa ngrok:
 
    ```bash
    npm run dev
    ```
 
-5. Connect your phone to the same WiFi and run the Flutter app
+5. Hubungkan HP ke WiFi yang sama dan jalankan aplikasi Flutter
 
-## Summary
+---
 
-**With Ngrok:**
+## Ringkasan
 
-- Add `NGROK_AUTHTOKEN` to `.env`
-- Run `npm run dev`
-- Server auto-updates `app/.env` with public URL
-- Works on any device, anywhere
+**Dengan Ngrok:**
 
-**Without Ngrok:**
+- Tambahkan `NGROK_AUTHTOKEN` ke `.env`
+- Jalankan `npm run dev`
+- Server otomatis memperbarui `app/.env` dengan URL publik
+- Bisa diakses dari perangkat mana saja, di mana saja
 
-- Don't add `NGROK_AUTHTOKEN`
-- Run `npm run dev`
-- Server auto-updates `app/.env` with `10.0.2.2:3000`
-- Works on emulator only
+**Tanpa Ngrok:**
 
-The server handles everything automatically — you just need to add the authtoken if you want ngrok.
+- Jangan tambahkan `NGROK_AUTHTOKEN`
+- Jalankan `npm run dev`
+- Server otomatis memperbarui `app/.env` dengan `10.0.2.2:3000`
+- Hanya bisa digunakan di emulator
+
+Server menangani semuanya secara otomatis — kamu hanya perlu menambahkan authtoken jika ingin menggunakan ngrok.
