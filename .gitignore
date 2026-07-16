@@ -4,6 +4,7 @@ templates/
 ApplicationFeature.txt
 .kiro
 .idea
+.vscode
 AGENTS.md
 
 app/test
