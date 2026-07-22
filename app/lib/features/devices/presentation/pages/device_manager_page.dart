@@ -15,8 +15,7 @@ class DeviceManagerPage extends StatefulWidget {
   State<DeviceManagerPage> createState() => _DeviceManagerPageState();
 }
 
-class _DeviceManagerPageState extends State<DeviceManagerPage>
-    with SingleTickerProviderStateMixin {
+class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTickerProviderStateMixin {
   late final AnimationController _refreshController;
   _DeviceTab _activeTab = _DeviceTab.printer;
   bool _isScanning = false;
@@ -209,8 +208,7 @@ class _DeviceManagerPageState extends State<DeviceManagerPage>
               onChanged: (tab) => setState(() => _activeTab = tab),
             ),
           ),
-          if (_btUnavailable)
-            _BtWarningBanner(),
+          if (_btUnavailable) _BtWarningBanner(),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -276,9 +274,9 @@ class _BtWarningBanner extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTheme.warning.withOpacity(0.12),
+        color: AppTheme.warning.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.warning.withOpacity(0.4)),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
@@ -314,10 +312,16 @@ class _TabSelector extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _TabItem(label: 'Printer', icon: Icons.print_outlined,
-              isActive: active == _DeviceTab.printer, onTap: () => onChanged(_DeviceTab.printer)),
-          _TabItem(label: 'Scanner', icon: Icons.qr_code_scanner,
-              isActive: active == _DeviceTab.scanner, onTap: () => onChanged(_DeviceTab.scanner)),
+          _TabItem(
+              label: 'Printer',
+              icon: Icons.print_outlined,
+              isActive: active == _DeviceTab.printer,
+              onTap: () => onChanged(_DeviceTab.printer)),
+          _TabItem(
+              label: 'Scanner',
+              icon: Icons.qr_code_scanner,
+              isActive: active == _DeviceTab.scanner,
+              onTap: () => onChanged(_DeviceTab.scanner)),
         ],
       ),
     );
@@ -348,12 +352,11 @@ class _TabItem extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18,
-                  color: isActive ? AppTheme.background : scheme.onSurface.withOpacity(0.6)),
+              Icon(icon, size: 18, color: isActive ? AppTheme.background : scheme.onSurface.withValues(alpha: 0.6)),
               const SizedBox(width: 6),
               Text(label,
                   style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                        color: isActive ? AppTheme.background : scheme.onSurface.withOpacity(0.6),
+                        color: isActive ? AppTheme.background : scheme.onSurface.withValues(alpha: 0.6),
                         fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                       )),
             ],
@@ -371,23 +374,27 @@ class _PairedDeviceCard extends StatelessWidget {
   final VoidCallback onRemove;
   const _PairedDeviceCard({required this.device, required this.onRemove});
 
-  IconData get _icon => device.category == DeviceCategory.printer
-      ? Icons.print_outlined
-      : Icons.qr_code_2_outlined;
+  IconData get _icon => device.category == DeviceCategory.printer ? Icons.print_outlined : Icons.qr_code_2_outlined;
 
   IconData get _connIcon {
     switch (device.connectionType) {
-      case DeviceConnectionType.wifi: return Icons.wifi;
-      case DeviceConnectionType.usb: return Icons.usb;
-      case DeviceConnectionType.bluetooth: return Icons.bluetooth;
+      case DeviceConnectionType.wifi:
+        return Icons.wifi;
+      case DeviceConnectionType.usb:
+        return Icons.usb;
+      case DeviceConnectionType.bluetooth:
+        return Icons.bluetooth;
     }
   }
 
   String get _connLabel {
     switch (device.connectionType) {
-      case DeviceConnectionType.wifi: return 'Wi-Fi';
-      case DeviceConnectionType.usb: return 'USB';
-      case DeviceConnectionType.bluetooth: return 'Bluetooth';
+      case DeviceConnectionType.wifi:
+        return 'Wi-Fi';
+      case DeviceConnectionType.usb:
+        return 'USB';
+      case DeviceConnectionType.bluetooth:
+        return 'Bluetooth';
     }
   }
 
@@ -407,7 +414,7 @@ class _PairedDeviceCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppTheme.success.withOpacity(0.15),
+              color: AppTheme.success.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(_icon, color: AppTheme.success, size: 22),
@@ -421,13 +428,13 @@ class _PairedDeviceCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(_connIcon, size: 12, color: scheme.onSurface.withOpacity(0.5)),
+                    Icon(_connIcon, size: 12, color: scheme.onSurface.withValues(alpha: 0.5)),
                     const SizedBox(width: 4),
-                    Text(_connLabel,
-                        style: Theme.of(context).textTheme.bodySmall),
+                    Text(_connLabel, style: Theme.of(context).textTheme.bodySmall),
                     const SizedBox(width: 8),
                     Container(
-                      width: 6, height: 6,
+                      width: 6,
+                      height: 6,
                       decoration: BoxDecoration(
                         color: device.isConnected ? AppTheme.success : AppTheme.mutedForeground,
                         shape: BoxShape.circle,
@@ -478,7 +485,7 @@ class _DiscoveredDeviceCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppTheme.goldDark.withOpacity(0.12),
+              color: AppTheme.goldDark.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.bluetooth, color: AppTheme.goldDark, size: 22),
@@ -492,12 +499,10 @@ class _DiscoveredDeviceCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Text('Bluetooth',
-                        style: Theme.of(context).textTheme.bodySmall),
+                    Text('Bluetooth', style: Theme.of(context).textTheme.bodySmall),
                     if (device.rssi != null) ...[
                       const SizedBox(width: 8),
-                      Text('${device.rssi} dBm',
-                          style: Theme.of(context).textTheme.bodySmall),
+                      Text('${device.rssi} dBm', style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ],
                 ),
@@ -526,10 +531,12 @@ class _SkeletonList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: List.generate(3, (_) => const Padding(
-        padding: EdgeInsets.only(bottom: 12),
-        child: _SkeletonCard(),
-      )),
+      children: List.generate(
+          3,
+          (_) => const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: _SkeletonCard(),
+              )),
     );
   }
 }
@@ -541,21 +548,22 @@ class _SkeletonCard extends StatefulWidget {
   State<_SkeletonCard> createState() => _SkeletonCardState();
 }
 
-class _SkeletonCardState extends State<_SkeletonCard>
-    with SingleTickerProviderStateMixin {
+class _SkeletonCardState extends State<_SkeletonCard> with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-      ..repeat(reverse: true);
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
     _anim = Tween<double>(begin: 0.3, end: 0.7).animate(_ctrl);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -572,9 +580,10 @@ class _SkeletonCardState extends State<_SkeletonCard>
         child: Row(
           children: [
             Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: scheme.onSurface.withOpacity(_anim.value * 0.15),
+                color: scheme.onSurface.withValues(alpha: _anim.value * 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -583,15 +592,19 @@ class _SkeletonCardState extends State<_SkeletonCard>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(height: 13, width: 130,
+                  Container(
+                      height: 13,
+                      width: 130,
                       decoration: BoxDecoration(
-                        color: scheme.onSurface.withOpacity(_anim.value * 0.15),
-                        borderRadius: BorderRadius.circular(4))),
+                          color: scheme.onSurface.withValues(alpha: _anim.value * 0.15),
+                          borderRadius: BorderRadius.circular(4))),
                   const SizedBox(height: 8),
-                  Container(height: 10, width: 80,
+                  Container(
+                      height: 10,
+                      width: 80,
                       decoration: BoxDecoration(
-                        color: scheme.onSurface.withOpacity(_anim.value * 0.1),
-                        borderRadius: BorderRadius.circular(4))),
+                          color: scheme.onSurface.withValues(alpha: _anim.value * 0.1),
+                          borderRadius: BorderRadius.circular(4))),
                 ],
               ),
             ),
@@ -631,13 +644,15 @@ class _EmptyScanPrompt extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Column(
           children: [
-            Icon(Icons.bluetooth_searching, size: 48,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+            Icon(Icons.bluetooth_searching,
+                size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
             const SizedBox(height: 12),
             Text('Tap refresh to scan for nearby Bluetooth devices',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium!
-                    .copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium!
+                    .copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
           ],
         ),
       ),

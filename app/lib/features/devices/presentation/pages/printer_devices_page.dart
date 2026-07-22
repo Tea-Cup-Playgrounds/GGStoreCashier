@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:developer' as dev;
 import 'package:gg_store_cashier/features/devices/presentation/widgets/devices.dart';
 import 'package:gg_store_cashier/features/devices/presentation/widgets/custom_title.dart';
 import 'package:gg_store_cashier/shared/widgets/refresh_button.dart';
@@ -10,8 +11,7 @@ class PrinterDevicesPage extends StatefulWidget {
   State<PrinterDevicesPage> createState() => _PrinterDevicesPageState();
 }
 
-class _PrinterDevicesPageState extends State<PrinterDevicesPage>
-    with SingleTickerProviderStateMixin {
+class _PrinterDevicesPageState extends State<PrinterDevicesPage> with SingleTickerProviderStateMixin {
   late final AnimationController _refreshController;
 
   @override
@@ -86,7 +86,7 @@ class _PrinterDevicesPageState extends State<PrinterDevicesPage>
                   icon: Icons.print_outlined,
                   extraInfo: '14',
                   onPressed: () {
-                    debugPrint("Disconnect Printer");
+                    dev.log("Disconnect Printer");
                   },
                 ),
                 const SizedBox(height: 20),
@@ -97,7 +97,7 @@ class _PrinterDevicesPageState extends State<PrinterDevicesPage>
                   isPaired: true,
                   icon: Icons.print_outlined,
                   onPressed: () {
-                    debugPrint("Disconnect Printer");
+                    dev.log("Disconnect Printer");
                   },
                 ),
               ]);
@@ -126,7 +126,7 @@ class _PrinterDevicesPageState extends State<PrinterDevicesPage>
                 type: 'Printer',
                 icon: Icons.print_outlined,
                 onPressed: () {
-                  debugPrint("Disconnect Printer");
+                  dev.log("Disconnect Printer");
                 },
               );
             },

@@ -25,9 +25,7 @@ class _ApiConfigDialogState extends State<ApiConfigDialog> {
 
     setState(() {
       _isTestingConnection = false;
-      _connectionResult = isConnected
-          ? 'Connection successful!'
-          : 'Connection failed. Check console for details.';
+      _connectionResult = isConnected ? 'Connection successful!' : 'Connection failed. Check console for details.';
     });
   }
 
@@ -84,7 +82,7 @@ class _ApiConfigDialogState extends State<ApiConfigDialog> {
             //     padding: const EdgeInsets.all(12),
             //     decoration: BoxDecoration(
             //       color: entry.key == _selectedEnvironment
-            //           ? AppTheme.gold.withOpacity(0.1)
+            //           ? AppTheme.gold.withValues(alpha: 0.1)
             //           : AppTheme.muted,
             //       borderRadius: BorderRadius.circular(8),
             //       border: Border.all(
@@ -161,21 +159,17 @@ class _ApiConfigDialogState extends State<ApiConfigDialog> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _connectionResult!.contains('successful')
-                      ? AppTheme.success.withOpacity(0.1)
-                      : AppTheme.destructive.withOpacity(0.1),
+                      ? AppTheme.success.withValues(alpha: 0.1)
+                      : AppTheme.destructive.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _connectionResult!.contains('successful')
-                        ? AppTheme.success
-                        : AppTheme.destructive,
+                    color: _connectionResult!.contains('successful') ? AppTheme.success : AppTheme.destructive,
                   ),
                 ),
                 child: Text(
                   _connectionResult!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: _connectionResult!.contains('successful')
-                            ? AppTheme.success
-                            : AppTheme.destructive,
+                        color: _connectionResult!.contains('successful') ? AppTheme.success : AppTheme.destructive,
                       ),
                 ),
               ),

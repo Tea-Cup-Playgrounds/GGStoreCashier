@@ -43,8 +43,11 @@ class UserListItem extends StatelessWidget {
     }
   }
 
-  String _formatDate(String dateString) {
-    return DateFormatter.format(dateString);
+  String _formatLastActive(dynamic lastActive) {
+    if (lastActive == null || lastActive.toString().isEmpty) {
+      return 'Belum pernah online';
+    }
+    return DateFormatter.format(lastActive.toString());
   }
 
   @override
@@ -60,9 +63,7 @@ class UserListItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: cs.outlineVariant),
       ),
-      child: isDesktop
-          ? _buildDesktopLayout(context, cs)
-          : _buildMobileLayout(context, cs),
+      child: isDesktop ? _buildDesktopLayout(context, cs) : _buildMobileLayout(context, cs),
     );
   }
 
@@ -77,14 +78,10 @@ class UserListItem extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(user['name']?.toString() ?? 'Unknown',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w600)),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               Text('@${user['username']?.toString() ?? 'unknown'}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface.withOpacity(0.6))),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
             ],
           ),
         ),
@@ -96,10 +93,20 @@ class UserListItem extends StatelessWidget {
         ),
         const SizedBox(width: 20),
         Expanded(
-          child: Text(
-              _formatDate(user['created_at']?.toString() ?? ''),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: cs.onSurface.withOpacity(0.6))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Terakhir Online',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: cs.onSurface.withValues(alpha: 0.5), fontSize: 11)),
+              const SizedBox(height: 2),
+              Text(_formatLastActive(user['last_active_at']),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.8))),
+            ],
+          ),
         ),
         const SizedBox(width: 20),
         _buildActions(context, cs),
@@ -120,14 +127,11 @@ class UserListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(user['name']?.toString() ?? 'Unknown',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600)),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 2),
                   Text('@${user['username']?.toString() ?? 'unknown'}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withOpacity(0.6))),
+                      style:
+                          Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
                 ],
               ),
             ),
@@ -142,9 +146,10 @@ class UserListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Cabang',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withOpacity(0.5),
-                          fontSize: 11)),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: cs.onSurface.withValues(alpha: 0.5), fontSize: 11)),
                   const SizedBox(height: 2),
                   Text(user['branch_name']?.toString() ?? 'Tidak ada cabang',
                       style: Theme.of(context).textTheme.bodySmall),
@@ -155,13 +160,13 @@ class UserListItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Dibuat',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withOpacity(0.5),
-                          fontSize: 11)),
+                  Text('Terakhir Online',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: cs.onSurface.withValues(alpha: 0.5), fontSize: 11)),
                   const SizedBox(height: 2),
-                  Text(_formatDate(user['created_at']?.toString() ?? ''),
-                      style: Theme.of(context).textTheme.bodySmall),
+                  Text(_formatLastActive(user['last_active_at']), style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
@@ -198,12 +203,12 @@ class UserListItem extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withOpacity(0.08),
+                    color: cs.onSurface.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text('View Only',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withOpacity(0.5)),
+                      style:
+                          Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.5)),
                       textAlign: TextAlign.center),
                 ),
               ),
@@ -219,15 +224,14 @@ class UserListItem extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppTheme.gold.withOpacity(0.1),
+        color: AppTheme.gold.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: AppTheme.gold.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
       ),
       child: Center(
         child: Text(
           user['name']?.toString().substring(0, 1).toUpperCase() ?? 'U',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppTheme.gold, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.gold, fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -239,14 +243,13 @@ class UserListItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         _formatRole(roleStr),
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: color, fontWeight: FontWeight.w500, fontSize: 11),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w500, fontSize: 11),
       ),
     );
   }
@@ -276,12 +279,11 @@ class UserListItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: cs.onSurface.withOpacity(0.08),
+              color: cs.onSurface.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text('Lihat Saja',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface.withOpacity(0.5))),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.5))),
           ),
       ],
     );

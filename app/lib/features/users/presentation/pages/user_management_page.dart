@@ -50,14 +50,13 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
     ).then((_) => ref.read(userManagementProvider.notifier).loadUsers());
   }
 
-  void _onSearch(String query) =>
-      ref.read(userManagementProvider.notifier).searchUsers(query);
+  void _onSearch(String query) => ref.read(userManagementProvider.notifier).searchUsers(query);
 
   void _onFilterChanged() {
     ref.read(userManagementProvider.notifier).filterUsers(
-      role: _selectedRole == 'all' ? null : _selectedRole,
-      branchId: _selectedBranch == 'all' ? null : _selectedBranch,
-    );
+          role: _selectedRole == 'all' ? null : _selectedRole,
+          branchId: _selectedBranch == 'all' ? null : _selectedBranch,
+        );
   }
 
   @override
@@ -90,10 +89,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                             children: [
                               Text(
                                 'Manajemen Pengguna',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
+                                style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               if (userState.isStale) ...[
                                 const SizedBox(width: 8),
@@ -107,8 +103,10 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                           const SizedBox(height: 4),
                           Text(
                             'Kelola pengguna sistem dan hak aksesnya',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: cs.onSurface.withOpacity(0.6)),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
                           ),
                         ],
                       ),
@@ -116,14 +114,14 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                     Row(
                       children: [
                         IconButton(
-                          onPressed: userState.isLoading
-                              ? null
-                              : () => ref.read(userManagementProvider.notifier).loadUsers(),
+                          onPressed:
+                              userState.isLoading ? null : () => ref.read(userManagementProvider.notifier).loadUsers(),
                           icon: userState.isLoading
                               ? const SizedBox(
-                                  width: 20, height: 20,
+                                  width: 20,
+                                  height: 20,
                                   child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold))
-                              : Icon(Icons.refresh, color: cs.onSurface.withOpacity(0.6)),
+                              : Icon(Icons.refresh, color: cs.onSurface.withValues(alpha: 0.6)),
                         ),
                         const SizedBox(width: 12),
                         Tooltip(
@@ -146,9 +144,9 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
                     ),
                     child: const Row(
                       children: [
@@ -285,8 +283,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
             Text('Gagal memuat pengguna', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(state.error!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurface.withOpacity(0.6)),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
                 textAlign: TextAlign.center),
             const SizedBox(height: 24),
             CustomButton(
@@ -303,13 +300,12 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: cs.onSurface.withOpacity(0.4)),
+            Icon(Icons.people_outline, size: 64, color: cs.onSurface.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
             Text('Pengguna tidak ditemukan', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text('Tambahkan pengguna pertama Anda untuk memulai',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurface.withOpacity(0.6))),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
             const SizedBox(height: 24),
             CustomButton(text: 'Tambah Pengguna', icon: Icons.add, onPressed: () => _showUserForm()),
           ],

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:developer' as dev;
 import '../services/socket_service.dart';
 import '../models/product.dart';
 
@@ -72,7 +73,7 @@ class RealtimeProductNotifier extends StateNotifier<RealtimeProductState> {
           lastUpdateTime: DateTime.now(),
         );
       } catch (e) {
-        print('Error parsing product-created event: $e');
+        dev.log('Error parsing product-created event: $e');
       }
     });
 
@@ -85,7 +86,7 @@ class RealtimeProductNotifier extends StateNotifier<RealtimeProductState> {
           lastUpdateTime: DateTime.now(),
         );
       } catch (e) {
-        print('Error parsing product-updated event: $e');
+        dev.log('Error parsing product-updated event: $e');
       }
     });
 
@@ -98,7 +99,7 @@ class RealtimeProductNotifier extends StateNotifier<RealtimeProductState> {
           lastUpdateTime: DateTime.now(),
         );
       } catch (e) {
-        print('Error parsing product-deleted event: $e');
+        dev.log('Error parsing product-deleted event: $e');
       }
     });
   }
@@ -125,7 +126,7 @@ class RealtimeTransactionNotifier extends StateNotifier<RealtimeTransactionState
           lastUpdateTime: DateTime.now(),
         );
       } catch (e) {
-        print('Error parsing transaction-created event: $e');
+        dev.log('Error parsing transaction-created event: $e');
       }
     });
 
@@ -137,7 +138,7 @@ class RealtimeTransactionNotifier extends StateNotifier<RealtimeTransactionState
           lastUpdateTime: DateTime.now(),
         );
       } catch (e) {
-        print('Error parsing payment-completed event: $e');
+        dev.log('Error parsing payment-completed event: $e');
       }
     });
   }

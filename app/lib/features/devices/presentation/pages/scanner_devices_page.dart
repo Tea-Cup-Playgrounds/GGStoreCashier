@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:developer' as dev;
 import 'package:gg_store_cashier/features/devices/presentation/widgets/devices.dart';
 import 'package:gg_store_cashier/features/devices/presentation/widgets/custom_title.dart';
 import 'package:gg_store_cashier/shared/widgets/refresh_button.dart';
@@ -10,8 +11,7 @@ class ScannerDevicesPage extends StatefulWidget {
   State<ScannerDevicesPage> createState() => _ScannerDevicesPageState();
 }
 
-class _ScannerDevicesPageState extends State<ScannerDevicesPage>
-    with SingleTickerProviderStateMixin {
+class _ScannerDevicesPageState extends State<ScannerDevicesPage> with SingleTickerProviderStateMixin {
   late final AnimationController _refreshController;
 
   @override
@@ -46,8 +46,7 @@ class _ScannerDevicesPageState extends State<ScannerDevicesPage>
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back,
-              color: Theme.of(context).colorScheme.onSurface),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         // Judul dan Subtitle Kustom
@@ -87,7 +86,7 @@ class _ScannerDevicesPageState extends State<ScannerDevicesPage>
                   icon: Icons.qr_code_2_outlined,
                   extraInfo: '14',
                   onPressed: () {
-                    debugPrint("Disconnect Scanner");
+                    dev.log("Disconnect Scanner");
                   },
                 ),
                 const SizedBox(height: 20),
@@ -98,7 +97,7 @@ class _ScannerDevicesPageState extends State<ScannerDevicesPage>
                   isPaired: true,
                   icon: Icons.qr_code_2_outlined,
                   onPressed: () {
-                    debugPrint("Disconnect Scanner");
+                    dev.log("Disconnect Scanner");
                   },
                 ),
               ]);
@@ -127,7 +126,7 @@ class _ScannerDevicesPageState extends State<ScannerDevicesPage>
                 type: 'Scanner',
                 icon: Icons.qr_code_2_outlined,
                 onPressed: () {
-                  debugPrint("Disconnect Scanner");
+                  dev.log("Disconnect Scanner");
                 },
               );
             },

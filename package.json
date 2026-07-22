@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node API/src/server.js",
     "sync-env": "node API/scripts/sync-env.js",
-    "dev": "nodemon API/src/server.js",
+    "dev": "nodemon API/src/server.js && sync-env",
     "hash-passwords": "node API/scripts/hash_passwords.js",
     "create-test-user": "node API/scripts/create_test_user.js",
     "test-server": "node API/scripts/test_server.js",

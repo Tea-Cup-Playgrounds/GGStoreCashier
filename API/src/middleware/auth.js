@@ -24,6 +24,13 @@ const authenticateToken = async (req, res, next) => {
         }
 
         req.user = users[0];
+        
+        // Update last active timestamp asynchronously
+        pool.execute(
+            'UPDATE users SET last_active_at = NOW() WHERE id = ?',
+            [req.user.id]
+        ).catch(err => console.error('Error updating last_active_at:', err.message));
+
         next();
 
     } catch (error) {

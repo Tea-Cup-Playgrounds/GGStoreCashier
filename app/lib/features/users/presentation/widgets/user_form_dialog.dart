@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/text_input.dart';
 import '../../../../shared/widgets/password_strength_indicator.dart';
@@ -87,9 +86,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
       }
 
       if (_isEditing) {
-        await ref
-            .read(userManagementProvider.notifier)
-            .updateUser(widget.user!['id'], userData);
+        await ref.read(userManagementProvider.notifier).updateUser(widget.user!['id'], userData);
         if (mounted) SnackBarService.success('Pengguna berhasil diperbarui');
       } else {
         await ref.read(userManagementProvider.notifier).createUser(userData);
@@ -164,16 +161,12 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                 Expanded(
                   child: Text(
                     _isEditing ? 'Edit Pengguna' : 'Tambah Pengguna Baru',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: Icon(Icons.close,
-                      color: cs.onSurface.withOpacity(0.6)),
+                  icon: Icon(Icons.close, color: cs.onSurface.withValues(alpha: 0.6)),
                 ),
               ],
             ),
@@ -207,16 +200,12 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                       // Role dropdown
                       Text(
                         'Role',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w500),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           color: cs.surface,
                           border: Border.all(color: cs.outlineVariant),
@@ -227,29 +216,17 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                             value: _selectedRole,
                             isExpanded: true,
                             dropdownColor: cs.surface,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: cs.onSurface),
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface),
                             items: widget.isSuperAdmin
                                 ? const [
-                                    DropdownMenuItem(
-                                        value: 'karyawan',
-                                        child: Text('Karyawan')),
-                                    DropdownMenuItem(
-                                        value: 'admin',
-                                        child: Text('Admin')),
-                                    DropdownMenuItem(
-                                        value: 'superadmin',
-                                        child: Text('Super Admin')),
+                                    DropdownMenuItem(value: 'karyawan', child: Text('Karyawan')),
+                                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                                    DropdownMenuItem(value: 'superadmin', child: Text('Super Admin')),
                                   ]
                                 : const [
-                                    DropdownMenuItem(
-                                        value: 'karyawan',
-                                        child: Text('Karyawan')),
+                                    DropdownMenuItem(value: 'karyawan', child: Text('Karyawan')),
                                   ],
-                            onChanged: (value) =>
-                                setState(() => _selectedRole = value!),
+                            onChanged: (value) => setState(() => _selectedRole = value!),
                           ),
                         ),
                       ),
@@ -279,21 +256,16 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
                       TextInput(
                         controller: _passwordController,
-                        label: _isEditing
-                            ? 'Password Baru (kosongkan untuk tetap sama)'
-                            : 'Password',
+                        label: _isEditing ? 'Password Baru (kosongkan untuk tetap sama)' : 'Password',
                         hintText: 'Masukkan password',
                         obscureText: _obscurePassword,
                         validator: _validatePassword,
                         prefixIcon: Icons.lock_outline,
                         suffixIcon: IconButton(
-                          onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                           icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            color: cs.onSurface.withOpacity(0.6),
+                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                         onChanged: (_) => setState(() {}),
@@ -301,8 +273,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                       const SizedBox(height: 12),
                       PasswordStrengthIndicator(
                         password: _passwordController.text,
-                        showRequirements:
-                            _passwordController.text.isNotEmpty,
+                        showRequirements: _passwordController.text.isNotEmpty,
                       ),
                       const SizedBox(height: 20),
 
@@ -314,14 +285,10 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         validator: _validateConfirmPassword,
                         prefixIcon: Icons.lock_outline,
                         suffixIcon: IconButton(
-                          onPressed: () => setState(() =>
-                              _obscureConfirmPassword =
-                                  !_obscureConfirmPassword),
+                          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                           icon: Icon(
-                            _obscureConfirmPassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            color: cs.onSurface.withOpacity(0.6),
+                            _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ),

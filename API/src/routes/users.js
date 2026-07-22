@@ -99,7 +99,7 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         const offsetNum = (pageNum - 1) * limitNum;
         
         let query = `
-            SELECT u.id, u.name, u.username, u.role, u.branch_id, u.created_at, u.updated_at,
+            SELECT u.id, u.name, u.username, u.role, u.branch_id, u.last_active_at, u.created_at, u.updated_at,
                    b.name as branch_name
             FROM users u 
             LEFT JOIN branches b ON u.branch_id = b.id 
@@ -195,7 +195,7 @@ router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
 router.get('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
     try {
         const [users] = await pool.execute(
-            `SELECT u.id, u.name, u.username, u.role, u.branch_id, u.created_at, u.updated_at,
+            `SELECT u.id, u.name, u.username, u.role, u.branch_id, u.last_active_at, u.created_at, u.updated_at,
                     b.name as branch_name
              FROM users u 
              LEFT JOIN branches b ON u.branch_id = b.id 

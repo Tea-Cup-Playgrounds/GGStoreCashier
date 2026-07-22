@@ -14,8 +14,10 @@ Future<bool> _isolateProbe(String endpoint) {
   return Isolate.run(() async {
     try {
       final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 3);
+      client.badCertificateCallback = (cert, host, port) => true;
+      client.connectionTimeout = const Duration(seconds: 5);
       final request = await client.getUrl(Uri.parse(endpoint));
+      request.headers.set('ngrok-skip-browser-warning', 'true');
       final response = await request.close();
       await response.drain<void>();
       client.close();
@@ -99,6 +101,7 @@ class ConnectivityMonitor {
   }
 }
 
-final connectivityProvider = StreamProvider<ConnectivityStatus>((ref) {
-  return ConnectivityMonitor.instance.statusStream;
+final connectivityProvider = StreamProvider<ConnectivityStatus>((ref) async* {
+  yield ConnectivityMonitor.instance.currentStatus;
+  yield* ConnectivityMonitor.instance.statusStream;
 });

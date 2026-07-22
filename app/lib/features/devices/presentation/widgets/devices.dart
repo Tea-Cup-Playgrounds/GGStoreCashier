@@ -23,8 +23,7 @@ class Devices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color statusColor =
-        isConnected ? AppTheme.success : AppTheme.mutedForeground;
+    final Color statusColor = isConnected ? AppTheme.success : AppTheme.mutedForeground;
     final String statusText = isConnected ? 'Connected' : 'Disconnected';
     final String actionText = isConnected ? 'Disconnect' : 'Connect';
 
@@ -63,23 +62,16 @@ class Devices extends StatelessWidget {
                           title,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
-                        if (isConnected)
-                          const Icon(Icons.check_circle,
-                              color: AppTheme.success, size: 20),
+                        if (isConnected) const Icon(Icons.check_circle, color: AppTheme.success, size: 20),
                         if (!isConnected && extraInfo != null)
-                          Text(extraInfo!,
-                              style: Theme.of(context).textTheme.bodySmall),
+                          Text(extraInfo!, style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          type,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium
-                        ),
+                        Text(type, style: Theme.of(context).textTheme.bodyMedium),
                         const SizedBox(height: 4),
                         if (isPaired)
                           Row(
@@ -88,10 +80,7 @@ class Devices extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text(
                                 statusText,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium!
-                                    .copyWith(
+                                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                                       color: statusColor,
                                     ),
                               )
@@ -110,13 +99,10 @@ class Devices extends StatelessWidget {
             child: ElevatedButton(
               onPressed: onPressed,
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    isPaired ? Theme.of(context).colorScheme.outlineVariant : AppTheme.goldDark,
-                foregroundColor:
-                    isPaired ? AppTheme.foreground : AppTheme.background,
-                overlayColor: isPaired
-                    ? AppTheme.foreground.withOpacity(0.1)
-                    : AppTheme.background.withOpacity(0.2),
+                backgroundColor: isPaired ? Theme.of(context).colorScheme.outlineVariant : AppTheme.goldDark,
+                foregroundColor: isPaired ? AppTheme.foreground : AppTheme.background,
+                overlayColor:
+                    isPaired ? AppTheme.foreground.withValues(alpha: 0.1) : AppTheme.background.withValues(alpha: 0.2),
                 elevation: 0,
               ),
               child: Text(actionText),

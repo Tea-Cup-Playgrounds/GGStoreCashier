@@ -44,7 +44,10 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
   }
 
   Future<void> _loadBranch() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final branch = await BranchService.getBranch(widget.branchId);
       if (mounted) {
@@ -58,7 +61,12 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -99,9 +107,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
         _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
       );
       if (mounted) {
-        final msg = savedOnline
-            ? 'Cabang berhasil diperbarui'
-            : 'Perubahan disimpan — akan dikirim saat online';
+        final msg = savedOnline ? 'Cabang berhasil diperbarui' : 'Perubahan disimpan — akan dikirim saat online';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(msg),
           backgroundColor: savedOnline ? AppTheme.success : Colors.orange,
@@ -179,11 +185,11 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              isOffline
-                  ? 'Data cabang belum tersimpan di perangkat ini. Coba lagi saat online.'
-                  : _error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              isOffline ? 'Data cabang belum tersimpan di perangkat ini. Coba lagi saat online.' : _error!,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -208,9 +214,9 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
                 ),
                 child: const Row(
                   children: [
@@ -230,16 +236,16 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.gold.withOpacity(0.08),
+                color: AppTheme.gold.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.gold.withOpacity(0.2)),
+                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppTheme.gold.withOpacity(0.15),
+                      color: AppTheme.gold.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.storefront_outlined, color: AppTheme.gold, size: 24),
@@ -250,11 +256,12 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Branch ID: ${widget.branchId}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: cs.onSurface.withOpacity(0.5))),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: cs.onSurface.withValues(alpha: 0.5))),
                         Text(_branch?.name ?? '',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600)),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -292,13 +299,12 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
                 onPressed: _isFetchingLocation ? null : _autofillAddress,
                 icon: _isFetchingLocation
                     ? const SizedBox(
-                        width: 16, height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold))
+                        width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold))
                     : const Icon(Icons.my_location, size: 18),
                 label: Text(_isFetchingLocation ? 'Mendapatkan lokasi...' : 'Gunakan lokasi saat ini'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.gold,
-                  side: BorderSide(color: AppTheme.gold.withOpacity(0.4)),
+                  side: BorderSide(color: AppTheme.gold.withValues(alpha: 0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),

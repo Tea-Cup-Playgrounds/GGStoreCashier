@@ -1,5 +1,6 @@
+// ignore: library_prefixes
 import 'package:socket_io_client/socket_io_client.dart' as IO;
-import 'package:flutter/foundation.dart';
+import 'dart:developer' as dev;
 import '../config/api_config.dart';
 
 class SocketService {
@@ -15,14 +16,14 @@ class SocketService {
   // Initialize socket connection
   static void connect(String token, int branchId) {
     if (_socket != null && _isConnected) {
-      debugPrint('Socket already connected');
+      dev.log('Socket already connected');
       return;
     }
 
     final baseUrl = ApiConfig.apiUrl.replaceAll('/api', '');
-    
-    debugPrint('Connecting to Socket.IO at: $baseUrl');
-    
+
+    dev.log('Connecting to Socket.IO at: $baseUrl');
+
     _socket = IO.io(
       baseUrl,
       IO.OptionBuilder()
@@ -37,29 +38,29 @@ class SocketService {
     );
 
     _socket!.onConnect((_) {
-      debugPrint('Socket.IO connected');
+      dev.log('Socket.IO connected');
       _isConnected = true;
       _currentBranchId = branchId;
-      
+
       // Join branch room
       _socket!.emit('join-branch', branchId);
-      
+
       // Also join branch-0 for superadmin to receive all events
       _socket!.emit('join-branch', 0);
     });
 
     _socket!.onDisconnect((_) {
-      debugPrint('Socket.IO disconnected');
+      dev.log('Socket.IO disconnected');
       _isConnected = false;
     });
 
     _socket!.onConnectError((error) {
-      debugPrint('Socket.IO connection error: $error');
+      dev.log('Socket.IO connection error: $error');
       _isConnected = false;
     });
 
     _socket!.onError((error) {
-      debugPrint('Socket.IO error: $error');
+      dev.log('Socket.IO error: $error');
     });
 
     // Setup event listeners
@@ -70,29 +71,29 @@ class SocketService {
   static void _setupEventListeners() {
     // Product events
     _socket!.on('product-created', (data) {
-      debugPrint('Product created: $data');
+      dev.log('Product created: $data');
       _notifyListeners('product-created', data);
     });
 
     _socket!.on('product-updated', (data) {
-      debugPrint('Product updated: $data');
+      dev.log('Product updated: $data');
       _notifyListeners('product-updated', data);
     });
 
     _socket!.on('product-deleted', (data) {
-      debugPrint('Product deleted: $data');
+      dev.log('Product deleted: $data');
       _notifyListeners('product-deleted', data);
     });
 
     // Transaction events
     _socket!.on('transaction-created', (data) {
-      debugPrint('Transaction created: $data');
+      dev.log('Transaction created: $data');
       _notifyListeners('transaction-created', data);
     });
 
     // Payment events
     _socket!.on('payment-completed', (data) {
-      debugPrint('Payment completed: $data');
+      dev.log('Payment completed: $data');
       _notifyListeners('payment-completed', data);
     });
   }
@@ -124,7 +125,7 @@ class SocketService {
   // Change branch room
   static void changeBranch(int newBranchId) {
     if (_socket == null || !_isConnected) {
-      debugPrint('Socket not connected, cannot change branch');
+      dev.log('Socket not connected, cannot change branch');
       return;
     }
 
@@ -134,11 +135,11 @@ class SocketService {
 
     _currentBranchId = newBranchId;
     _socket!.emit('join-branch', newBranchId);
-    
+
     // Also join branch-0 for superadmin
     _socket!.emit('join-branch', 0);
-    
-    debugPrint('Changed to branch: $newBranchId');
+
+    dev.log('Changed to branch: $newBranchId');
   }
 
   // Disconnect socket
@@ -153,7 +154,7 @@ class SocketService {
       _isConnected = false;
       _currentBranchId = null;
       _eventListeners.clear();
-      debugPrint('Socket.IO disconnected and disposed');
+      dev.log('Socket.IO disconnected and disposed');
     }
   }
 
@@ -162,7 +163,7 @@ class SocketService {
     if (_socket != null && _isConnected) {
       _socket!.emit(event, data);
     } else {
-      debugPrint('Cannot emit event: Socket not connected');
+      dev.log('Cannot emit event: Socket not connected');
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:developer' as dev;
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,7 +28,7 @@ class ProductService {
         error: true,
         logPrint: (obj) {
           if (ApiConfig.enableLogging) {
-            print('[PRODUCT SERVICE] $obj');
+            dev.log('[PRODUCT SERVICE] $obj');
           }
         },
       ));
@@ -40,8 +41,7 @@ class ProductService {
   }
 
   /// Cache key scoped to the branch so different users never share cached lists.
-  static String _cacheKey(int? branchId) =>
-      branchId != null ? 'products:branch_$branchId' : 'products:all';
+  static String _cacheKey(int? branchId) => branchId != null ? 'products:branch_$branchId' : 'products:all';
 
   static String getProductImageUrl(String? imageName) {
     if (imageName == null || imageName.isEmpty) {
@@ -65,8 +65,7 @@ class ProductService {
     // Reset stale flag at the start of every call.
     lastFetchWasStale = false;
 
-    final bool noFilters =
-        categoryId == null && (search == null || search.isEmpty);
+    final bool noFilters = categoryId == null && (search == null || search.isEmpty);
 
     final cacheKey = _cacheKey(branchId);
 
@@ -74,9 +73,8 @@ class ProductService {
     if (noFilters && !forceRefresh && CacheManager.isValid(cacheKey)) {
       final entry = CacheManager.get(cacheKey);
       if (entry != null) {
-        final cachedList = (entry.data as List)
-            .map((json) => Product.fromJson(Map<String, dynamic>.from(json as Map)))
-            .toList();
+        final cachedList =
+            (entry.data as List).map((json) => Product.fromJson(Map<String, dynamic>.from(json as Map))).toList();
         return cachedList;
       }
     }
@@ -103,8 +101,7 @@ class ProductService {
       if (response.statusCode == 200) {
         final data = response.data;
         final productsJson = data['products'] as List;
-        final products =
-            productsJson.map((json) => Product.fromJson(json)).toList();
+        final products = productsJson.map((json) => Product.fromJson(json)).toList();
 
         // Store raw JSON in cache (only when no extra filters).
         if (noFilters) {
@@ -124,8 +121,7 @@ class ProductService {
           staleEntry.isStale = true;
           await staleEntry.save();
           return (staleEntry.data as List)
-              .map((json) =>
-                  Product.fromJson(Map<String, dynamic>.from(json as Map)))
+              .map((json) => Product.fromJson(Map<String, dynamic>.from(json as Map)))
               .toList();
         }
       }

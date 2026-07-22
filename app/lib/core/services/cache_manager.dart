@@ -5,6 +5,7 @@ part 'cache_manager.g.dart';
 
 @HiveType(typeId: 8)
 class CacheEntry extends HiveObject {
+  @override
   @HiveField(0)
   String key;
 

@@ -27,7 +27,7 @@ class _LiveClockState extends State<LiveClock> {
   late Timer _timer;
 
   static final _dateFmt = DateFormat('EEEE, dd MMM yyyy'); // Monday, 03 Apr 2026
-  static final _timeFmt = DateFormat('HH:mm:ss');          // 14:32:07
+  static final _timeFmt = DateFormat('HH:mm:ss'); // 14:32:07
 
   @override
   void initState() {
@@ -48,23 +48,19 @@ class _LiveClockState extends State<LiveClock> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final defaultDateStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: cs.onSurface.withOpacity(0.55),
+          color: cs.onSurface.withValues(alpha: 0.55),
         );
     final defaultTimeStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          fontFeatures: const [FontFeature.tabularFigures()],
-        );
+      fontWeight: FontWeight.w600,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.showTime)
-          Text(_timeFmt.format(_now),
-              style: widget.timeStyle ?? defaultTimeStyle),
-        if (widget.showDate)
-          Text(_dateFmt.format(_now),
-              style: widget.dateStyle ?? defaultDateStyle),
+        if (widget.showTime) Text(_timeFmt.format(_now), style: widget.timeStyle ?? defaultTimeStyle),
+        if (widget.showDate) Text(_dateFmt.format(_now), style: widget.dateStyle ?? defaultDateStyle),
       ],
     );
   }

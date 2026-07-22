@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -35,29 +34,47 @@ class ReceiptSection {
 
   String get label {
     switch (type) {
-      case SectionType.logo:    return 'Store Logo';
-      case SectionType.header:  return 'Store Name & Branch';
-      case SectionType.contact: return 'Address & Phone';
-      case SectionType.divider: return 'Divider Line';
-      case SectionType.items:   return 'Item List';
-      case SectionType.totals:  return 'Subtotal / Tax / Total';
-      case SectionType.payment: return 'Payment Method';
-      case SectionType.footer:  return 'Footer Message';
-      case SectionType.barcode: return 'Barcode / QR Code';
+      case SectionType.logo:
+        return 'Store Logo';
+      case SectionType.header:
+        return 'Store Name & Branch';
+      case SectionType.contact:
+        return 'Address & Phone';
+      case SectionType.divider:
+        return 'Divider Line';
+      case SectionType.items:
+        return 'Item List';
+      case SectionType.totals:
+        return 'Subtotal / Tax / Total';
+      case SectionType.payment:
+        return 'Payment Method';
+      case SectionType.footer:
+        return 'Footer Message';
+      case SectionType.barcode:
+        return 'Barcode / QR Code';
     }
   }
 
   IconData get icon {
     switch (type) {
-      case SectionType.logo:    return Icons.image_outlined;
-      case SectionType.header:  return Icons.store_outlined;
-      case SectionType.contact: return Icons.location_on_outlined;
-      case SectionType.divider: return Icons.horizontal_rule;
-      case SectionType.items:   return Icons.list_alt_outlined;
-      case SectionType.totals:  return Icons.calculate_outlined;
-      case SectionType.payment: return Icons.payment_outlined;
-      case SectionType.footer:  return Icons.notes_outlined;
-      case SectionType.barcode: return Icons.qr_code_outlined;
+      case SectionType.logo:
+        return Icons.image_outlined;
+      case SectionType.header:
+        return Icons.store_outlined;
+      case SectionType.contact:
+        return Icons.location_on_outlined;
+      case SectionType.divider:
+        return Icons.horizontal_rule;
+      case SectionType.items:
+        return Icons.list_alt_outlined;
+      case SectionType.totals:
+        return Icons.calculate_outlined;
+      case SectionType.payment:
+        return Icons.payment_outlined;
+      case SectionType.footer:
+        return Icons.notes_outlined;
+      case SectionType.barcode:
+        return Icons.qr_code_outlined;
     }
   }
 }
@@ -71,21 +88,20 @@ class ReceiptEditorPage extends StatefulWidget {
   State<ReceiptEditorPage> createState() => _ReceiptEditorPageState();
 }
 
-class _ReceiptEditorPageState extends State<ReceiptEditorPage>
-    with SingleTickerProviderStateMixin {
+class _ReceiptEditorPageState extends State<ReceiptEditorPage> with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
   static const _prefsKey = 'receipt_config';
 
   PaperSize _selectedSize = _paperSizes.first;
 
-  final _storeNameCtrl   = TextEditingController(text: 'GG Store');
-  final _branchCtrl      = TextEditingController(text: 'Downtown Branch');
-  final _addressCtrl     = TextEditingController(text: 'Jl. Contoh No. 1, Jakarta');
-  final _phoneCtrl       = TextEditingController(text: '+62 812-3456-7890');
-  final _footerCtrl      = TextEditingController(text: 'Thank you for your purchase!');
-  final _taxLabelCtrl    = TextEditingController(text: 'PPN');
+  final _storeNameCtrl = TextEditingController(text: 'GG Store');
+  final _branchCtrl = TextEditingController(text: 'Downtown Branch');
+  final _addressCtrl = TextEditingController(text: 'Jl. Contoh No. 1, Jakarta');
+  final _phoneCtrl = TextEditingController(text: '+62 812-3456-7890');
+  final _footerCtrl = TextEditingController(text: 'Thank you for your purchase!');
+  final _taxLabelCtrl = TextEditingController(text: 'PPN');
   final _discountLabelCtrl = TextEditingController(text: 'Discount');
-  final _voucherLabelCtrl  = TextEditingController(text: 'Voucher');
+  final _voucherLabelCtrl = TextEditingController(text: 'Voucher');
 
   double _taxRate = 11.0;
   bool _taxEnabled = true;
@@ -118,8 +134,16 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage>
   @override
   void dispose() {
     _tabCtrl.dispose();
-    for (final c in [_storeNameCtrl, _branchCtrl, _addressCtrl, _phoneCtrl,
-        _footerCtrl, _taxLabelCtrl, _discountLabelCtrl, _voucherLabelCtrl]) {
+    for (final c in [
+      _storeNameCtrl,
+      _branchCtrl,
+      _addressCtrl,
+      _phoneCtrl,
+      _footerCtrl,
+      _taxLabelCtrl,
+      _discountLabelCtrl,
+      _voucherLabelCtrl
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -132,28 +156,27 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage>
     try {
       final m = jsonDecode(raw) as Map<String, dynamic>;
       setState(() {
-        _storeNameCtrl.text    = m['storeName']    ?? _storeNameCtrl.text;
-        _branchCtrl.text       = m['branch']       ?? _branchCtrl.text;
-        _addressCtrl.text      = m['address']      ?? _addressCtrl.text;
-        _phoneCtrl.text        = m['phone']        ?? _phoneCtrl.text;
-        _footerCtrl.text       = m['footer']       ?? _footerCtrl.text;
-        _taxLabelCtrl.text     = m['taxLabel']     ?? _taxLabelCtrl.text;
-        _discountLabelCtrl.text= m['discountLabel']?? _discountLabelCtrl.text;
+        _storeNameCtrl.text = m['storeName'] ?? _storeNameCtrl.text;
+        _branchCtrl.text = m['branch'] ?? _branchCtrl.text;
+        _addressCtrl.text = m['address'] ?? _addressCtrl.text;
+        _phoneCtrl.text = m['phone'] ?? _phoneCtrl.text;
+        _footerCtrl.text = m['footer'] ?? _footerCtrl.text;
+        _taxLabelCtrl.text = m['taxLabel'] ?? _taxLabelCtrl.text;
+        _discountLabelCtrl.text = m['discountLabel'] ?? _discountLabelCtrl.text;
         _voucherLabelCtrl.text = m['voucherLabel'] ?? _voucherLabelCtrl.text;
-        _taxRate               = (m['taxRate']     ?? 11.0).toDouble();
-        _taxEnabled            = m['taxEnabled']   ?? true;
-        _discountEnabled       = m['discountEnabled'] ?? true;
-        _voucherEnabled        = m['voucherEnabled']  ?? true;
-        _showCashierName       = m['showCashierName'] ?? true;
-        _showTransactionId     = m['showTransactionId'] ?? true;
-        _showDateTime          = m['showDateTime'] ?? true;
-        final sizeIdx          = m['paperSizeIndex'] ?? 0;
-        _selectedSize          = _paperSizes[sizeIdx.clamp(0, _paperSizes.length - 1)];
+        _taxRate = (m['taxRate'] ?? 11.0).toDouble();
+        _taxEnabled = m['taxEnabled'] ?? true;
+        _discountEnabled = m['discountEnabled'] ?? true;
+        _voucherEnabled = m['voucherEnabled'] ?? true;
+        _showCashierName = m['showCashierName'] ?? true;
+        _showTransactionId = m['showTransactionId'] ?? true;
+        _showDateTime = m['showDateTime'] ?? true;
+        final sizeIdx = m['paperSizeIndex'] ?? 0;
+        _selectedSize = _paperSizes[sizeIdx.clamp(0, _paperSizes.length - 1)];
         if (m['sections'] != null) {
           final sl = m['sections'] as List;
           _sections = sl.map((s) {
-            final t = SectionType.values.firstWhere(
-                (e) => e.name == s['type'], orElse: () => SectionType.divider);
+            final t = SectionType.values.firstWhere((e) => e.name == s['type'], orElse: () => SectionType.divider);
             return ReceiptSection(type: t, visible: s['visible'] ?? true);
           }).toList();
         }
@@ -163,25 +186,27 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage>
 
   Future<void> _saveConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, jsonEncode({
-      'storeName':       _storeNameCtrl.text,
-      'branch':          _branchCtrl.text,
-      'address':         _addressCtrl.text,
-      'phone':           _phoneCtrl.text,
-      'footer':          _footerCtrl.text,
-      'taxLabel':        _taxLabelCtrl.text,
-      'discountLabel':   _discountLabelCtrl.text,
-      'voucherLabel':    _voucherLabelCtrl.text,
-      'taxRate':         _taxRate,
-      'taxEnabled':      _taxEnabled,
-      'discountEnabled': _discountEnabled,
-      'voucherEnabled':  _voucherEnabled,
-      'showCashierName': _showCashierName,
-      'showTransactionId': _showTransactionId,
-      'showDateTime':    _showDateTime,
-      'paperSizeIndex':  _paperSizes.indexOf(_selectedSize),
-      'sections': _sections.map((s) => {'type': s.type.name, 'visible': s.visible}).toList(),
-    }));
+    await prefs.setString(
+        _prefsKey,
+        jsonEncode({
+          'storeName': _storeNameCtrl.text,
+          'branch': _branchCtrl.text,
+          'address': _addressCtrl.text,
+          'phone': _phoneCtrl.text,
+          'footer': _footerCtrl.text,
+          'taxLabel': _taxLabelCtrl.text,
+          'discountLabel': _discountLabelCtrl.text,
+          'voucherLabel': _voucherLabelCtrl.text,
+          'taxRate': _taxRate,
+          'taxEnabled': _taxEnabled,
+          'discountEnabled': _discountEnabled,
+          'voucherEnabled': _voucherEnabled,
+          'showCashierName': _showCashierName,
+          'showTransactionId': _showTransactionId,
+          'showDateTime': _showDateTime,
+          'paperSizeIndex': _paperSizes.indexOf(_selectedSize),
+          'sections': _sections.map((s) => {'type': s.type.name, 'visible': s.visible}).toList(),
+        }));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Receipt settings saved')),
@@ -189,8 +214,7 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage>
     }
   }
 
-  bool _sectionVisible(SectionType t) =>
-      _sections.any((s) => s.type == t && s.visible);
+  bool _sectionVisible(SectionType t) => _sections.any((s) => s.type == t && s.visible);
 
   @override
   Widget build(BuildContext context) {
@@ -208,8 +232,7 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage>
         actions: [
           TextButton(
             onPressed: _saveConfig,
-            child: Text('Save',
-                style: TextStyle(color: AppTheme.goldDark, fontWeight: FontWeight.w600)),
+            child: const Text('Save', style: TextStyle(color: AppTheme.goldDark, fontWeight: FontWeight.w600)),
           ),
         ],
         bottom: TabBar(
@@ -293,15 +316,24 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage>
 class _ContentTab extends StatelessWidget {
   final PaperSize selectedSize;
   final ValueChanged<PaperSize> onSizeChanged;
-  final TextEditingController storeNameCtrl, branchCtrl, addressCtrl,
-      phoneCtrl, footerCtrl, taxLabelCtrl, discountLabelCtrl, voucherLabelCtrl;
+  final TextEditingController storeNameCtrl,
+      branchCtrl,
+      addressCtrl,
+      phoneCtrl,
+      footerCtrl,
+      taxLabelCtrl,
+      discountLabelCtrl,
+      voucherLabelCtrl;
   final double taxRate;
   final bool taxEnabled, discountEnabled, voucherEnabled;
   final bool showCashierName, showTransactionId, showDateTime;
   final ValueChanged<double> onTaxRateChanged;
-  final ValueChanged<bool> onTaxEnabledChanged, onDiscountEnabledChanged,
-      onVoucherEnabledChanged, onCashierNameChanged,
-      onTransactionIdChanged, onDateTimeChanged;
+  final ValueChanged<bool> onTaxEnabledChanged,
+      onDiscountEnabledChanged,
+      onVoucherEnabledChanged,
+      onCashierNameChanged,
+      onTransactionIdChanged,
+      onDateTimeChanged;
 
   const _ContentTab({
     required this.selectedSize,
@@ -482,21 +514,19 @@ class _LayoutTab extends StatelessWidget {
                   color: scheme.secondary,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: s.visible ? scheme.outline : scheme.outline.withOpacity(0.4),
+                    color: s.visible ? scheme.outline : scheme.outline.withValues(alpha: 0.4),
                   ),
                 ),
                 child: ListTile(
                   leading: Icon(s.icon,
                       size: 20,
                       color: s.visible
-                          ? scheme.onSurface.withOpacity(0.7)
-                          : scheme.onSurface.withOpacity(0.3)),
+                          ? scheme.onSurface.withValues(alpha: 0.7)
+                          : scheme.onSurface.withValues(alpha: 0.3)),
                   title: Text(
                     s.label,
                     style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                          color: s.visible
-                              ? scheme.onSurface
-                              : scheme.onSurface.withOpacity(0.4),
+                          color: s.visible ? scheme.onSurface : scheme.onSurface.withValues(alpha: 0.4),
                         ),
                   ),
                   trailing: Row(
@@ -505,11 +535,10 @@ class _LayoutTab extends StatelessWidget {
                       Switch.adaptive(
                         value: s.visible,
                         onChanged: (v) => onToggle(i, v),
-                        activeColor: AppTheme.goldDark,
+                        activeThumbColor: AppTheme.goldDark,
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.drag_handle,
-                          color: scheme.onSurface.withOpacity(0.3), size: 20),
+                      Icon(Icons.drag_handle, color: scheme.onSurface.withValues(alpha: 0.3), size: 20),
                     ],
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -564,11 +593,11 @@ class _PreviewTab extends StatelessWidget {
     final previewWidth = isNarrow ? 220.0 : 280.0;
     const subtotal = 35000.0;
     const discount = 5000.0;
-    const voucher  = 2000.0;
-    final taxAmt   = taxEnabled ? subtotal * (taxRate / 100) : 0.0;
-    final discAmt  = discountEnabled ? discount : 0.0;
+    const voucher = 2000.0;
+    final taxAmt = taxEnabled ? subtotal * (taxRate / 100) : 0.0;
+    final discAmt = discountEnabled ? discount : 0.0;
     final vouchAmt = voucherEnabled ? voucher : 0.0;
-    final total    = subtotal + taxAmt - discAmt - vouchAmt;
+    final total = subtotal + taxAmt - discAmt - vouchAmt;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -579,7 +608,7 @@ class _PreviewTab extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(4),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4)),
             ],
           ),
           child: Column(
@@ -603,30 +632,24 @@ class _PreviewTab extends StatelessWidget {
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black),
                             textAlign: TextAlign.center),
                         Text(branch,
-                            style: const TextStyle(fontSize: 10, color: Colors.black54),
-                            textAlign: TextAlign.center),
+                            style: const TextStyle(fontSize: 10, color: Colors.black54), textAlign: TextAlign.center),
                       ],
                       // Contact
                       if (_vis(SectionType.contact)) ...[
                         const SizedBox(height: 4),
                         if (address != null)
                           Text(address!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 9, color: Colors.black54)),
+                              textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.black54)),
                         if (phone != null)
                           Text(phone!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 9, color: Colors.black54)),
+                              textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.black54)),
                       ],
                       // Transaction meta
                       if (showDateTime || showTransactionId || showCashierName) ...[
                         const _PDivider(),
-                        if (showDateTime)
-                          _PRow(left: 'Date', right: '08/04/2026 14:32'),
-                        if (showTransactionId)
-                          _PRow(left: 'TRX ID', right: '#TRX-00123'),
-                        if (showCashierName)
-                          _PRow(left: 'Cashier', right: 'Budi Santoso'),
+                        if (showDateTime) const _PRow(left: 'Date', right: '08/04/2026 14:32'),
+                        if (showTransactionId) const _PRow(left: 'TRX ID', right: '#TRX-00123'),
+                        if (showCashierName) const _PRow(left: 'Cashier', right: 'Budi Santoso'),
                       ],
                       // Items
                       if (_vis(SectionType.items)) ...[
@@ -639,19 +662,16 @@ class _PreviewTab extends StatelessWidget {
                       if (_vis(SectionType.totals)) ...[
                         const _PDivider(),
                         _PRow(left: 'Subtotal', right: _fmt(subtotal)),
-                        if (taxEnabled)
-                          _PRow(left: '$taxLabel (${taxRate.toStringAsFixed(0)}%)', right: _fmt(taxAmt)),
-                        if (discountEnabled)
-                          _PRow(left: discountLabel, right: '-${_fmt(discAmt)}'),
-                        if (voucherEnabled)
-                          _PRow(left: voucherLabel, right: '-${_fmt(vouchAmt)}'),
+                        if (taxEnabled) _PRow(left: '$taxLabel (${taxRate.toStringAsFixed(0)}%)', right: _fmt(taxAmt)),
+                        if (discountEnabled) _PRow(left: discountLabel, right: '-${_fmt(discAmt)}'),
+                        if (voucherEnabled) _PRow(left: voucherLabel, right: '-${_fmt(vouchAmt)}'),
                         const _PDivider(),
                         _PRow(left: 'TOTAL', right: _fmt(total), bold: true),
                       ],
                       // Payment
                       if (_vis(SectionType.payment)) ...[
                         const SizedBox(height: 4),
-                        _PRow(left: 'Payment', right: 'Cash'),
+                        const _PRow(left: 'Payment', right: 'Cash'),
                         _PRow(left: 'Paid', right: _fmt(total + 5000)),
                         _PRow(left: 'Change', right: _fmt(5000)),
                       ],
@@ -670,20 +690,17 @@ class _PreviewTab extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         const Text('TRX-00123',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 8, color: Colors.black38)),
+                            textAlign: TextAlign.center, style: TextStyle(fontSize: 8, color: Colors.black38)),
                         const SizedBox(height: 4),
                       ],
                       // Footer
                       if (_vis(SectionType.footer)) ...[
                         const _PDivider(),
                         Text(footer,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 9, color: Colors.black54)),
+                            textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.black54)),
                       ],
                       const SizedBox(height: 4),
-                      Text(paperSize.label,
-                          style: const TextStyle(fontSize: 7, color: Colors.black26)),
+                      Text(paperSize.label, style: const TextStyle(fontSize: 7, color: Colors.black26)),
                     ],
                   ),
                 ),
@@ -776,8 +793,7 @@ class _SecTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(title,
-        style: Theme.of(context).textTheme.titleSmall!.copyWith(letterSpacing: 0.8));
+    return Text(title, style: Theme.of(context).textTheme.titleSmall!.copyWith(letterSpacing: 0.8));
   }
 }
 
@@ -801,31 +817,34 @@ class _PaperSizeDropdown extends StatelessWidget {
           value: selected,
           isExpanded: true,
           dropdownColor: scheme.secondary,
-          items: _paperSizes.map((s) => DropdownMenuItem(
-            value: s,
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: s.width == PaperWidth.mm58
-                        ? AppTheme.goldDark.withOpacity(0.15)
-                        : Colors.blue.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    s.width == PaperWidth.mm58 ? '58mm' : '80mm',
-                    style: TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w600,
-                      color: s.width == PaperWidth.mm58 ? AppTheme.goldDark : Colors.blue,
+          items: _paperSizes
+              .map((s) => DropdownMenuItem(
+                    value: s,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: s.width == PaperWidth.mm58
+                                ? AppTheme.goldDark.withValues(alpha: 0.15)
+                                : Colors.blue.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            s.width == PaperWidth.mm58 ? '58mm' : '80mm',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: s.width == PaperWidth.mm58 ? AppTheme.goldDark : Colors.blue,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(s.dimensions, style: Theme.of(context).textTheme.bodyMedium),
+                      ],
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(s.dimensions, style: Theme.of(context).textTheme.bodyMedium),
-              ],
-            ),
-          )).toList(),
+                  ))
+              .toList(),
           onChanged: (v) => v != null ? onChanged(v) : null,
         ),
       ),
@@ -850,12 +869,10 @@ class _RField extends StatelessWidget {
         labelText: label,
         filled: true,
         fillColor: scheme.secondary,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: scheme.outline)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: scheme.outline)),
+        border:
+            OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: scheme.outline)),
+        enabledBorder:
+            OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: scheme.outline)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppTheme.goldDark, width: 1.5)),
@@ -881,9 +898,9 @@ class _ToggleTile extends StatelessWidget {
         border: Border.all(color: scheme.outline),
       ),
       child: ListTile(
-        leading: Icon(icon, color: scheme.onSurface.withOpacity(0.6), size: 20),
+        leading: Icon(icon, color: scheme.onSurface.withValues(alpha: 0.6), size: 20),
         title: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-        trailing: Switch.adaptive(value: value, onChanged: onChanged, activeColor: AppTheme.goldDark),
+        trailing: Switch.adaptive(value: value, onChanged: onChanged, activeTrackColor: AppTheme.goldDark),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         dense: true,
       ),
@@ -916,13 +933,12 @@ class _TaxRateSlider extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.goldDark.withOpacity(0.12),
+                  color: AppTheme.goldDark.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${value.toStringAsFixed(1)}%',
-                  style: const TextStyle(
-                      color: AppTheme.goldDark, fontWeight: FontWeight.w600, fontSize: 13),
+                  style: const TextStyle(color: AppTheme.goldDark, fontWeight: FontWeight.w600, fontSize: 13),
                 ),
               ),
             ],
@@ -933,7 +949,7 @@ class _TaxRateSlider extends StatelessWidget {
             max: 25,
             divisions: 50,
             activeColor: AppTheme.goldDark,
-            inactiveColor: AppTheme.goldDark.withOpacity(0.2),
+            inactiveColor: AppTheme.goldDark.withValues(alpha: 0.2),
             onChanged: onChanged,
           ),
           Row(

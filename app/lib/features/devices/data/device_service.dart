@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -130,13 +131,12 @@ class DeviceService {
         }
       }
     } catch (e) {
-      debugPrint('BT scan error: $e');
+      dev.log('BT scan error: $e');
     } finally {
       await FlutterBluePlus.stopScan();
     }
   }
 
   /// Returns current Bluetooth adapter state stream.
-  static Stream<BluetoothAdapterState> get adapterState =>
-      FlutterBluePlus.adapterState;
+  static Stream<BluetoothAdapterState> get adapterState => FlutterBluePlus.adapterState;
 }

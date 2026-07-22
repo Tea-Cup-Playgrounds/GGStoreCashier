@@ -15,12 +15,10 @@ class AdminUserManagementPage extends ConsumerStatefulWidget {
   const AdminUserManagementPage({super.key});
 
   @override
-  ConsumerState<AdminUserManagementPage> createState() =>
-      _AdminUserManagementPageState();
+  ConsumerState<AdminUserManagementPage> createState() => _AdminUserManagementPageState();
 }
 
-class _AdminUserManagementPageState
-    extends ConsumerState<AdminUserManagementPage> {
+class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPage> {
   final _searchController = TextEditingController();
   String _selectedRole = 'all';
 
@@ -67,8 +65,7 @@ class _AdminUserManagementPageState
   void _showDeleteDialog(Map<String, dynamic> user) {
     if (user['role'] == 'admin' || user['role'] == 'superadmin') {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content:
-            Text('Anda tidak dapat menghapus pengguna admin atau superadmin'),
+        content: Text('Anda tidak dapat menghapus pengguna admin atau superadmin'),
         backgroundColor: AppTheme.destructive,
       ));
       return;
@@ -79,8 +76,7 @@ class _AdminUserManagementPageState
     ).then((_) => _reload());
   }
 
-  void _onSearch(String query) =>
-      ref.read(userManagementProvider.notifier).searchUsers(query);
+  void _onSearch(String query) => ref.read(userManagementProvider.notifier).searchUsers(query);
 
   void _onFilterChanged() {
     final user = ref.read(authProvider).user;
@@ -104,8 +100,7 @@ class _AdminUserManagementPageState
             children: [
               const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
-              Text('Admin Access Only',
-                  style: Theme.of(context).textTheme.headlineSmall),
+              Text('Admin Access Only', style: Theme.of(context).textTheme.headlineSmall),
             ],
           ),
         ),
@@ -126,8 +121,7 @@ class _AdminUserManagementPageState
     );
   }
 
-  Widget _buildHeader(
-      BuildContext context, UserManagementState state, bool isDesktop) {
+  Widget _buildHeader(BuildContext context, UserManagementState state, bool isDesktop) {
     final cs = Theme.of(context).colorScheme;
     return Container(
       padding: EdgeInsets.all(isDesktop ? 32 : 24),
@@ -144,11 +138,10 @@ class _AdminUserManagementPageState
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.manage_accounts,
-                    color: Colors.blue, size: 28),
+                child: const Icon(Icons.manage_accounts, color: Colors.blue, size: 28),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -160,28 +153,21 @@ class _AdminUserManagementPageState
                         Flexible(
                           child: Text(
                             'Manajemen Pengguna',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineLarge
-                                ?.copyWith(fontWeight: FontWeight.bold),
+                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.15),
+                            color: Colors.blue.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.blue),
                           ),
                           child: const Text(
                             'ADMIN',
-                            style: TextStyle(
-                                color: Colors.blue,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold),
+                            style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -189,8 +175,8 @@ class _AdminUserManagementPageState
                     const SizedBox(height: 4),
                     Text(
                       'Kelola karyawan di cabang Anda',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurface.withOpacity(0.6)),
+                      style:
+                          Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
                     ),
                   ],
                 ),
@@ -238,24 +224,17 @@ class _AdminUserManagementPageState
     );
   }
 
-  Widget _buildRefreshButton(UserManagementState state,
-      {bool asMobile = false}) {
+  Widget _buildRefreshButton(UserManagementState state, {bool asMobile = false}) {
     final cs = Theme.of(context).colorScheme;
     final icon = state.isLoading
-        ? const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: AppTheme.gold))
-        : Icon(Icons.refresh, color: cs.onSurface.withOpacity(0.6));
+        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold))
+        : Icon(Icons.refresh, color: cs.onSurface.withValues(alpha: 0.6));
 
     return IconButton(
       onPressed: state.isLoading ? null : _reload,
       icon: icon,
       style: asMobile
-          ? IconButton.styleFrom(
-              backgroundColor: cs.surfaceContainerHighest,
-              padding: const EdgeInsets.all(12))
+          ? IconButton.styleFrom(backgroundColor: cs.surfaceContainerHighest, padding: const EdgeInsets.all(12))
           : null,
     );
   }
@@ -304,10 +283,7 @@ class _AdminUserManagementPageState
           value: _selectedRole,
           isExpanded: true,
           dropdownColor: cs.surface,
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: cs.onSurface),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface),
           items: const [
             DropdownMenuItem(value: 'all', child: Text('Semua Role')),
             DropdownMenuItem(value: 'karyawan', child: Text('Karyawan')),
@@ -325,8 +301,7 @@ class _AdminUserManagementPageState
     final cs = Theme.of(context).colorScheme;
 
     if (state.isLoading && state.users.isEmpty) {
-      return const Center(
-          child: CircularProgressIndicator(color: Colors.blue));
+      return const Center(child: CircularProgressIndicator(color: Colors.blue));
     }
 
     if (state.error != null) {
@@ -334,15 +309,12 @@ class _AdminUserManagementPageState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline,
-                size: 64, color: AppTheme.destructive),
+            const Icon(Icons.error_outline, size: 64, color: AppTheme.destructive),
             const SizedBox(height: 16),
-            Text('Gagal memuat pengguna',
-                style: Theme.of(context).textTheme.headlineSmall),
+            Text('Gagal memuat pengguna', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(state.error!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurface.withOpacity(0.6))),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.6))),
             const SizedBox(height: 24),
             CustomButton(text: 'Coba Lagi', onPressed: _reload),
           ],
@@ -355,11 +327,9 @@ class _AdminUserManagementPageState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline,
-                size: 64, color: cs.onSurface.withOpacity(0.4)),
+            Icon(Icons.people_outline, size: 64, color: cs.onSurface.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
-            Text('Tidak ada karyawan ditemukan',
-                style: Theme.of(context).textTheme.headlineSmall),
+            Text('Tidak ada karyawan ditemukan', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 24),
             CustomButton(
               text: 'Tambah Karyawan',
@@ -380,8 +350,7 @@ class _AdminUserManagementPageState
           final canEdit = user['role'] == 'karyawan';
           final canDelete = user['role'] == 'karyawan';
           return Container(
-            margin: EdgeInsets.symmetric(
-                horizontal: isDesktop ? 32 : 24, vertical: 8),
+            margin: EdgeInsets.symmetric(horizontal: isDesktop ? 32 : 24, vertical: 8),
             child: UserListItem(
               user: user,
               onEdit: canEdit ? () => _showUserForm(user: user) : null,

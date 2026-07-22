@@ -14,14 +14,21 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/live_clock.dart';
 
 const _palette = [
-  Color(0xFFD4AF37), Color(0xFF6366F1), Color(0xFF10B981),
-  Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFF8B5CF6),
-  Color(0xFF06B6D4), Color(0xFFF97316),
+  Color(0xFFD4AF37),
+  Color(0xFF6366F1),
+  Color(0xFF10B981),
+  Color(0xFFF59E0B),
+  Color(0xFFEF4444),
+  Color(0xFF8B5CF6),
+  Color(0xFF06B6D4),
+  Color(0xFFF97316),
 ];
 
 const _periods = [
-  _Period('7 Days', 7), _Period('14 Days', 14),
-  _Period('30 Days', 30), _Period('90 Days', 90),
+  _Period('7 Days', 7),
+  _Period('14 Days', 14),
+  _Period('30 Days', 30),
+  _Period('90 Days', 90),
 ];
 
 class _Period {
@@ -56,8 +63,7 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
     _load();
     LocationService.requestPermission();
     _connectivitySub = ConnectivityMonitor.instance.statusStream.listen((status) {
-      if (_lastConnectivity == ConnectivityStatus.offline &&
-          status == ConnectivityStatus.online) {
+      if (_lastConnectivity == ConnectivityStatus.offline && status == ConnectivityStatus.online) {
         _load();
       }
       _lastConnectivity = status;
@@ -71,7 +77,10 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final r = await Future.wait([
         AnalyticsService.getSummary(),
@@ -80,22 +89,30 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
         AnalyticsService.getCategorySales(_catDays),
         AnalyticsService.getTopProducts(30),
       ]);
-      if (mounted) setState(() {
-        _summary = r[0] as Map<String, dynamic>;
-        _trend   = r[1] as List<Map<String, dynamic>>;
-        _branch  = r[2] as List<Map<String, dynamic>>;
-        _cat     = r[3] as List<Map<String, dynamic>>;
-        _top     = r[4] as List<Map<String, dynamic>>;
-        _isDataStale = false;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _summary = r[0] as Map<String, dynamic>;
+          _trend = r[1] as List<Map<String, dynamic>>;
+          _branch = r[2] as List<Map<String, dynamic>>;
+          _cat = r[3] as List<Map<String, dynamic>>;
+          _top = r[4] as List<Map<String, dynamic>>;
+          _isDataStale = false;
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         if (_summary != null) {
           // We have previous data — show it as stale instead of error
-          setState(() { _isDataStale = true; _loading = false; });
+          setState(() {
+            _isDataStale = true;
+            _loading = false;
+          });
         } else {
-          setState(() { _error = e.toString(); _loading = false; });
+          setState(() {
+            _error = e.toString();
+            _loading = false;
+          });
         }
       }
     }
@@ -124,16 +141,20 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
       return const Center(child: CircularProgressIndicator(color: AppTheme.gold));
     }
     if (_error != null) {
-      return Center(child: Padding(
+      return Center(
+          child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
           const SizedBox(height: 16),
           Text('Gagal memuat analitik', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          Text(_error!, textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+          Text(_error!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
           const SizedBox(height: 24),
           ElevatedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Coba Lagi')),
         ]),
@@ -177,9 +198,7 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
                     trailing: _datePick(),
                     child: SizedBox(
                       height: 240,
-                      child: _branch.isEmpty
-                          ? _emptyState('Tidak ada data cabang')
-                          : _BranchChart(data: _branch),
+                      child: _branch.isEmpty ? _emptyState('Tidak ada data cabang') : _BranchChart(data: _branch),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -213,12 +232,15 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
 
   Widget _buildHeader(String name) {
     return Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Dashboard Analitik',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
         Text('Selamat datang, $name',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
       ])),
       const LiveClock(),
       const SizedBox(width: 4),
@@ -235,23 +257,29 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
     if (_summary == null) return const SizedBox.shrink();
     final today = Map<String, dynamic>.from(_summary!['today'] as Map);
     final month = Map<String, dynamic>.from(_summary!['month'] as Map);
-    final all   = Map<String, dynamic>.from(_summary!['allTime'] as Map);
-    final act   = _summary!['activeBranchesToday'];
+    final all = Map<String, dynamic>.from(_summary!['allTime'] as Map);
+    final act = _summary!['activeBranchesToday'];
 
     final items = [
-      _KpiData("Pendapatan Hari Ini",  CurrencyFormatter.formatToCompactRupiah(_d(today['revenue'])),  Icons.today,                 _palette[0]),
-      _KpiData("Transaksi Hari Ini",   '${today['transactions']}',                                      Icons.receipt_outlined,      _palette[1]),
-      _KpiData("Pendapatan Bulan Ini", CurrencyFormatter.formatToCompactRupiah(_d(month['revenue'])),   Icons.calendar_month,        _palette[2]),
-      _KpiData("Cabang Aktif",         '$act',                                                           Icons.store_outlined,        _palette[3]),
-      _KpiData("Total Pendapatan",     CurrencyFormatter.formatToCompactRupiah(_d(all['revenue'])),     Icons.bar_chart,             _palette[5]),
-      _KpiData("Total Transaksi",      '${all['transactions']}',                                         Icons.shopping_bag_outlined, _palette[6]),
+      _KpiData("Pendapatan Hari Ini", CurrencyFormatter.formatToCompactRupiah(_d(today['revenue'])), Icons.today,
+          _palette[0]),
+      _KpiData("Transaksi Hari Ini", '${today['transactions']}', Icons.receipt_outlined, _palette[1]),
+      _KpiData("Pendapatan Bulan Ini", CurrencyFormatter.formatToCompactRupiah(_d(month['revenue'])),
+          Icons.calendar_month, _palette[2]),
+      _KpiData("Cabang Aktif", '$act', Icons.store_outlined, _palette[3]),
+      _KpiData("Total Pendapatan", CurrencyFormatter.formatToCompactRupiah(_d(all['revenue'])), Icons.bar_chart,
+          _palette[5]),
+      _KpiData("Total Transaksi", '${all['transactions']}', Icons.shopping_bag_outlined, _palette[6]),
     ];
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.65,
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.65,
       ),
       itemCount: items.length,
       itemBuilder: (_, i) => _KpiCard(data: items[i]),
@@ -278,11 +306,12 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 2),
-              Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: cs.onSurface.withOpacity(0.55))),
+              Text(subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
             ])),
             if (trailing != null) ...[const SizedBox(width: 8), trailing],
           ]),
@@ -294,8 +323,8 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
   }
 
   Widget _emptyState(String msg) => Center(
-    child: Text(msg, style: const TextStyle(color: AppTheme.mutedForeground)),
-  );
+        child: Text(msg, style: const TextStyle(color: AppTheme.mutedForeground)),
+      );
 
   Widget _periodDrop(int val, ValueChanged<int> cb) {
     final cs = Theme.of(context).colorScheme;
@@ -308,10 +337,14 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
-          value: val, isDense: true, dropdownColor: cs.surface,
+          value: val,
+          isDense: true,
+          dropdownColor: cs.surface,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface),
           items: _periods.map((p) => DropdownMenuItem(value: p.days, child: Text(p.label))).toList(),
-          onChanged: (v) { if (v != null) cb(v); },
+          onChanged: (v) {
+            if (v != null) cb(v);
+          },
         ),
       ),
     );
@@ -340,9 +373,10 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
           border: Border.all(color: cs.outlineVariant),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.calendar_today_outlined, size: 14, color: cs.onSurface.withOpacity(0.7)),
+          Icon(Icons.calendar_today_outlined, size: 14, color: cs.onSurface.withValues(alpha: 0.7)),
           const SizedBox(width: 6),
-          Text(DateFormatter.format(_branchDate), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface)),
+          Text(DateFormatter.format(_branchDate),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface)),
         ]),
       ),
     );
@@ -381,24 +415,25 @@ class _KpiCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: data.color.withOpacity(0.12),
+            color: data.color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(data.icon, color: data.color, size: 20),
         ),
         const SizedBox(width: 10),
-        Expanded(child: Column(
+        Expanded(
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(data.value,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold, color: data.color),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: data.color),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
             Text(data.label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: cs.onSurface.withOpacity(0.55)),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
           ],
         )),
       ]),
@@ -419,33 +454,34 @@ class _TrendChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spots = data.asMap().entries.map((e) =>
-        FlSpot(e.key.toDouble(), _n(e.value['revenue']))
-    ).toList();
+    final spots = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), _n(e.value['revenue']))).toList();
 
-    final maxY = spots.isEmpty ? 1.0
-        : spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final maxY = spots.isEmpty ? 1.0 : spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
 
     return LineChart(LineChartData(
       minY: 0,
       maxY: maxY == 0 ? 1 : maxY * 1.25,
       clipData: const FlClipData.all(),
       gridData: FlGridData(
-        show: true, drawVerticalLine: false,
-        getDrawingHorizontalLine: (_) =>
-            FlLine(color: Colors.grey.withOpacity(0.15), strokeWidth: 1),
+        show: true,
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.withValues(alpha: 0.15), strokeWidth: 1),
       ),
       borderData: FlBorderData(show: false),
       titlesData: FlTitlesData(
-        leftTitles: AxisTitles(sideTitles: SideTitles(
-          showTitles: true, reservedSize: 56,
+        leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 56,
           getTitlesWidget: (v, _) => Text(
             CurrencyFormatter.formatToCompactRupiah(v),
             style: const TextStyle(fontSize: 9, color: AppTheme.mutedForeground),
           ),
         )),
-        bottomTitles: AxisTitles(sideTitles: SideTitles(
-          showTitles: true, reservedSize: 22,
+        bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 22,
           interval: data.length <= 7 ? 1 : (data.length / 5).ceilToDouble(),
           getTitlesWidget: (v, _) {
             final idx = v.toInt();
@@ -461,19 +497,24 @@ class _TrendChart extends StatelessWidget {
         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
-      lineBarsData: [LineChartBarData(
-        spots: spots,
-        isCurved: true,
-        color: _palette[0],
-        barWidth: 2.5,
-        dotData: const FlDotData(show: false),
-        belowBarData: BarAreaData(show: true, color: _palette[0].withOpacity(0.1)),
-      )],
-      lineTouchData: LineTouchData(touchTooltipData: LineTouchTooltipData(
-        getTooltipItems: (ts) => ts.map((s) => LineTooltipItem(
-          CurrencyFormatter.formatToCompactRupiah(s.y),
-          const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-        )).toList(),
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          color: _palette[0],
+          barWidth: 2.5,
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(show: true, color: _palette[0].withValues(alpha: 0.1)),
+        )
+      ],
+      lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+        getTooltipItems: (ts) => ts
+            .map((s) => LineTooltipItem(
+                  CurrencyFormatter.formatToCompactRupiah(s.y),
+                  const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                ))
+            .toList(),
       )),
     ));
   }
@@ -486,20 +527,21 @@ class _BranchChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxY = data.isEmpty ? 1.0
-        : data.map((e) => _n(e['revenue']))
-              .fold(0.0, (a, b) => a > b ? a : b);
+    final maxY = data.isEmpty ? 1.0 : data.map((e) => _n(e['revenue'])).fold(0.0, (a, b) => a > b ? a : b);
 
-    return BarChart(BarChartData(      maxY: maxY == 0 ? 1 : maxY * 1.3,
+    return BarChart(BarChartData(
+      maxY: maxY == 0 ? 1 : maxY * 1.3,
       gridData: FlGridData(
-        show: true, drawVerticalLine: false,
-        getDrawingHorizontalLine: (_) =>
-            FlLine(color: Colors.grey.withOpacity(0.15), strokeWidth: 1),
+        show: true,
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.withValues(alpha: 0.15), strokeWidth: 1),
       ),
       borderData: FlBorderData(show: false),
       titlesData: FlTitlesData(
-        bottomTitles: AxisTitles(sideTitles: SideTitles(
-          showTitles: true, reservedSize: 36,
+        bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 36,
           getTitlesWidget: (v, _) {
             final i = v.toInt();
             if (i < 0 || i >= data.length) return const SizedBox.shrink();
@@ -508,13 +550,14 @@ class _BranchChart extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(short,
-                  style: const TextStyle(fontSize: 9, color: AppTheme.mutedForeground),
-                  textAlign: TextAlign.center),
+                  style: const TextStyle(fontSize: 9, color: AppTheme.mutedForeground), textAlign: TextAlign.center),
             );
           },
         )),
-        leftTitles: AxisTitles(sideTitles: SideTitles(
-          showTitles: true, reservedSize: 56,
+        leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 56,
           getTitlesWidget: (v, _) => Text(
             CurrencyFormatter.formatToCompactRupiah(v),
             style: const TextStyle(fontSize: 9, color: AppTheme.mutedForeground),
@@ -532,12 +575,13 @@ class _BranchChart extends StatelessWidget {
             color: color,
             width: 20,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-            backDrawRodData: BackgroundBarChartRodData(
-              show: true, toY: maxY * 1.3, color: color.withOpacity(0.07)),
+            backDrawRodData:
+                BackgroundBarChartRodData(show: true, toY: maxY * 1.3, color: color.withValues(alpha: 0.07)),
           ),
         ]);
       }).toList(),
-      barTouchData: BarTouchData(touchTooltipData: BarTouchTooltipData(
+      barTouchData: BarTouchData(
+          touchTooltipData: BarTouchTooltipData(
         getTooltipItem: (group, _, rod, __) => BarTooltipItem(
           '${data[group.x]['branch_name']}\n${CurrencyFormatter.formatToCompactRupiah(rod.toY)}',
           const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
@@ -565,7 +609,8 @@ class _PieChartState extends State<_PieChart> {
     return Column(mainAxisSize: MainAxisSize.min, children: [
       SizedBox(
         height: 200,
-        child: PieChart(PieChartData(          pieTouchData: PieTouchData(touchCallback: (_, r) {
+        child: PieChart(PieChartData(
+          pieTouchData: PieTouchData(touchCallback: (_, r) {
             setState(() => _touched = r?.touchedSection?.touchedSectionIndex ?? -1);
           }),
           sectionsSpace: 2,
@@ -580,10 +625,7 @@ class _PieChartState extends State<_PieChart> {
               color: color,
               radius: isTouched ? 72 : 60,
               title: '${pct.toStringAsFixed(1)}%',
-              titleStyle: TextStyle(
-                  fontSize: isTouched ? 13 : 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white),
+              titleStyle: TextStyle(fontSize: isTouched ? 13 : 11, fontWeight: FontWeight.bold, color: Colors.white),
             );
           }).toList(),
         )),
@@ -594,7 +636,10 @@ class _PieChartState extends State<_PieChart> {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2, childAspectRatio: 4.5, mainAxisSpacing: 4, crossAxisSpacing: 4,
+          crossAxisCount: 2,
+          childAspectRatio: 4.5,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
         ),
         itemCount: widget.data.length > 8 ? 8 : widget.data.length,
         itemBuilder: (_, i) {
@@ -602,11 +647,15 @@ class _PieChartState extends State<_PieChart> {
           return Row(children: [
             Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
             const SizedBox(width: 4),
-            Expanded(child: Text(
+            Expanded(
+                child: Text(
               widget.data[i]['category_name']?.toString() ?? 'Unknown',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             )),
           ]);
         },
@@ -622,9 +671,7 @@ class _TopChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxQty = data.isEmpty ? 1.0
-        : data.map((e) => _n(e['total_qty']))
-              .fold(0.0, (a, b) => a > b ? a : b);
+    final maxQty = data.isEmpty ? 1.0 : data.map((e) => _n(e['total_qty'])).fold(0.0, (a, b) => a > b ? a : b);
     final top = data.take(8).toList();
 
     return Column(
@@ -637,15 +684,16 @@ class _TopChart extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Text(
+              Expanded(
+                  child: Text(
                 e.value['name']?.toString() ?? '',
                 style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 1, overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               )),
               const SizedBox(width: 8),
               Text('${qty.toInt()} sold',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: color, fontWeight: FontWeight.bold)),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.bold)),
             ]),
             const SizedBox(height: 5),
             ClipRRect(
@@ -653,7 +701,7 @@ class _TopChart extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: pct,
                 minHeight: 8,
-                backgroundColor: color.withOpacity(0.12),
+                backgroundColor: color.withValues(alpha: 0.12),
                 valueColor: AlwaysStoppedAnimation(color),
               ),
             ),

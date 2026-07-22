@@ -81,7 +81,7 @@ class _ConnectivityBannerState extends ConsumerState<ConnectivityBanner> {
       bannerContent = Container(
         key: const ValueKey('online'),
         color: Colors.green,
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
         child: const Row(
           children: [
             Icon(Icons.wifi, size: 16, color: Colors.white),

@@ -20,9 +20,7 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
   Future<void> _handleDelete() async {
     setState(() => _isLoading = true);
     try {
-      await ref
-          .read(userManagementProvider.notifier)
-          .deleteUser(widget.user['id']);
+      await ref.read(userManagementProvider.notifier).deleteUser(widget.user['id']);
       if (mounted) {
         SnackBarService.success('Pengguna berhasil dihapus');
         Navigator.of(context).pop();
@@ -79,36 +77,28 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: AppTheme.destructive.withOpacity(0.1),
+                color: AppTheme.destructive.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(32),
               ),
-              child: const Icon(Icons.delete_outline,
-                  size: 32, color: AppTheme.destructive),
+              child: const Icon(Icons.delete_outline, size: 32, color: AppTheme.destructive),
             ),
             const SizedBox(height: 20),
 
             Text(
               'Hapus Pengguna',
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
 
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: cs.onSurface.withOpacity(0.6)),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
                 children: [
                   const TextSpan(text: 'Apakah Anda yakin ingin menghapus '),
                   TextSpan(
                     text: widget.user['name']?.toString() ?? 'pengguna ini',
-                    style: TextStyle(
-                        color: cs.onSurface, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600),
                   ),
                   const TextSpan(text: '? Tindakan ini tidak dapat dibatalkan.'),
                 ],
@@ -131,20 +121,17 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: AppTheme.gold.withOpacity(0.1),
+                      color: AppTheme.gold.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border:
-                          Border.all(color: AppTheme.gold.withOpacity(0.2)),
+                      border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
                     ),
                     child: Center(
                       child: Text(
-                        widget.user['name']
-                                ?.toString()
-                                .substring(0, 1)
-                                .toUpperCase() ??
-                            'U',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.gold, fontWeight: FontWeight.bold),
+                        widget.user['name']?.toString().substring(0, 1).toUpperCase() ?? 'U',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(color: AppTheme.gold, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -155,34 +142,32 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
                       children: [
                         Text(
                           widget.user['name']?.toString() ?? 'Unknown',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '@${widget.user['username']?.toString() ?? 'unknown'}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.onSurface.withOpacity(0.6)),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: roleColor.withOpacity(0.1),
+                      color: roleColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: roleColor.withOpacity(0.3)),
+                      border: Border.all(color: roleColor.withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       _formatRole(roleStr),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: roleColor,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 10),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: roleColor, fontWeight: FontWeight.w500, fontSize: 10),
                     ),
                   ),
                 ],

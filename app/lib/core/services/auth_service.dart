@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
@@ -39,7 +40,7 @@ class AuthService {
         error: true,
         logPrint: (obj) {
           if (ApiConfig.enableLogging) {
-            print('[DIO] $obj');
+            dev.log('[DIO] $obj');
           }
         },
       ));
@@ -52,10 +53,10 @@ class AuthService {
 
     try {
       if (ApiConfig.enableLogging) {
-        print('=== LOGIN ATTEMPT ===');
-        print('Username: $username');
-        print('API URL: ${ApiConfig.apiUrl}');
-        print('Login Endpoint: ${ApiConfig.loginEndpoint}');
+        dev.log('=== LOGIN ATTEMPT ===');
+        dev.log('Username: $username');
+        dev.log('API URL: ${ApiConfig.apiUrl}');
+        dev.log('Login Endpoint: ${ApiConfig.loginEndpoint}');
       }
 
       final response = await _dio.post(
@@ -76,8 +77,8 @@ class AuthService {
       );
 
       if (ApiConfig.enableLogging) {
-        print('Response status: ${response.statusCode}');
-        print('Response data: ${response.data}');
+        dev.log('Response status: ${response.statusCode}');
+        dev.log('Response data: ${response.data}');
       }
 
       if (response.statusCode == 200) {
@@ -92,8 +93,8 @@ class AuthService {
         SocketService.connect(token, user.branchId ?? 0);
 
         if (ApiConfig.enableLogging) {
-          print('Login successful for user: ${user.username}');
-          print('Socket.IO connection initiated for branch: ${user.branchId}');
+          dev.log('Login successful for user: ${user.username}');
+          dev.log('Socket.IO connection initiated for branch: ${user.branchId}');
         }
 
         return AuthResult.success(user);
@@ -111,15 +112,15 @@ class AuthService {
       }
     } catch (e) {
       if (ApiConfig.enableLogging) {
-        print('=== LOGIN ERROR ===');
-        print('Error: $e');
+        dev.log('=== LOGIN ERROR ===');
+        dev.log('Error: $e');
       }
 
       if (e is DioException) {
         if (ApiConfig.enableLogging) {
-          print('DioException type: ${e.type}');
-          print('DioException message: ${e.message}');
-          print('Response: ${e.response?.data}');
+          dev.log('DioException type: ${e.type}');
+          dev.log('DioException message: ${e.message}');
+          dev.log('Response: ${e.response?.data}');
         }
 
         if (e.response?.statusCode == 401) {

@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/user.dart';
 import 'auth_service.dart';
 import '../provider/auth_provider.dart';
 
@@ -25,7 +25,7 @@ class SessionManager {
   /// Start monitoring session
   static void _startSessionMonitoring(WidgetRef ref) {
     _sessionTimer?.cancel();
-    
+
     _sessionTimer = Timer.periodic(_checkInterval, (timer) async {
       await _checkSession(ref);
     });
@@ -49,13 +49,13 @@ class SessionManager {
         await _handleSessionExpired(ref);
       }
     } catch (e) {
-      print('Session check error: $e');
+      dev.log('Session check error: $e');
     }
   }
 
   /// Handle session timeout
   static Future<void> _handleSessionTimeout(WidgetRef ref) async {
-    print('Session timeout - logging out');
+    dev.log('Session timeout - logging out');
     await _handleSessionExpired(ref);
   }
 
@@ -64,7 +64,7 @@ class SessionManager {
     _sessionTimer?.cancel();
     _sessionTimer = null;
     _lastActivity = null;
-    
+
     // Logout user
     await ref.read(authProvider.notifier).logout();
   }
@@ -79,10 +79,10 @@ class SessionManager {
   /// Get remaining session time
   static Duration? getRemainingSessionTime() {
     if (_lastActivity == null) return null;
-    
+
     final elapsed = DateTime.now().difference(_lastActivity!);
     final remaining = _sessionTimeout - elapsed;
-    
+
     return remaining.isNegative ? Duration.zero : remaining;
   }
 
@@ -90,7 +90,7 @@ class SessionManager {
   static bool isSessionExpiringSoon() {
     final remaining = getRemainingSessionTime();
     if (remaining == null) return false;
-    
+
     return remaining.inMinutes <= 15 && remaining.inMinutes > 0;
   }
 
@@ -146,7 +146,7 @@ class SessionStateNotifier extends StateNotifier<SessionState> {
   void _updateState() {
     final remaining = SessionManager.getRemainingSessionTime();
     final isExpiring = SessionManager.isSessionExpiringSoon();
-    
+
     state = state.copyWith(
       isActive: remaining != null && remaining > Duration.zero,
       remainingTime: remaining,

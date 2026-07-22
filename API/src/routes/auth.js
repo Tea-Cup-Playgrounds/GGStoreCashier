@@ -172,7 +172,7 @@ router.get('/me', async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
         const [users] = await pool.execute(
-            'SELECT id, name, username, role, branch_id FROM users WHERE id = ?',
+            'SELECT id, name, username, role, branch_id, last_active_at FROM users WHERE id = ?',
             [decoded.userId]
         );
 

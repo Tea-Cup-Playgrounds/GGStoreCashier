@@ -12,8 +12,7 @@ class BottomNavigation extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = navigationShell.currentIndex;
-    final pendingCount =
-        ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
+    final pendingCount = ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
 
     return LayoutBuilder(builder: (context, constraints) {
       double fontSize;
@@ -27,8 +26,7 @@ class BottomNavigation extends ConsumerWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           border: Border(
-            top: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant, width: 1.2),
+            top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant, width: 1.2),
           ),
         ),
         child: SafeArea(
@@ -114,7 +112,7 @@ class _NavItem extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? AppTheme.gold.withOpacity(0.1) : Colors.transparent,
+          color: isActive ? AppTheme.gold.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -129,12 +127,8 @@ class _NavItem extends StatelessWidget {
                     isActive ? activeIcon : icon,
                     key: ValueKey(isActive),
                     color: isActive
-                        ? Theme.of(context)
-                            .bottomNavigationBarTheme
-                            .selectedItemColor
-                        : Theme.of(context)
-                            .bottomNavigationBarTheme
-                            .unselectedItemColor,
+                        ? Theme.of(context).bottomNavigationBarTheme.selectedItemColor
+                        : Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
                     size: 20,
                   ),
                 ),
@@ -171,12 +165,8 @@ class _NavItem extends StatelessWidget {
                 fontSize: fontSize,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 color: isActive
-                    ? Theme.of(context)
-                        .bottomNavigationBarTheme
-                        .selectedItemColor
-                    : Theme.of(context)
-                        .bottomNavigationBarTheme
-                        .unselectedItemColor,
+                    ? Theme.of(context).bottomNavigationBarTheme.selectedItemColor
+                    : Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
               ),
             ),
           ],

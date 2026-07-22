@@ -1,5 +1,5 @@
 import 'dart:io';
-
+import 'dart:developer' as dev;
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -37,7 +37,7 @@ class ImageInputState extends State<ImageInput> {
   // ================= IMAGE PICK + CROP =================
 
   Future<void> _pickImage(ImageSource source) async {
-    debugPrint('[ImageInput] _pickImage called, source: $source');
+    dev.log('[ImageInput] _pickImage called, source: $source');
     try {
       final XFile? picked = await _picker.pickImage(
         source: source,
@@ -46,7 +46,7 @@ class ImageInputState extends State<ImageInput> {
         maxHeight: 2048,
       );
 
-      debugPrint('[ImageInput] picker result: ${picked?.path ?? 'null'}');
+      dev.log('[ImageInput] picker result: ${picked?.path ?? 'null'}');
       if (picked == null) return;
 
       // Validate extension — be lenient on Android where camera paths vary
@@ -61,6 +61,8 @@ class ImageInputState extends State<ImageInput> {
           return;
         }
       }
+
+      if (!context.mounted) return;
 
       // Crop the image
       final CroppedFile? cropped = await ImageCropper().cropImage(
@@ -80,6 +82,7 @@ class ImageInputState extends State<ImageInput> {
             resetAspectRatioEnabled: false,
           ),
           WebUiSettings(
+            // ignore: use_build_context_synchronously
             context: context,
             presentStyle: WebPresentStyle.dialog,
           ),
@@ -87,7 +90,7 @@ class ImageInputState extends State<ImageInput> {
       );
 
       if (cropped == null) {
-        debugPrint('[ImageInput] crop cancelled');
+        dev.log('[ImageInput] crop cancelled');
         return;
       }
 
@@ -96,21 +99,21 @@ class ImageInputState extends State<ImageInput> {
       // Validate file size (5MB max)
       final int fileSize = await file.length();
       const int maxSize = 5 * 1024 * 1024;
-      debugPrint('[ImageInput] file size: ${(fileSize / 1024).toStringAsFixed(1)} KB');
+      dev.log('[ImageInput] file size: ${(fileSize / 1024).toStringAsFixed(1)} KB');
 
       if (fileSize > maxSize) {
         setState(() => _errorText = 'Ukuran file melebihi batas 5MB.');
         return;
       }
 
-      debugPrint('[ImageInput] image accepted, calling onChanged');
+      dev.log('[ImageInput] image accepted, calling onChanged');
       setState(() {
         _errorText = null;
         widget.onChanged(file);
       });
     } catch (e, stack) {
-      debugPrint('[ImageInput] ERROR picking image: $e');
-      debugPrint('[ImageInput] stack: $stack');
+      dev.log('[ImageInput] ERROR picking image: $e');
+      dev.log('[ImageInput] stack: $stack');
       setState(() => _errorText = 'Gagal memilih gambar: $e');
     }
   }
@@ -167,9 +170,7 @@ class ImageInputState extends State<ImageInput> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _errorText != null
-        ? Colors.redAccent
-        : Theme.of(context).colorScheme.outlineVariant;
+    final borderColor = _errorText != null ? Colors.redAccent : Theme.of(context).colorScheme.outlineVariant;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,7 +209,7 @@ class ImageInputState extends State<ImageInput> {
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
+                              color: Colors.black.withValues(alpha: 0.6),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(

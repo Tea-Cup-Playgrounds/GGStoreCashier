@@ -42,7 +42,6 @@ class _HomePageState extends ConsumerState<HomePage>
   ProviderSubscription<RealtimeTransactionState>? _txSub;
   ProviderSubscription<RealtimeProductState>? _productSub;
   ProviderSubscription<AsyncValue<ConnectivityStatus>>? _connectivitySub;
-  ConnectivityStatus? _lastConnectivityStatus;
 
   @override
   void initState() {
@@ -141,8 +140,9 @@ class _HomePageState extends ConsumerState<HomePage>
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Selamat Pagi';
-    if (hour < 18) return 'Selamat Siang';
+    if (hour < 10) return 'Selamat Pagi';
+    if (hour < 15) return 'Selamat Siang';
+    if (hour < 18) return 'Selamat Sore';
     return 'Selamat Malam';
   }
 
@@ -262,7 +262,7 @@ class _HomePageState extends ConsumerState<HomePage>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      AppTheme.gold.withOpacity(0.05),
+                      AppTheme.gold.withValues(alpha: 0.05),
                       Colors.transparent,
                     ],
                   ),
@@ -301,9 +301,9 @@ class _HomePageState extends ConsumerState<HomePage>
                         ),
                         if (isDataStale) ...[
                           const SizedBox(height: 4),
-                          Tooltip(
+                          const Tooltip(
                             message: 'Data mungkin tidak terbaru',
-                            child: const Icon(
+                            child: Icon(
                               Icons.cloud_off,
                               size: 14,
                               color: Colors.orange,
@@ -491,9 +491,9 @@ class _HomePageState extends ConsumerState<HomePage>
                   ),
                   const SizedBox(height: 16),
                   if (stats.recentTransactions.isEmpty)
-                    Center(
+                    const Center(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        padding: EdgeInsets.symmetric(vertical: 32),
                         child: Text(
                           'Belum ada transaksi hari ini',
                           style: TextStyle(color: AppTheme.mutedForeground),

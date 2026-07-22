@@ -24,19 +24,15 @@ class StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isHighlighted
-            ? AppTheme.gold.withOpacity(0.1)
-            : Theme.of(context).colorScheme.secondary,
+        color: isHighlighted ? AppTheme.gold.withValues(alpha: 0.1) : Theme.of(context).colorScheme.secondary,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isHighlighted
-              ? AppTheme.gold.withOpacity(0.3)
-              : Theme.of(context).colorScheme.outlineVariant,
+          color: isHighlighted ? AppTheme.gold.withValues(alpha: 0.3) : Theme.of(context).colorScheme.outlineVariant,
         ),
         boxShadow: isHighlighted
             ? [
                 BoxShadow(
-                  color: AppTheme.gold.withOpacity(0.1),
+                  color: AppTheme.gold.withValues(alpha: 0.1),
                   blurRadius: 20,
                   spreadRadius: 0,
                 ),
@@ -51,27 +47,23 @@ class StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isHighlighted
-                      ? AppTheme.gold.withOpacity(0.2)
-                      : Theme.of(context).colorScheme.secondary,
+                  color: isHighlighted ? AppTheme.gold.withValues(alpha: 0.2) : Theme.of(context).colorScheme.secondary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
                   size: 20,
-                  color:
-                      isHighlighted ? AppTheme.gold : AppTheme.mutedForeground,
+                  color: isHighlighted ? AppTheme.gold : AppTheme.mutedForeground,
                 ),
               ),
               const Spacer(),
               if (trend != null)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: isPositive
-                        ? AppTheme.success.withOpacity(0.1)
-                        : AppTheme.destructive.withOpacity(0.1),
+                        ? AppTheme.success.withValues(alpha: 0.1)
+                        : AppTheme.destructive.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -80,9 +72,7 @@ class StatCard extends StatelessWidget {
                       Icon(
                         isPositive ? Icons.trending_up : Icons.trending_down,
                         size: 12,
-                        color: isPositive
-                            ? AppTheme.success
-                            : AppTheme.destructive,
+                        color: isPositive ? AppTheme.success : AppTheme.destructive,
                       ),
                       const SizedBox(width: 2),
                       SizedBox(
@@ -94,9 +84,7 @@ class StatCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: isPositive
-                                ? AppTheme.success
-                                : AppTheme.destructive,
+                            color: isPositive ? AppTheme.success : AppTheme.destructive,
                           ),
                         ),
                       ),
@@ -111,9 +99,7 @@ class StatCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: isHighlighted
-                      ? AppTheme.gold
-                      : Theme.of(context).colorScheme.onSecondary,
+                  color: isHighlighted ? AppTheme.gold : Theme.of(context).colorScheme.onSecondary,
                 ),
           ),
           const SizedBox(height: 4),

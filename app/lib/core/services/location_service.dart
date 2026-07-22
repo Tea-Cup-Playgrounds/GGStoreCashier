@@ -1,6 +1,6 @@
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'dart:developer' as dev;
 
 class LocationResult {
   final double latitude;
@@ -69,30 +69,35 @@ class LocationService {
         },
       );
 
-      debugPrint('[LocationService] Nominatim raw: ${response.data}');
+      dev.log('[LocationService] Nominatim raw: ${response.data}');
 
       final data = response.data as Map<String, dynamic>;
       final addr = data['address'] as Map<String, dynamic>?;
 
       if (addr != null) {
-        debugPrint('[LocationService] address fields: $addr');
+        dev.log('[LocationService] address fields: $addr');
 
         // Build a human-readable address from available fields
         final parts = <String>[
           if (addr['road'] != null) addr['road'] as String,
-          if (addr['neighbourhood'] != null) addr['neighbourhood'] as String
-          else if (addr['suburb'] != null) addr['suburb'] as String,
-          if (addr['city'] != null) addr['city'] as String
-          else if (addr['town'] != null) addr['town'] as String
-          else if (addr['village'] != null) addr['village'] as String,
+          if (addr['neighbourhood'] != null)
+            addr['neighbourhood'] as String
+          else if (addr['suburb'] != null)
+            addr['suburb'] as String,
+          if (addr['city'] != null)
+            addr['city'] as String
+          else if (addr['town'] != null)
+            addr['town'] as String
+          else if (addr['village'] != null)
+            addr['village'] as String,
           if (addr['state'] != null) addr['state'] as String,
         ];
 
         address = parts.where((s) => s.isNotEmpty).join(', ');
-        debugPrint('[LocationService] assembled address: $address');
+        dev.log('[LocationService] assembled address: $address');
       }
     } catch (e) {
-      debugPrint('[LocationService] geocoding error: $e');
+      dev.log('[LocationService] geocoding error: $e');
       // Non-fatal — return coordinates without address
     }
 
@@ -110,7 +115,6 @@ class LocationService {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    return permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse;
+    return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
   }
 }

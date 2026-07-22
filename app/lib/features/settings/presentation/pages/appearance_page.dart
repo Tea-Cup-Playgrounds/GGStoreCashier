@@ -54,7 +54,7 @@ class AppearancePage extends ConsumerWidget {
                     ? null
                     : [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -120,9 +120,9 @@ class _PreviewCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppTheme.gold.withOpacity(0.2),
+              color: AppTheme.gold.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.gold.withOpacity(0.4)),
+              border: Border.all(color: AppTheme.gold.withValues(alpha: 0.4)),
             ),
             child: Icon(
               isDark ? Icons.nights_stay_rounded : Icons.wb_sunny_rounded,
@@ -154,7 +154,7 @@ class _PreviewCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: AppTheme.gold.withOpacity(0.15),
+              color: AppTheme.gold.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -203,7 +203,7 @@ class _ThemeOptionTile extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: isSelected ? AppTheme.gold.withOpacity(0.15) : cs.surfaceContainerHighest,
+                color: isSelected ? AppTheme.gold.withValues(alpha: 0.15) : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -244,7 +244,7 @@ class _ThemeOptionTile extends StatelessWidget {
                   color: isSelected ? AppTheme.gold : cs.outlineVariant,
                   width: isSelected ? 2 : 1.5,
                 ),
-                color: isSelected ? AppTheme.gold.withOpacity(0.15) : Colors.transparent,
+                color: isSelected ? AppTheme.gold.withValues(alpha: 0.15) : Colors.transparent,
               ),
               child: isSelected
                   ? const Center(

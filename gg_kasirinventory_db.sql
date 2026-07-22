@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.2
+-- version 5.2.0
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Apr 03, 2026 at 02:20 AM
+-- Generation Time: Jul 22, 2026 at 09:55 AM
 -- Server version: 8.0.30
--- PHP Version: 8.1.10
+-- PHP Version: 8.3.31
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `gg_kasir_db`
+-- Database: `gg_kasirinventory_db`
 --
 
 -- --------------------------------------------------------
@@ -179,6 +179,7 @@ CREATE TABLE `users` (
   `password` varchar(255) NOT NULL,
   `role` enum('karyawan','admin','superadmin') NOT NULL DEFAULT 'karyawan',
   `branch_id` int DEFAULT NULL,
+  `last_active_at` datetime DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -187,14 +188,8 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `branch_id`, `created_at`, `updated_at`) VALUES
-(1, 'King Wahyu', 'superadmin', '$2b$12$P07jhhBCn0QnCyXHQRfYGOVIx/SW16WxSPfuajScCLErrr1vwxGny', 'superadmin', NULL, '2025-09-26 11:04:07', '2026-02-06 10:49:48'),
-(2, 'Boss Kebun', 'GrowAGarden#1', '$2b$12$kioin3Gy78nh3h/WC60n8uuI.fzQnhQe3J6BXM9kMHONobeej1U5.', 'admin', 1, '2025-09-26 11:04:07', '2026-02-03 15:47:52'),
-(3, 'Boss Ikan', 'mancingmaniamantap', '$2b$12$MHPui3mOe1Me7TbjOTxtkO1uOi0twI0bFin2ITQAzpqE4zXoy7kuS', 'admin', 2, '2025-09-26 11:04:07', '2026-02-03 15:47:52'),
-(4, 'Kroco 1', 'kroco1', '$2b$12$0pZIlcdAgmXOgpaM2jLYX.MMizLVAJDTwdsf3HZpG6qHTLHs8s8mu', 'karyawan', 1, '2025-09-26 11:04:07', '2026-02-03 15:47:53'),
-(5, 'Kroco 2', 'kroco2', '$2b$12$UGJzu61DCfmxl.e8U9vRfuy0VVKH0n4i4iJWiCy9b/JtypulmcLza', 'karyawan', 2, '2025-09-26 11:04:07', '2026-02-03 15:47:53'),
-(6, 'Karyawan Testing', 'karyawantesting1', '$2b$12$W3YaLIp4M2devPpicLbNYuSl97Vm3XG/kaQFZx6AhQTCZTnexu46K', 'karyawan', 1, '2026-02-06 10:52:23', '2026-02-06 16:29:42'),
-(7, 'papa zola', 'PapaZola', '$2b$12$mIWpwRTT7HeiDNb6XaPgx.bOzuAKevDsZ5ekXuY/gGRg9CGYUi.Uq', 'admin', 2, '2026-03-30 18:41:56', '2026-04-03 08:33:42');
+INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `branch_id`, `last_active_at`, `created_at`, `updated_at`) VALUES
+(1, 'King Wahyu', 'superadmin', '$2b$12$P07jhhBCn0QnCyXHQRfYGOVIx/SW16WxSPfuajScCLErrr1vwxGny', 'superadmin', NULL, NULL, '2025-09-26 11:04:07', '2026-02-06 10:49:48');
 
 -- --------------------------------------------------------
 

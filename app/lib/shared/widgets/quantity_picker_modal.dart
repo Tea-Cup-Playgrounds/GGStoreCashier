@@ -314,11 +314,11 @@ class _QuantityPickerSheetState extends State<_QuantityPickerSheet> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.shopping_cart_outlined, size: 20),
-                        const SizedBox(width: 10),
+                        Icon(Icons.shopping_cart_outlined, size: 20),
+                        SizedBox(width: 10),
                         Text(
                           'Tambah ke Keranjang',
                           style: TextStyle(

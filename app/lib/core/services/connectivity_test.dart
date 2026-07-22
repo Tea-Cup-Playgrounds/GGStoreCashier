@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'dart:developer' as dev;
 import '../config/api_config.dart';
 
 class ConnectivityTest {
@@ -12,10 +13,10 @@ class ConnectivityTest {
   static Future<bool> testConnection() async {
     try {
       if (ApiConfig.enableLogging) {
-        print('=== CONNECTIVITY TEST ===');
-        print('Testing connection to: ${ApiConfig.testEndpoint}');
+        dev.log('=== CONNECTIVITY TEST ===');
+        dev.log('Testing connection to: ${ApiConfig.testEndpoint}');
       }
-      
+
       final response = await _dio.get(
         '/api/test',
         options: Options(
@@ -26,24 +27,24 @@ class ConnectivityTest {
       );
 
       if (ApiConfig.enableLogging) {
-        print('Test response status: ${response.statusCode}');
-        print('Test response data: ${response.data}');
+        dev.log('Test response status: ${response.statusCode}');
+        dev.log('Test response data: ${response.data}');
       }
 
       return response.statusCode == 200;
     } catch (e) {
       if (ApiConfig.enableLogging) {
-        print('=== CONNECTIVITY TEST FAILED ===');
-        print('Error: $e');
-        print('Current API URL: ${ApiConfig.apiUrl}');
-        print('Try changing the environment in ApiConfig.currentEnvironment');
+        dev.log('=== CONNECTIVITY TEST FAILED ===');
+        dev.log('Error: $e');
+        dev.log('Current API URL: ${ApiConfig.apiUrl}');
+        dev.log('Try changing the environment in ApiConfig.currentEnvironment');
       }
-      
+
       if (e is DioException) {
         if (ApiConfig.enableLogging) {
-          print('DioException type: ${e.type}');
-          print('DioException message: ${e.message}');
-          print('Response: ${e.response?.data}');
+          dev.log('DioException type: ${e.type}');
+          dev.log('DioException message: ${e.message}');
+          dev.log('Response: ${e.response?.data}');
         }
       }
       return false;

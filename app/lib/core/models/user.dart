@@ -1,9 +1,12 @@
+import 'dart:developer' as dev;
+
 class User {
   final int id;
   final String name;
   final String username;
   final String role;
   final int? branchId;
+  final DateTime? lastActiveAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -13,6 +16,7 @@ class User {
     required this.username,
     required this.role,
     this.branchId,
+    this.lastActiveAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -25,12 +29,13 @@ class User {
         username: _parseString(json['username']) ?? 'unknown',
         role: _parseString(json['role']) ?? 'karyawan',
         branchId: _parseNullableInt(json['branch_id'] ?? json['branchId']),
+        lastActiveAt: _parseDateTime(json['last_active_at'] ?? json['lastActiveAt']),
         createdAt: _parseDateTime(json['created_at'] ?? json['createdAt']) ?? DateTime.now(),
         updatedAt: _parseDateTime(json['updated_at'] ?? json['updatedAt']) ?? DateTime.now(),
       );
     } catch (e) {
-      print('Error parsing User from JSON: $e');
-      print('JSON data: $json');
+      dev.log('Error parsing User from JSON: $e');
+      dev.log('JSON data: $json');
       rethrow;
     }
   }
@@ -62,7 +67,7 @@ class User {
       try {
         return DateTime.parse(value);
       } catch (e) {
-        print('Error parsing DateTime: $value, error: $e');
+        dev.log('Error parsing DateTime: $value, error: $e');
         return null;
       }
     }
@@ -76,6 +81,7 @@ class User {
       'username': username,
       'role': role,
       'branch_id': branchId,
+      'last_active_at': lastActiveAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -87,6 +93,7 @@ class User {
     String? username,
     String? role,
     int? branchId,
+    DateTime? lastActiveAt,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -96,6 +103,7 @@ class User {
       username: username ?? this.username,
       role: role ?? this.role,
       branchId: branchId ?? this.branchId,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

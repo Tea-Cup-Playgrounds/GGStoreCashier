@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../core/config/api_config.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/theme/app_theme.dart';
+import 'dart:developer' as dev;
 
 class BranchAutocomplete extends StatefulWidget {
   final String? initialValue;
@@ -34,7 +35,7 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
   void initState() {
     super.initState();
     _loadBranches();
-    
+
     // Set initial value
     if (widget.initialBranchName != null) {
       _controller.text = widget.initialBranchName!;
@@ -46,7 +47,7 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
 
   Future<void> _loadBranches() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final token = await AuthService.getToken();
       final dio = Dio(BaseOptions(
@@ -55,19 +56,17 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
       ));
 
       final response = await dio.get('/api/branches');
-      
+
       setState(() {
-        _branches = List<Map<String, dynamic>>.from(
-          response.data['branches'].map((b) => {
-            'id': b['id'],
-            'name': b['name'],
-          })
-        );
+        _branches = List<Map<String, dynamic>>.from(response.data['branches'].map((b) => {
+              'id': b['id'],
+              'name': b['name'],
+            }));
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      debugPrint('Gagal memuat cabang: $e');
+      dev.log('Gagal memuat cabang: $e');
     }
   }
 
@@ -85,24 +84,19 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
         Text(
           'Branch',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppTheme.foreground,
-            fontWeight: FontWeight.w500,
-          ),
+                color: AppTheme.foreground,
+                fontWeight: FontWeight.w500,
+              ),
         ),
         const SizedBox(height: 8),
         Autocomplete<Map<String, dynamic>>(
-          initialValue: widget.initialBranchName != null 
-              ? TextEditingValue(text: widget.initialBranchName!)
-              : null,
+          initialValue: widget.initialBranchName != null ? TextEditingValue(text: widget.initialBranchName!) : null,
           optionsBuilder: (TextEditingValue textEditingValue) {
             if (textEditingValue.text.isEmpty) {
               return _branches;
             }
             return _branches.where((branch) {
-              return branch['name']
-                  .toString()
-                  .toLowerCase()
-                  .contains(textEditingValue.text.toLowerCase());
+              return branch['name'].toString().toLowerCase().contains(textEditingValue.text.toLowerCase());
             });
           },
           displayStringForOption: (Map<String, dynamic> option) => option['name'],
@@ -128,7 +122,7 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
               enabled: widget.enabled,
               decoration: InputDecoration(
                 hintText: 'Type to search or add new branch',
-                hintStyle: TextStyle(color: AppTheme.mutedForeground.withOpacity(0.6)),
+                hintStyle: TextStyle(color: AppTheme.mutedForeground.withValues(alpha: 0.6)),
                 filled: true,
                 fillColor: widget.enabled ? AppTheme.surface : AppTheme.muted,
                 border: OutlineInputBorder(
@@ -178,8 +172,8 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
                     : null,
               ),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.foreground,
-              ),
+                    color: AppTheme.foreground,
+                  ),
               validator: widget.validator,
               onChanged: (value) {
                 _controller.text = value;
@@ -188,7 +182,7 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
                   (b) => b['name'].toString().toLowerCase() == value.toLowerCase(),
                   orElse: () => {},
                 );
-                
+
                 if (matchingBranch.isNotEmpty) {
                   _selectedBranchId = matchingBranch['id'];
                   widget.onChanged(matchingBranch['id'], matchingBranch['name']);
@@ -238,15 +232,15 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
                                 child: Text(
                                   option['name'],
                                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppTheme.foreground,
-                                  ),
+                                        color: AppTheme.foreground,
+                                      ),
                                 ),
                               ),
                               if (option['id'] == 0)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.gold.withOpacity(0.2),
+                                    color: AppTheme.gold.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const Text(
@@ -280,9 +274,9 @@ class _BranchAutocompleteState extends State<BranchAutocomplete> {
                   child: Text(
                     'New branch "${_controller.text}" will be created',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.gold,
-                      fontStyle: FontStyle.italic,
-                    ),
+                          color: AppTheme.gold,
+                          fontStyle: FontStyle.italic,
+                        ),
                   ),
                 ),
               ],

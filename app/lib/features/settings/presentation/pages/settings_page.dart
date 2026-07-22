@@ -343,9 +343,9 @@ class _StoreProfileHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Flagship Store', style: Theme.of(context).textTheme.headlineSmall),
+                Text('GG Case Store', style: Theme.of(context).textTheme.headlineSmall),
                 Text(
-                  'Cabang Downtown',
+                  'Samarinda',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),

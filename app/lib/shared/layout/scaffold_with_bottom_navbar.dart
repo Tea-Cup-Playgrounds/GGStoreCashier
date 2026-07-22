@@ -166,17 +166,17 @@ class _LandscapeLayout extends ConsumerWidget {
                       backgroundColor: cs.surface,
                       labelType: NavigationRailLabelType.all,
                       selectedIconTheme: const IconThemeData(color: AppTheme.gold, size: 22),
-                      unselectedIconTheme: IconThemeData(color: cs.onSurface.withOpacity(0.55), size: 22),
+                      unselectedIconTheme: IconThemeData(color: cs.onSurface.withValues(alpha: 0.55), size: 22),
                       selectedLabelTextStyle: const TextStyle(
                         color: AppTheme.gold,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
                       unselectedLabelTextStyle: TextStyle(
-                        color: cs.onSurface.withOpacity(0.55),
+                        color: cs.onSurface.withValues(alpha: 0.55),
                         fontSize: 11,
                       ),
-                      indicatorColor: AppTheme.gold.withOpacity(0.12),
+                      indicatorColor: AppTheme.gold.withValues(alpha: 0.12),
                       destinations: items.map((item) {
                         return NavigationRailDestination(
                           icon: item.badge > 0
@@ -252,7 +252,7 @@ class _BottomNavItem extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? AppTheme.gold.withOpacity(0.1) : Colors.transparent,
+          color: isActive ? AppTheme.gold.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
