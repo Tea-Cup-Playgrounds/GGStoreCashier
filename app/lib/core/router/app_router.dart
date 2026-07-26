@@ -45,7 +45,7 @@ mixin AppRouter {
   static const String voucherCreate = '/vouchers/new';
   static const String voucherEdit = '/vouchers/edit/:id';
 
-  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
+  static final rootNavigatorKey = GlobalKey<NavigatorState>();
   static final homeNavKey = GlobalKey<NavigatorState>();
   static final cashierNavKey = GlobalKey<NavigatorState>();
   static final inventoryNavKey = GlobalKey<NavigatorState>();
@@ -53,7 +53,7 @@ mixin AppRouter {
   static final settingsNavKey = GlobalKey<NavigatorState>();
 
   static final GoRouter router = GoRouter(
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: rootNavigatorKey,
     initialLocation: login,
     redirect: AuthGuard.redirectLogic,
     errorBuilder: (context, state) => Scaffold(

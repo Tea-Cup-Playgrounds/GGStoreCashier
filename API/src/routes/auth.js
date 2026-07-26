@@ -55,7 +55,7 @@ router.post('/login', async (req, res) => {
             userAgent: req.get('User-Agent')
         });
         
-        const { username, password } = req.body;
+        const { username, password, remember = false } = req.body;
         const clientIP = getClientIP(req);
         const identifier = `${username}_${clientIP}`;
 
@@ -118,6 +118,9 @@ router.post('/login', async (req, res) => {
         console.log('Login successful for user:', username);
 
         // Generate JWT token
+        const expiresIn = remember ? "30d" : "10d";
+        const maxAge = remember ? 30 * 24 * 60 * 60 * 1000 : 10 * 24 * 60 * 60 * 1000;
+        
         const token = jwt.sign(
             { 
                 userId: user.id, 
@@ -126,14 +129,15 @@ router.post('/login', async (req, res) => {
                 branchId: user.branch_id 
             },
             process.env.JWT_SECRET,
-            { expiresIn: '24h' }
+            { expiresIn: expiresIn }
         );
 
         // Set cookie
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+            sameSite: 'strict',
+            maxAge: maxAge
         });
 
         res.json({
@@ -156,7 +160,11 @@ router.post('/login', async (req, res) => {
 
 // Logout endpoint
 router.post('/logout', (req, res) => {
-    res.clearCookie('token');
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+    });
     res.json({ message: 'Berhasil keluar' });
 });
 

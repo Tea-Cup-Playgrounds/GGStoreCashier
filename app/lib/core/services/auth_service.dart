@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/user.dart';
@@ -29,8 +31,13 @@ class AuthService {
   static const String _userKey = 'user_data';
   static const String _rememberMeKey = 'remember_me';
 
+  static bool _isDioInitialized = false;
+
   // Initialize dio with interceptors for logging
   static void _initializeDio() {
+    if (_isDioInitialized) return;
+    _isDioInitialized = true;
+
     if (ApiConfig.enableNetworkLogging) {
       _dio.interceptors.add(LogInterceptor(
         requestBody: true,
@@ -89,8 +96,38 @@ class AuthService {
         // Store token and user data
         await _storeAuthData(token, user, rememberMe: rememberMe);
 
-        // Connect to Socket.IO for real-time updates
-        SocketService.connect(token, user.branchId ?? 0);
+        // Connect to Socket.IO for real-time updates (role-aware room assignment)
+        SocketService.connect(
+          token: token,
+          branchId: user.branchId ?? 0,
+          role: user.role,
+          onAuthFailed: (errorMessage) {
+            dev.log("Auth Failed: $errorMessage");
+
+            final context = AppRouter.rootNavigatorKey.currentContext;
+            if (context == null || !context.mounted) return;
+
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: const Text('Sesi Berakhir'),
+                content: const Text(
+                  'Sesi Anda telah berakhir. Silahkan login kembali.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      logout();
+                    },
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
 
         if (ApiConfig.enableLogging) {
           dev.log('Login successful for user: ${user.username}');
@@ -183,7 +220,6 @@ class AuthService {
     try {
       final token = await getToken();
       if (token != null) {
-        // Call logout endpoint
         await _dio.post(
           '/api/auth/logout',
           options: Options(
@@ -195,12 +231,9 @@ class AuthService {
         );
       }
     } catch (e) {
-      // Continue with local logout even if server call fails
+      dev.log('Server logout failed or offline: $e');
     } finally {
-      // Disconnect Socket.IO
       SocketService.disconnect();
-
-      // Clear local storage
       await _clearAuthData();
     }
   }

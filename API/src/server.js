@@ -67,20 +67,79 @@ const io = socketIO(server, {
   },
 });
 
-// Socket.IO connection handling
-io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+// ── Socket.IO JWT authentication middleware ──────────────────────────────────
+io.use((socket, next) => {
+  try {
+    let token = null;
+    
+    const authHeader = socket.handshake.headers["authorization"];
+    if (authHeader) {
+      token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
+    } else if (socket.handshake.auth.token) {
+      const rawToken = socket.handshake.auth.token;
+      token = rawToken.startsWith("Bearer ") ? rawToken.slice(7) : rawToken;
+    }
 
-  // Join branch-specific room
-  socket.on("join-branch", (branchId) => {
+    if (!token) {
+      return next(new Error("Authentication error: missing token"));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    socket.data.userId = decoded.userId;
+    socket.data.role = decoded.role;
+    socket.data.branchId = decoded.branchId ?? null;
+
+    next();
+  } catch (err) {
+    next(new Error("AUTHENTICATION_FAILED"));
+  }
+});
+
+// ── Socket.IO connection handling ────────────────────────────────────────────
+io.on("connection", (socket) => {
+  const { role, branchId } = socket.data;
+  console.log(`Client connected: ${socket.id} | role=${role ?? "anon"} | branch=${branchId ?? "—"}`);
+
+  if (role === "superadmin") {
+    // Superadmin receives every branch's events via the catch-all room.
+    socket.join("all_rooms");
+    console.log(`Socket ${socket.id} joined all_rooms (superadmin)`);
+  } else if (branchId) {
+    // Regular admin / karyawan — join their own branch room only.
     socket.join(`branch-${branchId}`);
     console.log(`Socket ${socket.id} joined branch-${branchId}`);
+  }
+
+  // --- Client-driven room changes (e.g. superadmin switching branch view) ---
+
+  socket.on("join-branch", (reqBranchId) => {
+  if (socket.data.role === "superadmin") {
+    socket.join(`branch-${reqBranchId}`);
+    return;
+  }
+  
+  if (socket.data.branchId && String(socket.data.branchId) === String(reqBranchId)) {
+    socket.join(`branch-${reqBranchId}`);
+  } else {
+    console.warn(`Unauthorized join-branch attempt by user ${socket.data.userId} for branch ${reqBranchId}`);
+  }
+});
+
+  // leave-branch: leave a specific branch room.
+  socket.on("leave-branch", (reqBranchId) => {
+    socket.leave(`branch-${reqBranchId}`);
+    console.log(`Socket ${socket.id} left branch-${reqBranchId}`);
   });
 
-  // Leave branch room
-  socket.on("leave-branch", (branchId) => {
-    socket.leave(`branch-${branchId}`);
-    console.log(`Socket ${socket.id} left branch-${branchId}`);
+  // join-all-rooms: only superadmins may join the catch-all room via a client emit.
+  socket.on("join-all-rooms", () => {
+    if (socket.data.role !== "superadmin") {
+      console.warn(`Socket ${socket.id} attempted join-all-rooms without superadmin role`);
+      return;
+    }
+    socket.join("all_rooms");
+    console.log(`Socket ${socket.id} joined all_rooms via explicit request`);
   });
 
   socket.on("disconnect", () => {
@@ -110,22 +169,18 @@ app.use(
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      // In development, allow all localhost and 127.0.0.1 origins
       if (process.env.NODE_ENV === "development") {
         if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
           return callback(null, true);
         }
       }
 
-      // Check against configured origins
       if (corsOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      // Log rejected origins for debugging
       console.log("CORS rejected origin:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
@@ -142,26 +197,52 @@ app.use(
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-// Serve static files from uploads directory (inside API folder)
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Serve public assets (api-docs.js, favicon, etc.)
 app.use(express.static(path.join(__dirname, "public")));
 
-// Suppress favicon 404
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
-// Trust proxy — required when running behind ngrok or any reverse proxy
-// '1' means trust the first hop (ngrok -> your server)
 app.set("trust proxy", 1);
 
-const limiter = rateLimit({
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 15,
+  message: { error: "Terlalu banyak percobaan login. Coba lagi dalam 15 menit." },
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use(limiter);
+
+const posLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 3000,
+  message: { error: "Terlalu banyak percobaan. Coba lagi dalam 10 menit"},
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const genLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minutes
+  max: 500,
+  message: { error: "Terlalu banyak percobaan. Coba lagi dalam 1 menit."},
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// Limiter Settings
+app.use("/api/auth", authLimiter);
+
+app.use("/api/users", genLimiter);
+app.use("/api/admins", genLimiter);
+app.use("/api/super", genLimiter);
+app.use("/api/vouchers", genLimiter);
+app.use("/api/branches", genLimiter);
+
+app.use("/api/products", posLimiter);
+app.use("/api/categories", posLimiter);
+app.use("/api/transactions", posLimiter);
+app.use("/api/dashboard", posLimiter);
+app.use("/api/analytics", posLimiter);
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -244,7 +325,7 @@ app.post("/api/docs/login", async (req, res) => {
 
     docsLoginAttempts.delete(clientIP);
 
-    const maxAge = remember ? 24 * 60 * 60 * 1000 : undefined; // 1 day or session
+    const maxAge = remember ? 24 * 60 * 60 * 1000 : undefined;
     const expiresIn = remember ? "1d" : "8h";
 
     const token = jwt.sign(

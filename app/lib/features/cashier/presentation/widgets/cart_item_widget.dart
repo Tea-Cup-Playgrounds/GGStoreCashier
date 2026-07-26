@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/cart_item.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/services/product_service.dart';
+import '../../../../shared/widgets/app_network_image.dart';
 import '../../../../shared/widgets/quantity_picker_modal.dart';
 
 class CartItemWidget extends StatelessWidget {
@@ -86,67 +86,65 @@ class CartItemWidget extends StatelessWidget {
                 ),
               ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // ── Product image ─────────────────────────────────────────
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: product.image != null && product.image!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: ProductService.getProductImageUrl(product.image),
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => _placeholder(isDark),
-                        errorWidget: (_, __, ___) => _placeholder(isDark),
-                      )
-                    : _placeholder(isDark),
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // ── Name + price ──────────────────────────────────────────
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${CurrencyFormatter.formatToRupiah(cartItem.price)} / item',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    CurrencyFormatter.formatToRupiah(cartItem.subtotal),
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppTheme.gold,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // ── Controls column ───────────────────────────────────────
-            Column(
-              mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // +/- with tappable qty number
+                // ── Product image ─────────────────────────────────────────
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: product.image != null && product.image!.isNotEmpty
+                        ? AppNetworkImage(
+                            url: ProductService.getProductImageUrl(product.image),
+                            fit: BoxFit.cover,
+                            placeholder: (context) => _placeholder(isDark),
+                            errorWidget: (context) => _placeholder(isDark),
+                          )
+                        : _placeholder(isDark),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // ── Name + price ──────────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.name,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${CurrencyFormatter.formatToRupiah(cartItem.price)} / item',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        CurrencyFormatter.formatToRupiah(cartItem.subtotal),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: AppTheme.gold,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // ── Quantity controls ───────────────────────────────────────
                 Container(
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF2A2A2A) : cs.surfaceContainerHighest,
@@ -194,45 +192,38 @@ class CartItemWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 6),
-
-                // Delete button
-                GestureDetector(
-                  onTap: () => _showDeleteConfirm(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.destructive.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppTheme.destructive.withValues(alpha: 0.2),
-                        width: 0.8,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.delete_outline_rounded,
-                          size: 16,
-                          color: AppTheme.destructive.withValues(alpha: 0.8),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Hapus',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppTheme.destructive.withValues(alpha: 0.8),
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             ),
-          ],
-        ),
+          ),
+
+          // ── Delete button (top-left X) ───────────────────────────────
+          Positioned(
+            top: 4,
+            left: 4,
+            child: GestureDetector(
+              onTap: () => _showDeleteConfirm(context),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppTheme.destructive.withValues(alpha: 0.9),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

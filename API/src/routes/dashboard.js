@@ -40,11 +40,11 @@ router.get('/', async (req, res) => {
             branchParam
         );
 
-        // Low stock products (stock <= 5)
+        // Low stock products (stock <= 50)
         const [lowStock] = await pool.execute(
             `SELECT COUNT(*) AS count
              FROM products
-             WHERE stock <= 5 AND stock > 0
+             WHERE stock <= 50
                ${productBranchClause}`,
             productBranchParam
         );

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/services/product_service.dart';
+import '../../../../shared/widgets/app_network_image.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -63,16 +63,16 @@ class ProductCard extends StatelessWidget {
                         color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F4F0),
                       ),
                       product.image != null && product.image!.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: ProductService.getProductImageUrl(product.image),
+                          ? AppNetworkImage(
+                              url: ProductService.getProductImageUrl(product.image),
                               fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
+                              placeholder: (context) => const Center(
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   color: AppTheme.gold,
                                 ),
                               ),
-                              errorWidget: (context, url, error) => Image.asset(
+                              errorWidget: (context) => Image.asset(
                                 ProductService.getPlaceholderImage(),
                                 fit: BoxFit.cover,
                               ),

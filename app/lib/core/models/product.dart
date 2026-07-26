@@ -110,7 +110,7 @@ class Product {
     );
   }
 
-  bool get isLowStock => stock <= 5;
+  bool get isLowStock => stock <= 50;
   bool get isOutOfStock => stock <= 0;
 
   double get profitMargin => sellPrice - costPrice;

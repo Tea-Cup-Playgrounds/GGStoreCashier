@@ -6,6 +6,7 @@ import 'package:gg_store_cashier/core/helper/screen_type_utils.dart';
 import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
 import 'package:gg_store_cashier/core/provider/realtime_provider.dart';
+import 'package:gg_store_cashier/core/provider/socket_provider.dart';
 import 'package:gg_store_cashier/core/services/product_service.dart';
 import 'package:gg_store_cashier/core/models/product.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
@@ -45,7 +46,14 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   void didChangeDependencies() {
     super.didChangeDependencies();
     _realtimeSub ??= ref.listenManual(realtimeProductProvider, (previous, next) {
-      if (next.lastUpdateTime != previous?.lastUpdateTime) _loadProducts();
+      if (next.lastUpdateTime != previous?.lastUpdateTime) {
+        // Apply delta in-place — no network round-trip needed.
+        if (mounted) {
+          setState(() {
+            _products = next.applyDelta(_products);
+          });
+        }
+      }
     });
   }
 
@@ -55,7 +63,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
       _productsError = null;
     });
     try {
-      final products = await ProductService.getProducts();
+      final products = await ProductService.getProducts(forceRefresh: true);
       if (mounted) {
         setState(() {
           _products = products;
@@ -134,12 +142,17 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                         'Inventory',
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
+                      const SizedBox(width: 8),
+                      _LiveDot(provider: socketConnectionProvider),
                       const Spacer(),
                       if (!isKaryawan)
                         SizedBox(
                           height: 40,
                           child: ElevatedButton.icon(
-                            onPressed: () => context.push(AppRouter.inventoryAddItem),
+                            onPressed: () async {
+                              final changed = await context.push(AppRouter.inventoryAddItem);
+                              if (changed == true && mounted) _loadProducts();
+                            },
                             icon: const Icon(Icons.add_rounded, size: 18),
                             label: const Text('Tambah Produk'),
                             style: ElevatedButton.styleFrom(
@@ -265,6 +278,13 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                             itemBuilder: (context, index) => _ProductTile(
                               product: filtered[index],
                               isTablet: screenType == ScreenType.tablet,
+                              onTap: () async {
+                                final changed = await context.pushNamed(
+                                  'inventoryDetail',
+                                  pathParameters: {'id': filtered[index].id},
+                                );
+                                if (changed == true && mounted) _loadProducts();
+                              },
                             ),
                           ),
                         ),
@@ -279,7 +299,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
 class _ProductTile extends StatelessWidget {
   final Product product;
   final bool isTablet;
-  const _ProductTile({required this.product, this.isTablet = false});
+  final VoidCallback? onTap;
+  const _ProductTile({required this.product, this.isTablet = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +321,7 @@ class _ProductTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        onTap: () => context.pushNamed('inventoryDetail', pathParameters: {'id': product.id}),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
           padding: const EdgeInsets.all(12),
@@ -384,6 +405,37 @@ class _ProductTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared live-connection indicator dot
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A small animated dot that shows the Socket.IO connection status.
+/// Green = live, Red = disconnected / reconnecting.
+class _LiveDot extends ConsumerWidget {
+  final ProviderBase<AsyncValue<bool>> provider;
+  const _LiveDot({required this.provider});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isLive = ref.watch(provider).valueOrNull ?? false;
+    return Tooltip(
+      message: isLive ? 'Live updates aktif' : 'Tidak terhubung — data mungkin tidak terbaru',
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isLive ? AppTheme.success : AppTheme.destructive,
+          boxShadow: isLive
+              ? [BoxShadow(color: AppTheme.success.withValues(alpha: 0.5), blurRadius: 6, spreadRadius: 1)]
+              : null,
         ),
       ),
     );

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/helper/currency_formatter.dart';
 import '../../core/services/product_service.dart';
+import '../widgets/app_network_image.dart';
 
 /// Shows a bottom sheet modal to pick quantity before adding to cart.
 /// Returns the chosen quantity, or null if dismissed.
@@ -134,10 +134,10 @@ class _QuantityPickerSheetState extends State<_QuantityPickerSheet> {
                         width: 56,
                         height: 56,
                         child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: ProductService.getProductImageUrl(widget.imageUrl),
+                            ? AppNetworkImage(
+                                url: ProductService.getProductImageUrl(widget.imageUrl),
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
+                                placeholder: (context) => Container(
                                   color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0EDE6),
                                   child: const Center(
                                     child: CircularProgressIndicator(
@@ -146,7 +146,7 @@ class _QuantityPickerSheetState extends State<_QuantityPickerSheet> {
                                     ),
                                   ),
                                 ),
-                                errorWidget: (_, __, ___) => _fallbackIcon(isDark),
+                                errorWidget: (context) => _fallbackIcon(isDark),
                               )
                             : _fallbackIcon(isDark),
                       ),

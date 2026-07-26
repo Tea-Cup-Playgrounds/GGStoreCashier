@@ -261,11 +261,10 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                       children: [
                         Expanded(
                           child: TextInput(
-                            label: 'Jumlah Stok *',
+                            label: 'Jumlah Stok',
                             hintText: 'Masukkan jumlah',
-                            keyboardType: TextInputType.number,
                             controller: _stockController,
-                            prefixIcon: Icons.numbers_outlined,
+                            keyboardType: TextInputType.number,
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return 'Stok wajib diisi';
                               if (int.tryParse(v.trim()) == null) return 'Angka tidak valid';
@@ -276,11 +275,10 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: TextInput(
-                            label: 'Harga Jual *',
-                            hintText: 'Masukkan harga',
-                            keyboardType: TextInputType.number,
+                            label: 'Harga Jual',
+                            hintText: 'Rp0',
                             controller: _priceController,
-                            prefixIcon: Icons.attach_money_outlined,
+                            keyboardType: TextInputType.number,
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return 'Harga wajib diisi';
                               final n = double.tryParse(v.trim());

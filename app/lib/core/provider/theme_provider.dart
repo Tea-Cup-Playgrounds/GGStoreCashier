@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 const _themeKey = 'theme_mode'; // 'dark' | 'light' | 'system'
 
 class ThemeNotifier extends StateNotifier<ThemeMode> {
-  ThemeNotifier() : super(ThemeMode.light) {
+  ThemeNotifier() : super(ThemeMode.system) {
     _loadTheme();
   }
 
@@ -24,8 +24,9 @@ class ThemeNotifier extends StateNotifier<ThemeMode> {
     state = switch (saved) {
       'dark' => ThemeMode.dark,
       'light' => ThemeMode.light,
-      // No saved preference yet → default to light
-      _ => ThemeMode.light,
+      'system' => ThemeMode.system,
+      // No saved preference yet → default to system
+      _ => ThemeMode.system,
     };
   }
 

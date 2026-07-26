@@ -10,8 +10,10 @@ import '../../../../core/services/location_service.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/helper/date_formatter.dart';
 import '../../../../core/provider/auth_provider.dart';
+import '../../../../core/provider/realtime_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/live_clock.dart';
+import '../../../../shared/widgets/animated_number.dart';
 
 const _palette = [
   Color(0xFFD4AF37),
@@ -57,6 +59,10 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
   StreamSubscription<ConnectivityStatus>? _connectivitySub;
   ConnectivityStatus? _lastConnectivity;
 
+  // Socket subscriptions for live KPI updates
+  ProviderSubscription<RealtimeTransactionState>? _txSub;
+  ProviderSubscription<RealtimeProductState>? _productSub;
+
   @override
   void initState() {
     super.initState();
@@ -71,9 +77,34 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Reload KPI summary whenever a transaction comes in or a product changes
+    _txSub ??= ref.listenManual(realtimeTransactionProvider, (prev, next) {
+      if (next.lastUpdateTime != prev?.lastUpdateTime) _reloadSummary();
+    });
+    _productSub ??= ref.listenManual(realtimeProductProvider, (prev, next) {
+      if (next.lastUpdateTime != prev?.lastUpdateTime) _reloadSummary();
+    });
+  }
+
+  @override
   void dispose() {
     _connectivitySub?.cancel();
+    _txSub?.close();
+    _productSub?.close();
     super.dispose();
+  }
+
+  /// Light reload — only refreshes the KPI summary numbers, not charts.
+  Future<void> _reloadSummary() async {
+    try {
+      final summary = await AnalyticsService.getSummary(forceRefresh: true);
+      if (mounted) setState(() => _summary = summary);
+    } catch (_) {
+      // Silently ignore — stale data is fine for background refresh
+    }
   }
 
   Future<void> _load() async {
@@ -426,10 +457,12 @@ class _KpiCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(data.value,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: data.color),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+            AnimatedNumber(
+              value: data.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: data.color),
+            ),
             Text(data.label,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
                 maxLines: 1,

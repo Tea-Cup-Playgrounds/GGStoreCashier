@@ -3,13 +3,18 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/api_config.dart';
 
+export '../config/api_config.dart' show ApiConfig;
+
 enum ConnectivityStatus { online, offline }
 
-/// Runs the HTTP probe in a separate isolate so it NEVER blocks the UI thread.
+// ── Mobile probe — runs in a separate isolate so it never blocks the UI ───────
+
 Future<bool> _isolateProbe(String endpoint) {
   return Isolate.run(() async {
     try {
@@ -27,6 +32,26 @@ Future<bool> _isolateProbe(String endpoint) {
     }
   });
 }
+
+// ── Web probe — dart:io / dart:isolate are unavailable on Flutter Web ─────────
+// Uses Dio which compiles to XMLHttpRequest under the hood.
+
+Future<bool> _webProbe(String endpoint) async {
+  try {
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 5),
+      headers: ApiConfig.defaultHeaders,
+      validateStatus: (status) => status != null && status >= 200 && status < 300,
+    ));
+    final response = await dio.get<void>(endpoint);
+    return (response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300;
+  } catch (_) {
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class ConnectivityMonitor {
   ConnectivityMonitor._internal();
@@ -52,8 +77,6 @@ class ConnectivityMonitor {
   bool get initialProbeComplete => _initialProbeComplete;
 
   /// Start monitoring. Call this AFTER login, not on app startup.
-  /// This prevents the HTTP probe from running while the user is on the
-  /// login page and blocking keyboard input.
   void start() {
     if (_started) return;
     _started = true;
@@ -83,10 +106,12 @@ class ConnectivityMonitor {
     if (isInitial) _initialProbeComplete = true;
   }
 
-  /// Probes in a separate isolate — zero UI thread impact.
+  /// Probes the API health endpoint.
+  /// - On web: uses Dio (XMLHttpRequest) — dart:io/dart:isolate unavailable
+  /// - On mobile: uses dart:io HttpClient in a separate isolate
   Future<ConnectivityStatus> probe() async {
     try {
-      final ok = await _isolateProbe(ApiConfig.testEndpoint);
+      final ok = kIsWeb ? await _webProbe(ApiConfig.testEndpoint) : await _isolateProbe(ApiConfig.testEndpoint);
       return ok ? ConnectivityStatus.online : ConnectivityStatus.offline;
     } catch (_) {
       return ConnectivityStatus.offline;

@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const { authenticateToken, requireRole } = require("../middleware/auth");
 const { uploadCategory, deleteFile, validateUploadedImage } = require("../utils/upload");
+const { broadcastToRoom } = require("../utils/socket_broadcast");
 
 const router = express.Router();
 
@@ -70,6 +71,13 @@ router.post("/", requireRole(["admin", "superadmin"]), uploadCategory.single("ca
 
     // Get the created category
     const [categories] = await pool.execute("SELECT * FROM categories WHERE id = ?", [result.insertId]);
+
+    // Broadcast to all branches (categories are global)
+    const io = req.app.get('io');
+    if (io) {
+      // Use branch 0 to broadcast to all_rooms (superadmin) only
+      broadcastToRoom(io, 0, 'category-created', categories[0]);
+    }
 
     res.status(201).json({
       message: "Category created successfully",
@@ -142,6 +150,12 @@ router.put("/:id", requireRole(["admin", "superadmin"]), uploadCategory.single("
     // Get updated category
     const [categories] = await pool.execute("SELECT * FROM categories WHERE id = ?", [req.params.id]);
 
+    // Broadcast to all branches (categories are global)
+    const io = req.app.get('io');
+    if (io) {
+      broadcastToRoom(io, 0, 'category-updated', categories[0]);
+    }
+
     res.json({
       message: "Category updated successfully",
       category: categories[0],
@@ -183,6 +197,12 @@ router.delete("/:id", requireRole(["superadmin"]), async (req, res) => {
     // Delete category image if exists
     if (categories[0].category_image) {
       deleteFile(`API/uploads/categories/${categories[0].category_image}`);
+    }
+
+    // Broadcast to all branches (categories are global)
+    const io = req.app.get('io');
+    if (io) {
+      broadcastToRoom(io, 0, 'category-deleted', { id: req.params.id });
     }
 
     res.json({ message: "Category deleted successfully" });

@@ -38,8 +38,8 @@ class AppConstants {
   static const int defaultPageSize = 20;
   
   // Currency
-  static const String currencySymbol = '\$';
-  static const String currencyCode = 'USD';
+  static const String currencySymbol = 'Rp';
+  static const String currencyCode = 'IDR';
   
   // Default Values
   static const String defaultStoreId = 'STORE001';

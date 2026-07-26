@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
@@ -230,29 +229,17 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
 
               const Spacer(),
 
-              // New Transaction Button
+              // Close Button - Large and Prominent
               SlideTransition(
                 position: _slideAnimation,
                 child: FadeTransition(
                   opacity: _fadeAnimation,
-                  child: Column(
-                    children: [
-                      CustomButton(
-                        text: 'Transaksi Baru',
-                        onPressed: widget.onNewTransaction,
-                        fullWidth: true,
-                        size: ButtonSize.extraLarge,
-                      ),
-                      const SizedBox(height: 12),
-                      CustomButton(
-                        text: 'Kembali ke Beranda',
-                        variant: ButtonVariant.outline,
-                        icon: Icons.home_outlined,
-                        onPressed: () => context.go('/home'),
-                        fullWidth: true,
-                        size: ButtonSize.large,
-                      ),
-                    ],
+                  child: CustomButton(
+                    text: 'Tutup',
+                    onPressed: widget.onNewTransaction,
+                    fullWidth: true,
+                    size: ButtonSize.extraLarge,
+                    icon: Icons.close,
                   ),
                 ),
               ),

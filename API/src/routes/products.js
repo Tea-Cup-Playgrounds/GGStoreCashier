@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole, filterByBranch } = require('../middleware/auth');
 const { uploadProduct, deleteFile, validateUploadedImage } = require('../utils/upload');
+const { broadcastToRoom } = require('../utils/socket_broadcast');
 
 const router = express.Router();
 
@@ -151,12 +152,7 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
 
         // Emit real-time event
         const io = req.app.get('io');
-        if (io) {
-            // Emit to specific branch
-            io.to(`branch-${branch_id}`).emit('product-created', products[0]);
-            // Emit to all branches (for superadmin)
-            io.to('branch-0').emit('product-created', products[0]);
-        }
+        broadcastToRoom(io, branch_id, 'product-created', products[0]);
 
         res.status(201).json({ 
             message: 'Produk berhasil ditambahkan',
@@ -256,11 +252,8 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
 
         // Emit real-time event
         const io = req.app.get('io');
-        if (io && products.length > 0) {
-            // Emit to specific branch
-            io.to(`branch-${branch_id}`).emit('product-updated', products[0]);
-            // Emit to all branches (for superadmin)
-            io.to('branch-0').emit('product-updated', products[0]);
+        if (products.length > 0) {
+            broadcastToRoom(io, branch_id, 'product-updated', products[0]);
         }
 
         res.json({ 
@@ -313,12 +306,7 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
 
         // Emit real-time event
         const io = req.app.get('io');
-        if (io) {
-            // Emit to specific branch
-            io.to(`branch-${product.branch_id}`).emit('product-deleted', { id: req.params.id });
-            // Emit to all branches (for superadmin)
-            io.to('branch-0').emit('product-deleted', { id: req.params.id });
-        }
+        broadcastToRoom(io, product.branch_id, 'product-deleted', { id: req.params.id, branch_id: product.branch_id });
 
         res.json({ message: 'Produk berhasil dihapus' });
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole, filterByBranch } = require('../middleware/auth');
+const { broadcastToRoom } = require('../utils/socket_broadcast');
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ router.get('/', filterByBranch, async (req, res) => {
             query += ' AND DATE(t.created_at) >= ?';
             params.push(start_date);
         }
-
+        
         if (end_date) {
             query += ' AND DATE(t.created_at) <= ?';
             params.push(end_date);
@@ -136,7 +137,7 @@ router.post('/', async (req, res) => {
         // Check stock availability for all items before touching anything
         for (const item of items) {
             const [rows] = await connection.execute(
-                'SELECT stock, name FROM products WHERE id = ?',
+                'SELECT stock, name FROM products WHERE id = ? FOR UPDATE',
                 [item.product_id]
             );
             if (rows.length === 0) {
@@ -156,6 +157,7 @@ router.post('/', async (req, res) => {
         for (const item of items) {
             total_amount += item.qty * item.price;
         }
+        
         const final_amount = total_amount - discount;
 
         // Insert transaction
@@ -196,7 +198,6 @@ router.post('/', async (req, res) => {
                 [item.product_id, branchId, item.qty, `Sale - Transaction #${transactionId}`]
             );
         }
-
         // Insert payment record
         if (payment_method && payment_amount) {
             await connection.execute(
@@ -219,22 +220,19 @@ router.post('/', async (req, res) => {
 
         // Emit real-time events
         const io = req.app.get('io');
-        if (io) {
-            io.to(`branch-${branchId}`).emit('transaction-created', transactions[0]);
-            io.to('branch-0').emit('transaction-created', transactions[0]);
+        broadcastToRoom(io, branchId, 'transaction-created', transactions[0]);
 
-            updatedProducts.forEach(product => {
-                io.to(`branch-${product.branch_id}`).emit('product-updated', product);
-                io.to('branch-0').emit('product-updated', product);
-            });
+        // Broadcast updated stock for every product sold.
+        // Use branchId from the transaction as fallback in case product.branch_id
+        // is somehow null — ensures the broadcast always reaches the right room.
+        updatedProducts.forEach(product => {
+            const productBranchId = product.branch_id || branchId;
+            broadcastToRoom(io, productBranchId, 'product-updated', product);
+        });
 
-            io.to(`branch-${branchId}`).emit('payment-completed', {
-                transactionId, method: payment_method, amount: payment_amount, branchId
-            });
-            io.to('branch-0').emit('payment-completed', {
-                transactionId, method: payment_method, amount: payment_amount, branchId
-            });
-        }
+        broadcastToRoom(io, branchId, 'payment-completed', {
+            transactionId, method: payment_method, amount: payment_amount, branchId
+        });
 
         res.status(201).json({
             message: 'Transaksi berhasil dibuat',

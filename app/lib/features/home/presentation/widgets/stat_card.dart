@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/animated_number.dart';
 
 class StatCard extends StatelessWidget {
   final IconData icon;
@@ -83,7 +84,7 @@ class StatCard extends StatelessWidget {
                           maxLines: 2,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.bold,
                             color: isPositive ? AppTheme.success : AppTheme.destructive,
                           ),
                         ),
@@ -94,8 +95,9 @@ class StatCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            value,
+          AnimatedNumber(
+            value: value,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -106,7 +108,7 @@ class StatCard extends StatelessWidget {
           Text(
             label,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(),
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ),

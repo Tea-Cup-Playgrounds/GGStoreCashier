@@ -16,6 +16,7 @@ import '../../../../core/config/api_config.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/provider/realtime_provider.dart';
+import '../../../../core/provider/socket_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
@@ -56,6 +57,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
 
   late AnimationController _viewAnimationController;
   ProviderSubscription<RealtimeProductState>? _realtimeSub;
+  ProviderSubscription<RealtimeTransactionState>? _realtimeTransactionSub;
 
   // Payment methods — cash always enabled; card/transfer/e-wallet require connectivity
   List<Map<String, dynamic>> get _paymentMethods {
@@ -81,7 +83,44 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     // Guard: only register once
     _realtimeSub ??= ref.listenManual(realtimeProductProvider, (previous, next) {
       if (next.lastUpdateTime != previous?.lastUpdateTime) {
-        _loadProducts();
+        // Apply delta in-place — no network round-trip needed.
+        if (mounted) {
+          setState(() {
+            _products = next.applyDelta(_products);
+          });
+          // Check if any cart item is now over-stocked.
+          _handleCartConflict(next);
+        }
+      }
+    });
+
+    _realtimeTransactionSub ??= ref.listenManual(realtimeTransactionProvider, (previous, next) {
+      if (next.lastPayment != null && next.lastUpdateTime != previous?.lastUpdateTime) {
+        // Show a toast when a payment comes in from another terminal.
+        if (mounted) {
+          final method = next.lastPayment!['method'] ?? '';
+          final amount = next.lastPayment!['amount'];
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.receipt_long, color: Colors.white, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Transaksi selesai: ${CurrencyFormatter.formatToRupiah((amount as num).toDouble())} via $method',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppTheme.success,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+        }
       }
     });
   }
@@ -138,10 +177,57 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   @override
   void dispose() {
     _realtimeSub?.close();
+    _realtimeTransactionSub?.close();
     _viewAnimationController.dispose();
     _searchController.dispose();
     _couponController.dispose();
     super.dispose();
+  }
+
+  /// Apply a socket delta to the product list without a network call.
+  /// Also silently updates any matching cart item's price.
+  void _handleCartConflict(RealtimeProductState delta) {
+    final updated = delta.lastUpdated;
+    if (updated == null) return;
+
+    // Find cart item for the updated product.
+    final cartIdx = _cart.indexWhere((c) => c.id == updated.id);
+    if (cartIdx < 0) return;
+
+    final cartItem = _cart[cartIdx];
+
+    // If stock dropped below cart quantity, warn the cashier.
+    if (updated.stock < cartItem.quantity) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Stok "${updated.name}" berkurang! Tersedia: ${updated.stock}, di keranjang: ${cartItem.quantity}',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppTheme.warning,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        action: SnackBarAction(
+          label: 'Sesuaikan',
+          textColor: Colors.white,
+          onPressed: () {
+            setState(() {
+              _cart[cartIdx] = cartItem.copyWith(quantity: updated.stock);
+            });
+          },
+        ),
+      ));
+    }
   }
 
   Future<void> _addToCart(Product product) async {
@@ -414,6 +500,9 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       _currentView = CashierView.products;
       _transactionUuid = const Uuid().v4();
     });
+    // Force-refresh the product list so the broadcaster sees
+    // the stock already reduced by the transaction they just completed.
+    _loadProducts(forceRefresh: true);
   }
 
   double get _subtotal => _cart.fold(0, (sum, item) => sum + item.subtotal);
@@ -471,11 +560,18 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: Text(
-          isTablet ? 'Penjualan Baru' : _getAppBarTitle(),
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isTablet ? 'Penjualan Baru' : _getAppBarTitle(),
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(width: 8),
+            _LiveDot(provider: socketConnectionProvider),
+          ],
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
@@ -1418,6 +1514,37 @@ class _PriceRow extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared live-connection indicator dot
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A small animated dot that shows the Socket.IO connection status.
+/// Green = live, Red = disconnected / reconnecting.
+class _LiveDot extends ConsumerWidget {
+  final ProviderBase<AsyncValue<bool>> provider;
+  const _LiveDot({required this.provider});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isLive = ref.watch(provider).valueOrNull ?? false;
+    return Tooltip(
+      message: isLive ? 'Live updates aktif' : 'Tidak terhubung — data mungkin tidak terbaru',
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isLive ? AppTheme.success : AppTheme.destructive,
+          boxShadow: isLive
+              ? [BoxShadow(color: AppTheme.success.withValues(alpha: 0.5), blurRadius: 6, spreadRadius: 1)]
+              : null,
+        ),
+      ),
     );
   }
 }
