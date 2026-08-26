@@ -29,6 +29,7 @@ const transactionRoutes = require("./routes/transactions");
 const dashboardRoutes = require("./routes/dashboard");
 const voucherRoutes = require("./routes/vouchers");
 const analyticsRoutes = require("./routes/analytics");
+const superadminDashboardRoutes = require("./routes/superadmin_dashboard");
 
 const app = express();
 const server = http.createServer(app);
@@ -111,20 +112,42 @@ io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} joined branch-${branchId}`);
   }
 
+  // ── Granular Subscriptions ─────────────────────────────────────────────────
+  
+  // Track which entities this client is subscribed to
+  socket.data.subscriptions = new Set();
+
+  socket.on("subscribe", (entity) => {
+    const validEntities = ["products", "vouchers", "users", "live_transactions"];
+    if (!validEntities.includes(entity)) {
+      console.warn(`Invalid subscription entity: ${entity}`);
+      return;
+    }
+    socket.data.subscriptions.add(entity);
+    socket.join(`entity-${entity}`);
+    console.log(`Socket ${socket.id} subscribed to: ${entity}`);
+  });
+
+  socket.on("unsubscribe", (entity) => {
+    socket.data.subscriptions.delete(entity);
+    socket.leave(`entity-${entity}`);
+    console.log(`Socket ${socket.id} unsubscribed from: ${entity}`);
+  });
+
   // --- Client-driven room changes (e.g. superadmin switching branch view) ---
 
   socket.on("join-branch", (reqBranchId) => {
-  if (socket.data.role === "superadmin") {
-    socket.join(`branch-${reqBranchId}`);
-    return;
-  }
-  
-  if (socket.data.branchId && String(socket.data.branchId) === String(reqBranchId)) {
-    socket.join(`branch-${reqBranchId}`);
-  } else {
-    console.warn(`Unauthorized join-branch attempt by user ${socket.data.userId} for branch ${reqBranchId}`);
-  }
-});
+    if (socket.data.role === "superadmin") {
+      socket.join(`branch-${reqBranchId}`);
+      return;
+    }
+    
+    if (socket.data.branchId && String(socket.data.branchId) === String(reqBranchId)) {
+      socket.join(`branch-${reqBranchId}`);
+    } else {
+      console.warn(`Unauthorized join-branch attempt by user ${socket.data.userId} for branch ${reqBranchId}`);
+    }
+  });
 
   // leave-branch: leave a specific branch room.
   socket.on("leave-branch", (reqBranchId) => {
@@ -243,6 +266,7 @@ app.use("/api/categories", posLimiter);
 app.use("/api/transactions", posLimiter);
 app.use("/api/dashboard", posLimiter);
 app.use("/api/analytics", posLimiter);
+app.use("/api/superadmin-dashboard", posLimiter);
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -256,6 +280,7 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/vouchers", voucherRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/superadmin-dashboard", superadminDashboardRoutes);
 
 // ── Docs session middleware ───────────────────────────────────────────────────
 const DOCS_SESSION_COOKIE = "docs_session";

@@ -18,6 +18,10 @@ class SocketService {
 
   static final Map<String, List<Function(dynamic)>> _eventListeners = {};
 
+  /// Active subscriptions — tracks which entities this client is subscribed to.
+  /// Format: {'products': true, 'vouchers': true, 'users': true, 'live_transactions': true}
+  static final Set<String> _activeSubscriptions = {};
+
   static void connect({
     required String token,
     required int branchId,
@@ -93,6 +97,8 @@ class SocketService {
       // Clear cache to ensure fresh data after reconnection
       CacheManager.clear();
       dev.log('Cache cleared after socket reconnection');
+      // Re-establish all active subscriptions
+      _resubscribeAll();
     });
 
     _setupEventListeners();
@@ -107,6 +113,13 @@ class SocketService {
     _socket!.off('category-deleted');
     _socket!.off('transaction-created');
     _socket!.off('payment-completed');
+    _socket!.off('dashboard:live-update');
+    _socket!.off('voucher-created');
+    _socket!.off('voucher-updated');
+    _socket!.off('voucher-deleted');
+    _socket!.off('user-created');
+    _socket!.off('user-updated');
+    _socket!.off('user-deleted');
 
     _socket!.on('product-created', (data) {
       dev.log('Event received: product-created');
@@ -146,6 +159,41 @@ class SocketService {
     _socket!.on('payment-completed', (data) {
       dev.log('Event received: payment-completed');
       _notifyListeners('payment-completed', data);
+    });
+
+    _socket!.on('dashboard:live-update', (data) {
+      dev.log('Event received: dashboard:live-update');
+      _notifyListeners('dashboard:live-update', data);
+    });
+
+    _socket!.on('voucher-created', (data) {
+      dev.log('Event received: voucher-created');
+      _notifyListeners('voucher-created', data);
+    });
+
+    _socket!.on('voucher-updated', (data) {
+      dev.log('Event received: voucher-updated');
+      _notifyListeners('voucher-updated', data);
+    });
+
+    _socket!.on('voucher-deleted', (data) {
+      dev.log('Event received: voucher-deleted');
+      _notifyListeners('voucher-deleted', data);
+    });
+
+    _socket!.on('user-created', (data) {
+      dev.log('Event received: user-created');
+      _notifyListeners('user-created', data);
+    });
+
+    _socket!.on('user-updated', (data) {
+      dev.log('Event received: user-updated');
+      _notifyListeners('user-updated', data);
+    });
+
+    _socket!.on('user-deleted', (data) {
+      dev.log('Event received: user-deleted');
+      _notifyListeners('user-deleted', data);
     });
   }
 
@@ -208,8 +256,61 @@ class SocketService {
       _currentRole = null;
       _currentBranchId = null;
       _eventListeners.clear();
+      _activeSubscriptions.clear();
       _connectionController.add(false);
-      dev.log('Socket.IO disconnected and disposed');
+      dev.log('Socket.IO disconnected and disposed', name: 'SOCKET_SERVICE');
+    }
+  }
+
+  // ── Granular Subscriptions ───────────────────────────────────────────────────
+
+  /// Subscribe to a specific entity type for real-time updates.
+  ///
+  /// Supported entities:
+  /// - 'products': inventory updates
+  /// - 'vouchers': voucher CRUD updates
+  /// - 'users': user account updates
+  /// - 'live_transactions': real-time transaction events
+  ///
+  /// Subscriptions are automatically maintained across reconnections.
+  static void subscribe(String entity) {
+    if (_activeSubscriptions.contains(entity)) {
+      dev.log('Already subscribed to $entity', name: 'SOCKET_SERVICE');
+      return;
+    }
+
+    _activeSubscriptions.add(entity);
+
+    if (_socket != null && _isConnected) {
+      _socket!.emit('subscribe', entity);
+      dev.log('Subscribed to: $entity', name: 'SOCKET_SERVICE');
+    }
+  }
+
+  /// Unsubscribe from a specific entity type.
+  static void unsubscribe(String entity) {
+    if (!_activeSubscriptions.contains(entity)) {
+      dev.log('Not subscribed to $entity', name: 'SOCKET_SERVICE');
+      return;
+    }
+
+    _activeSubscriptions.remove(entity);
+
+    if (_socket != null && _isConnected) {
+      _socket!.emit('unsubscribe', entity);
+      dev.log('Unsubscribed from: $entity', name: 'SOCKET_SERVICE');
+    }
+  }
+
+  /// Re-establish all active subscriptions after reconnection.
+  static void _resubscribeAll() {
+    if (_socket == null || !_isConnected || _activeSubscriptions.isEmpty) return;
+
+    dev.log('Re-subscribing to ${_activeSubscriptions.length} entities', name: 'SOCKET_SERVICE');
+
+    for (final entity in _activeSubscriptions) {
+      _socket!.emit('subscribe', entity);
+      dev.log('Re-subscribed to: $entity', name: 'SOCKET_SERVICE');
     }
   }
 }

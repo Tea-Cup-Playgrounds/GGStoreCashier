@@ -9,8 +9,11 @@ class AppearancePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
-    final isDark = themeMode == ThemeMode.dark;
     final cs = Theme.of(context).colorScheme;
+
+    // Resolve the label shown in the preview card
+    final bool isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerLow,
@@ -30,7 +33,7 @@ class AppearancePage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Preview card ───────────────────────────────────────────────
-            _PreviewCard(isDark: isDark),
+            _PreviewCard(isDark: isDark, themeMode: themeMode),
             const SizedBox(height: 24),
 
             // ── Theme options ──────────────────────────────────────────────
@@ -63,22 +66,26 @@ class AppearancePage extends ConsumerWidget {
               child: Column(
                 children: [
                   _ThemeOptionTile(
+                    title: 'System',
+                    subtitle: 'Follows your device setting',
+                    icon: Icons.brightness_auto_outlined,
+                    isSelected: themeMode == ThemeMode.system,
+                    onTap: () => ref.read(themeProvider.notifier).setTheme(ThemeMode.system),
+                  ),
+                  Divider(height: 1, indent: 56, color: cs.outlineVariant),
+                  _ThemeOptionTile(
                     title: 'Light',
                     subtitle: 'Clean and bright interface',
                     icon: Icons.light_mode_outlined,
-                    isSelected: !isDark,
+                    isSelected: themeMode == ThemeMode.light,
                     onTap: () => ref.read(themeProvider.notifier).setTheme(ThemeMode.light),
                   ),
-                  Divider(
-                    height: 1,
-                    indent: 56,
-                    color: cs.outlineVariant,
-                  ),
+                  Divider(height: 1, indent: 56, color: cs.outlineVariant),
                   _ThemeOptionTile(
                     title: 'Dark',
                     subtitle: 'Easy on the eyes at night',
                     icon: Icons.dark_mode_outlined,
-                    isSelected: isDark,
+                    isSelected: themeMode == ThemeMode.dark,
                     onTap: () => ref.read(themeProvider.notifier).setTheme(ThemeMode.dark),
                   ),
                 ],
@@ -95,11 +102,24 @@ class AppearancePage extends ConsumerWidget {
 
 class _PreviewCard extends StatelessWidget {
   final bool isDark;
-  const _PreviewCard({required this.isDark});
+  final ThemeMode themeMode;
+  const _PreviewCard({required this.isDark, required this.themeMode});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    final String label = switch (themeMode) {
+      ThemeMode.system => 'System (${isDark ? 'Dark' : 'Light'})',
+      ThemeMode.dark => 'Dark Mode',
+      ThemeMode.light => 'Light Mode',
+    };
+
+    final IconData icon = switch (themeMode) {
+      ThemeMode.system => Icons.brightness_auto_rounded,
+      ThemeMode.dark => Icons.nights_stay_rounded,
+      ThemeMode.light => Icons.wb_sunny_rounded,
+    };
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -124,11 +144,7 @@ class _PreviewCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppTheme.gold.withValues(alpha: 0.4)),
             ),
-            child: Icon(
-              isDark ? Icons.nights_stay_rounded : Icons.wb_sunny_rounded,
-              color: AppTheme.gold,
-              size: 24,
-            ),
+            child: Icon(icon, color: AppTheme.gold, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -136,14 +152,14 @@ class _PreviewCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isDark ? 'Dark Mode' : 'Light Mode',
+                  label,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isDark ? 'Currently active' : 'Currently active',
+                  'Currently active',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),

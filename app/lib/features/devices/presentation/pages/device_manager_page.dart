@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import 'package:gg_store_cashier/features/devices/data/device_service.dart';
@@ -20,6 +21,7 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
   _DeviceTab _activeTab = _DeviceTab.printer;
   bool _isScanning = false;
   bool _btUnavailable = false;
+  bool _checkingBt = true; // true while we run the initial BT check
 
   List<PairedDevice> _pairedDevices = [];
   final List<DiscoveredDevice> _discovered = [];
@@ -35,6 +37,8 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
     );
     _loadPaired();
     _watchAdapter();
+    // Run the BT check after the first frame so the dialog can show.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkBluetoothOnEntry());
   }
 
   @override
@@ -58,6 +62,110 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
     });
   }
 
+  // ── Initial Bluetooth check on page entry ──────────────────────────────────
+
+  Future<void> _checkBluetoothOnEntry() async {
+    if (!mounted) return;
+
+    // First request permissions — needed to query adapter state on Android 12+
+    final granted = await DeviceService.requestBluetoothPermissions();
+    if (!mounted) return;
+
+    if (!granted) {
+      setState(() {
+        _btUnavailable = true;
+        _checkingBt = false;
+      });
+      _showPermissionDeniedDialog();
+      return;
+    }
+
+    final isOn = await DeviceService.isBluetoothEnabled();
+    if (!mounted) return;
+
+    setState(() => _checkingBt = false);
+
+    if (!isOn) {
+      // Bluetooth is off — ask user for consent before enabling
+      _showBluetoothOffDialog();
+    }
+  }
+
+  void _showBluetoothOffDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: const Icon(Icons.bluetooth_disabled, color: AppTheme.warning, size: 48),
+        title: const Text('Bluetooth Tidak Aktif', textAlign: TextAlign.center),
+        content: Text(
+          defaultTargetPlatform == TargetPlatform.android
+              ? 'Bluetooth perlu diaktifkan untuk memindai dan menghubungkan perangkat. Aktifkan sekarang?'
+              : 'Aktifkan Bluetooth melalui Pengaturan perangkat untuk memindai perangkat.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Nanti'),
+          ),
+          if (defaultTargetPlatform == TargetPlatform.android)
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.gold),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _requestEnableBluetooth();
+              },
+              child: const Text('Aktifkan'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: const Icon(Icons.lock_outline, color: AppTheme.destructive, size: 48),
+        title: const Text('Izin Diperlukan', textAlign: TextAlign.center),
+        content: const Text(
+          'Izin Bluetooth diperlukan untuk memindai perangkat. Aktifkan di Pengaturan > Aplikasi.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _requestEnableBluetooth() async {
+    if (!mounted) return;
+    final enabled = await DeviceService.enableBluetooth();
+    if (!mounted) return;
+    if (!enabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Bluetooth tidak berhasil diaktifkan'),
+          backgroundColor: AppTheme.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+    // adapterState stream will update _btUnavailable automatically
+  }
+
+  // ── Scanning ───────────────────────────────────────────────────────────────
+
   Future<void> _startScan() async {
     if (_isScanning) return;
     setState(() {
@@ -73,9 +181,7 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
         setState(() => _isScanning = false);
         _refreshController.stop();
         _refreshController.reset();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bluetooth permission denied')),
-        );
+        _showPermissionDeniedDialog();
       }
       return;
     }
@@ -89,6 +195,7 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
         });
         _refreshController.stop();
         _refreshController.reset();
+        _showBluetoothOffDialog();
       }
       return;
     }
@@ -131,7 +238,11 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
     if (mounted) {
       setState(() => _discovered.removeWhere((x) => x.id == d.id));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${d.name} berhasil dipasangkan')),
+        SnackBar(
+          content: Text('${d.name} berhasil dipasangkan'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
     }
   }
@@ -161,8 +272,8 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
     return showDialog<DeviceCategory>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Device Type'),
-        content: const Text('What type of device is this?'),
+        title: const Text('Tipe Perangkat'),
+        content: const Text('Pilih jenis perangkat ini:'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, DeviceCategory.printer),
@@ -192,75 +303,77 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Device Manager',
+          'Manajemen Perangkat',
           style: Theme.of(context).textTheme.headlineMedium!.copyWith(fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: _TabSelector(
-              active: _activeTab,
-              onChanged: (tab) => setState(() => _activeTab = tab),
-            ),
-          ),
-          if (_btUnavailable) _BtWarningBanner(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Paired ──────────────────────────────────────────────
-                  const CustomTitle(title: 'Paired Devices'),
-                  const SizedBox(height: 12),
-                  if (_filteredPaired.isEmpty)
-                    _EmptyPaired(tab: _activeTab)
-                  else
-                    ..._filteredPaired.map((d) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _PairedDeviceCard(
-                            device: d,
-                            onRemove: () => _unpairDevice(d),
-                          ),
-                        )),
-                  const SizedBox(height: 8),
-
-                  // ── Available ───────────────────────────────────────────
-                  Row(
-                    children: [
-                      const CustomTitle(title: 'Available Devices'),
-                      const Spacer(),
-                      RefreshButton(
-                        onRefresh: _startScan,
-                        refreshController: _refreshController,
-                      ),
-                    ],
+      body: _checkingBt
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: _TabSelector(
+                    active: _activeTab,
+                    onChanged: (tab) => setState(() => _activeTab = tab),
                   ),
-                  const SizedBox(height: 12),
-                  if (_isScanning)
-                    const _SkeletonList()
-                  else if (_discovered.isEmpty)
-                    _EmptyScanPrompt(onScan: _startScan)
-                  else
-                    ..._discovered.map((d) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _DiscoveredDeviceCard(
-                            device: d,
-                            onPair: () => _pairDevice(d),
-                          ),
-                        )),
-                  const SizedBox(height: 24),
-                ],
-              ),
+                ),
+                if (_btUnavailable) _BtWarningBanner(onEnable: _requestEnableBluetooth),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Paired ──────────────────────────────────
+                        const CustomTitle(title: 'Perangkat Dipasangkan'),
+                        const SizedBox(height: 12),
+                        if (_filteredPaired.isEmpty)
+                          _EmptyPaired(tab: _activeTab)
+                        else
+                          ..._filteredPaired.map((d) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _PairedDeviceCard(
+                                  device: d,
+                                  onRemove: () => _unpairDevice(d),
+                                ),
+                              )),
+                        const SizedBox(height: 8),
+
+                        // ── Available ────────────────────────────────
+                        Row(
+                          children: [
+                            const CustomTitle(title: 'Perangkat Tersedia'),
+                            const Spacer(),
+                            RefreshButton(
+                              onRefresh: _startScan,
+                              refreshController: _refreshController,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (_isScanning)
+                          const _SkeletonList()
+                        else if (_discovered.isEmpty)
+                          _EmptyScanPrompt(onScan: _startScan)
+                        else
+                          ..._discovered.map((d) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _DiscoveredDeviceCard(
+                                  device: d,
+                                  onPair: () => _pairDevice(d),
+                                ),
+                              )),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -268,6 +381,9 @@ class _DeviceManagerPageState extends State<DeviceManagerPage> with SingleTicker
 // ── BT Warning ────────────────────────────────────────────────────────────────
 
 class _BtWarningBanner extends StatelessWidget {
+  final VoidCallback onEnable;
+  const _BtWarningBanner({required this.onEnable});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -284,9 +400,17 @@ class _BtWarningBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Bluetooth is off. Enable it to scan for devices.',
+              'Bluetooth tidak aktif. Aktifkan untuk memindai perangkat.',
               style: Theme.of(context).textTheme.bodySmall!.copyWith(color: AppTheme.warning),
             ),
+          ),
+          TextButton(
+            onPressed: onEnable,
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.warning,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+            child: const Text('Aktifkan'),
           ),
         ],
       ),
@@ -626,7 +750,7 @@ class _EmptyPaired extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Text(
-        'No paired ${tab == _DeviceTab.printer ? "printers" : "scanners"} yet.',
+        'Belum ada ${tab == _DeviceTab.printer ? "printer" : "scanner"} yang dipasangkan.',
         style: Theme.of(context).textTheme.bodySmall,
       ),
     );
@@ -647,7 +771,7 @@ class _EmptyScanPrompt extends StatelessWidget {
             Icon(Icons.bluetooth_searching,
                 size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
             const SizedBox(height: 12),
-            Text('Tap refresh to scan for nearby Bluetooth devices',
+            Text('Tap refresh untuk memindai perangkat Bluetooth terdekat',
                 textAlign: TextAlign.center,
                 style: Theme.of(context)
                     .textTheme

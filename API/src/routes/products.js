@@ -2,7 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole, filterByBranch } = require('../middleware/auth');
 const { uploadProduct, deleteFile, validateUploadedImage } = require('../utils/upload');
-const { broadcastToRoom } = require('../utils/socket_broadcast');
+const { broadcastToRoom, broadcastToEntity } = require('../utils/socket_broadcast');
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.get('/', filterByBranch, async (req, res) => {
             FROM products p 
             LEFT JOIN categories c ON p.category_id = c.id 
             LEFT JOIN branches b ON p.branch_id = b.id 
-            WHERE 1=1
+            WHERE p.is_deleted = 0
         `;
         const params = [];
 
@@ -57,7 +57,7 @@ router.get('/:id', async (req, res) => {
              FROM products p 
              LEFT JOIN categories c ON p.category_id = c.id 
              LEFT JOIN branches b ON p.branch_id = b.id 
-             WHERE p.id = ?`,
+             WHERE p.id = ? AND p.is_deleted = 0`,
             [req.params.id]
         );
 
@@ -150,9 +150,10 @@ router.post('/', requireRole(['admin', 'superadmin']), filterByBranch, uploadPro
             [result.insertId]
         );
 
-        // Emit real-time event
+        // Emit real-time event — branch room + entity-products subscribers
         const io = req.app.get('io');
         broadcastToRoom(io, branch_id, 'product-created', products[0]);
+        broadcastToEntity(io, 'products', 'product-created', products[0], branch_id);
 
         res.status(201).json({ 
             message: 'Produk berhasil ditambahkan',
@@ -183,7 +184,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
 
         // Get old product data to verify ownership and delete old image if new one is uploaded
         const [oldProducts] = await pool.execute(
-            'SELECT branch_id, product_image FROM products WHERE id = ?',
+            'SELECT branch_id, product_image FROM products WHERE id = ? AND is_deleted = 0',
             [req.params.id]
         );
 
@@ -250,10 +251,11 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
             [req.params.id]
         );
 
-        // Emit real-time event
+        // Emit real-time event — branch room + entity-products subscribers
         const io = req.app.get('io');
         if (products.length > 0) {
             broadcastToRoom(io, branch_id, 'product-updated', products[0]);
+            broadcastToEntity(io, 'products', 'product-updated', products[0], branch_id);
         }
 
         res.json({ 
@@ -276,11 +278,13 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
 });
 
 // Delete product (superadmin only)
+// Uses soft-delete (is_deleted=1) to preserve transaction history integrity.
+// Falls back to hard-delete only when the product has no transaction history.
 router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
     try {
         // Get product info before deletion
         const [products] = await pool.execute(
-            'SELECT id, branch_id, product_image FROM products WHERE id = ?',
+            'SELECT id, branch_id, product_image FROM products WHERE id = ? AND is_deleted = 0',
             [req.params.id]
         );
 
@@ -290,23 +294,32 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
 
         const product = products[0];
 
-        const [result] = await pool.execute(
-            'DELETE FROM products WHERE id = ?',
+        // Check if product has any transaction history
+        const [[{ txCount }]] = await pool.execute(
+            'SELECT COUNT(*) AS txCount FROM transaction_items WHERE product_id = ?',
             [req.params.id]
         );
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Produk tidak ditemukan' });
+        if (parseInt(txCount) > 0) {
+            // Soft delete — preserve transaction history
+            await pool.execute(
+                'UPDATE products SET is_deleted = 1, updated_at = NOW() WHERE id = ?',
+                [req.params.id]
+            );
+        } else {
+            // No transaction history — safe to hard delete
+            await pool.execute('DELETE FROM products WHERE id = ?', [req.params.id]);
+
+            // Delete product image only on hard delete
+            if (product.product_image) {
+                deleteFile(`uploads/products/${product.product_image}`);
+            }
         }
 
-        // Delete product image if exists
-        if (product.product_image) {
-            deleteFile(`uploads/products/${product.product_image}`);
-        }
-
-        // Emit real-time event
+        // Emit real-time event — branch room + entity-products subscribers
         const io = req.app.get('io');
         broadcastToRoom(io, product.branch_id, 'product-deleted', { id: req.params.id, branch_id: product.branch_id });
+        broadcastToEntity(io, 'products', 'product-deleted', { id: req.params.id, branch_id: product.branch_id }, product.branch_id);
 
         res.json({ message: 'Produk berhasil dihapus' });
 

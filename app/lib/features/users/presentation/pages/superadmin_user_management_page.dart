@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/router/role_guard.dart';
 import '../../../../core/provider/auth_provider.dart';
+import '../../../../core/models/branch.dart';
+import '../../../../core/services/branch_service.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/custom_search_bar.dart';
 import '../widgets/user_list_item.dart';
@@ -22,13 +24,24 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
   final _searchController = TextEditingController();
   String _selectedRole = 'all';
   String _selectedBranch = 'all';
+  List<Branch> _branches = [];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(userManagementProvider.notifier).loadUsers();
+      ref.read(superAdminUserManagementProvider.notifier).loadUsers();
+      _loadBranches();
     });
+  }
+
+  Future<void> _loadBranches() async {
+    try {
+      final branches = await BranchService.getBranches();
+      if (mounted) setState(() => _branches = branches);
+    } catch (_) {
+      // Non-fatal — branch filter just shows no options
+    }
   }
 
   @override
@@ -41,20 +54,20 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
     showDialog(
       context: context,
       builder: (context) => UserFormDialog(user: user, isSuperAdmin: true),
-    ).then((_) => ref.read(userManagementProvider.notifier).loadUsers());
+    ).then((_) => ref.read(superAdminUserManagementProvider.notifier).loadUsers());
   }
 
   void _showDeleteDialog(Map<String, dynamic> user) {
     showDialog(
       context: context,
       builder: (context) => UserDeleteDialog(user: user),
-    ).then((_) => ref.read(userManagementProvider.notifier).loadUsers());
+    ).then((_) => ref.read(superAdminUserManagementProvider.notifier).loadUsers());
   }
 
-  void _onSearch(String query) => ref.read(userManagementProvider.notifier).searchUsers(query);
+  void _onSearch(String query) => ref.read(superAdminUserManagementProvider.notifier).searchUsers(query);
 
   void _onFilterChanged() {
-    ref.read(userManagementProvider.notifier).filterUsers(
+    ref.read(superAdminUserManagementProvider.notifier).filterUsers(
           role: _selectedRole == 'all' ? null : _selectedRole,
           branchId: _selectedBranch == 'all' ? null : _selectedBranch,
         );
@@ -62,8 +75,7 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final user = authState.user;
+    final user = ref.watch(authProvider).user;
 
     if (!RoleGuard.isSuperAdmin(user)) {
       return Scaffold(
@@ -80,7 +92,7 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
       );
     }
 
-    final userState = ref.watch(userManagementProvider);
+    final userState = ref.watch(superAdminUserManagementProvider);
     final isDesktop = MediaQuery.of(context).size.width > 768;
 
     return Scaffold(
@@ -204,7 +216,7 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
         : Icon(Icons.refresh, color: cs.onSurface.withValues(alpha: 0.6));
 
     return IconButton(
-      onPressed: state.isLoading ? null : () => ref.read(userManagementProvider.notifier).loadUsers(),
+      onPressed: state.isLoading ? null : () => ref.read(superAdminUserManagementProvider.notifier).loadUsers(),
       icon: icon,
       style: asMobile
           ? IconButton.styleFrom(backgroundColor: cs.surfaceContainerHighest, padding: const EdgeInsets.all(12))
@@ -282,6 +294,18 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
 
   Widget _buildBranchFilter() {
     final cs = Theme.of(context).colorScheme;
+    // Build items from real branch list — fall back to "Memuat..." while loading
+    final items = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(value: 'all', child: Text('Semua Cabang')),
+      ..._branches.map((b) => DropdownMenuItem(
+            value: b.id.toString(),
+            child: Text(b.name, overflow: TextOverflow.ellipsis),
+          )),
+    ];
+
+    // If selected branch was removed from the list, reset to 'all'
+    final validValue = items.any((i) => i.value == _selectedBranch) ? _selectedBranch : 'all';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -291,19 +315,12 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: _selectedBranch,
+          value: validValue,
           isExpanded: true,
           dropdownColor: cs.surface,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface),
-          items: const [
-            DropdownMenuItem(value: 'all', child: Text('Semua Cabang')),
-            DropdownMenuItem(value: '0', child: Text('Semua Cabang (Global)')),
-            DropdownMenuItem(value: '1', child: Text('Cabang Satu')),
-            DropdownMenuItem(value: '2', child: Text('Cabang Dua')),
-            DropdownMenuItem(value: '3', child: Text('Cabang Tiga')),
-            DropdownMenuItem(value: '4', child: Text('Cabang Empat')),
-            DropdownMenuItem(value: '5', child: Text('Cabang Lima')),
-          ],
+          hint: const Text('Memuat cabang...'),
+          items: items,
           onChanged: (value) {
             setState(() => _selectedBranch = value!);
             _onFilterChanged();
@@ -334,7 +351,7 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
             const SizedBox(height: 24),
             CustomButton(
               text: 'Coba Lagi',
-              onPressed: () => ref.read(userManagementProvider.notifier).loadUsers(),
+              onPressed: () => ref.read(superAdminUserManagementProvider.notifier).loadUsers(),
             ),
           ],
         ),
@@ -361,7 +378,7 @@ class _SuperAdminUserManagementPageState extends ConsumerState<SuperAdminUserMan
     }
 
     return PullToRefresh(
-      onRefresh: () async => ref.read(userManagementProvider.notifier).loadUsers(),
+      onRefresh: () async => ref.read(superAdminUserManagementProvider.notifier).loadUsers(),
       child: ListView.builder(
         itemCount: state.users.length,
         itemBuilder: (context, index) {

@@ -5,7 +5,7 @@ import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart
 import 'package:gg_store_cashier/core/helper/screen_type_utils.dart';
 import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
-import 'package:gg_store_cashier/core/provider/realtime_provider.dart';
+import 'package:gg_store_cashier/core/provider/realtime_store_provider.dart';
 import 'package:gg_store_cashier/core/provider/socket_provider.dart';
 import 'package:gg_store_cashier/core/services/product_service.dart';
 import 'package:gg_store_cashier/core/models/product.dart';
@@ -27,76 +27,107 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   late final TextEditingController searchController;
   late TabController _tabController;
   InventoryFilter _currentFilter = InventoryFilter.all;
-
-  List<Product> _products = [];
-  bool _isLoadingProducts = true;
+  String? _selectedCategory; // null = all categories
+  List<String> _categories = [];
+  bool _isInitialLoading = true;
   String? _productsError;
-
-  ProviderSubscription<RealtimeProductState>? _realtimeSub;
+  int _currentTab = 0;
 
   @override
   void initState() {
     super.initState();
     searchController = TextEditingController();
     _tabController = TabController(length: 2, vsync: this);
-    _loadProducts();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _realtimeSub ??= ref.listenManual(realtimeProductProvider, (previous, next) {
-      if (next.lastUpdateTime != previous?.lastUpdateTime) {
-        // Apply delta in-place — no network round-trip needed.
-        if (mounted) {
-          setState(() {
-            _products = next.applyDelta(_products);
-          });
-        }
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {
+          _currentTab = _tabController.index;
+        });
       }
     });
+
+    _initialSync();
   }
 
-  Future<void> _loadProducts() async {
-    setState(() {
-      _isLoadingProducts = true;
-      _productsError = null;
-    });
+  // ── Data ──────────────────────────────────────────────────────────────────
+
+  /// First open: fetch from network → seed SQLite.
+  /// productStoreProvider takes over from there, polling every 500 ms.
+  Future<void> _initialSync() async {
+    if (mounted) setState(() => _isInitialLoading = true);
     try {
-      final products = await ProductService.getProducts(forceRefresh: true);
+      final user = ref.read(authProvider).user;
+      final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+      final products = await ProductService.getProducts(
+        branchId: branchId,
+        forceRefresh: true,
+      );
+      await ref.read(productStoreProvider(branchId).notifier).seedFromHttp(products);
       if (mounted) {
         setState(() {
-          _products = products;
-          _isLoadingProducts = false;
+          _productsError = null;
+          // Build sorted unique category list from fetched products
+          final cats = products.map((p) => p.category).whereType<String>().where((c) => c.isNotEmpty).toSet().toList()
+            ..sort();
+          _categories = cats;
         });
       }
     } catch (e) {
+      if (mounted) setState(() => _productsError = e.toString());
+    } finally {
+      if (mounted) setState(() => _isInitialLoading = false);
+    }
+  }
+
+  /// Pull-to-refresh: re-fetch network → reseed SQLite.
+  Future<void> _refresh() async {
+    if (mounted) setState(() => _productsError = null);
+    try {
+      final user = ref.read(authProvider).user;
+      final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+      final products = await ProductService.getProducts(
+        branchId: branchId,
+        forceRefresh: true,
+      );
+      await ref.read(productStoreProvider(branchId).notifier).seedFromHttp(products);
       if (mounted) {
         setState(() {
-          _productsError = e.toString();
-          _isLoadingProducts = false;
+          final cats = products.map((p) => p.category).whereType<String>().where((c) => c.isNotEmpty).toSet().toList()
+            ..sort();
+          _categories = cats;
+          // Reset selected category if it no longer exists after refresh
+          if (_selectedCategory != null && !cats.contains(_selectedCategory)) {
+            _selectedCategory = null;
+          }
         });
       }
+    } catch (e) {
+      if (mounted) setState(() => _productsError = e.toString());
     }
   }
 
   @override
   void dispose() {
-    _realtimeSub?.close();
     searchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
-  List<Product> get _filteredProducts {
-    List<Product> result = _products;
+  // ── Filtering ─────────────────────────────────────────────────────────────
+
+  List<Product> _applyFilters(List<Product> source) {
+    var result = source;
     final q = searchController.text.toLowerCase();
     if (q.isNotEmpty) {
-      result = result.where((p) {
-        return p.name.toLowerCase().contains(q) ||
-            (p.barcode?.toLowerCase().contains(q) ?? false) ||
-            (p.category?.toLowerCase().contains(q) ?? false);
-      }).toList();
+      result = result
+          .where((p) =>
+              p.name.toLowerCase().contains(q) ||
+              (p.barcode?.toLowerCase().contains(q) ?? false) ||
+              (p.category?.toLowerCase().contains(q) ?? false))
+          .toList();
+    }
+    if (_selectedCategory != null) {
+      result = result.where((p) => p.category == _selectedCategory).toList();
     }
     switch (_currentFilter) {
       case InventoryFilter.low:
@@ -110,6 +141,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     }
     return result;
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -128,6 +161,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
           constraints: const BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
           child: Column(
             children: [
+              // ── Top bar ────────────────────────────────────────────
               Container(
                 padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 8),
                 decoration: BoxDecoration(
@@ -150,11 +184,21 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                           height: 40,
                           child: ElevatedButton.icon(
                             onPressed: () async {
-                              final changed = await context.push(AppRouter.inventoryAddItem);
-                              if (changed == true && mounted) _loadProducts();
+                              bool? changed;
+
+                              if (_currentTab == 0) {
+                                changed = await context.push(AppRouter.inventoryAddItem);
+                              } else {
+                                changed = await context.push(AppRouter.categoryForm);
+                              }
+                              if (changed == true && mounted) {
+                                _refresh();
+                              }
                             },
                             icon: const Icon(Icons.add_rounded, size: 18),
-                            label: const Text('Tambah Produk'),
+                            label: Text(
+                              _currentTab == 0 ? 'Tambah Produk' : 'Tambah Kategori',
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.gold,
                               foregroundColor: isDark ? Colors.black : Colors.white,
@@ -169,6 +213,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   ),
                 ),
               ),
+
+              // ── Tabs ───────────────────────────────────────────────
               Container(
                 color: cs.surface,
                 child: TabBar(
@@ -183,11 +229,13 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   ],
                 ),
               ),
+
+              // ── Tab views ──────────────────────────────────────────
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildProductsTab(screenType, hPad),
+                    _buildProductsTab(screenType, hPad, user),
                     const CategoryManagementPage(),
                   ],
                 ),
@@ -199,31 +247,38 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     );
   }
 
-  Widget _buildProductsTab(ScreenType screenType, double hPad) {
-    final filtered = _filteredProducts;
+  Widget _buildProductsTab(ScreenType screenType, double hPad, dynamic user) {
     final cs = Theme.of(context).colorScheme;
+    final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+
+    // SQLite-backed store — auto-updated every 500 ms via WS
+    final storeProducts = ref.watch(productStoreProvider(branchId));
+    final filtered = _applyFilters(storeProducts);
 
     return Column(
       children: [
-        // ── Sticky header (search + filters + summary) ──────────────
+        // ── Header (search + filter chips + counts) ────────────────
         InventoryHeader(
           searchController: searchController,
           onSearchChanged: (_) => setState(() {}),
           currentFilter: _currentFilter,
           onFilterChanged: (f) => setState(() => _currentFilter = f),
-          totalItems: _products.length,
-          lowStockItems: _products.where((p) => p.isLowStock && !p.isOutOfStock).length,
-          outOfStockItems: _products.where((p) => p.isOutOfStock).length,
+          totalItems: storeProducts.length,
+          lowStockItems: storeProducts.where((p) => p.isLowStock && !p.isOutOfStock).length,
+          outOfStockItems: storeProducts.where((p) => p.isOutOfStock).length,
+          categories: _categories,
+          selectedCategory: _selectedCategory,
+          onCategoryChanged: (c) => setState(() => _selectedCategory = c),
         ),
 
-        // ── Content area ─────────────────────────────────────────────
+        // ── Content ────────────────────────────────────────────────
         Expanded(
-          child: _isLoadingProducts
+          child: _isInitialLoading
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const CircularProgressIndicator(color: AppTheme.gold),
+                      const CircularProgressIndicator(color: AppTheme.gold, strokeWidth: 2),
                       const SizedBox(height: 16),
                       Text('Memuat produk...',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
@@ -246,7 +301,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                                 textAlign: TextAlign.center),
                             const SizedBox(height: 20),
                             ElevatedButton.icon(
-                              onPressed: _loadProducts,
+                              onPressed: _initialSync,
                               icon: const Icon(Icons.refresh),
                               label: const Text('Coba Lagi'),
                               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold),
@@ -271,7 +326,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                           ),
                         )
                       : PullToRefresh(
-                          onRefresh: _loadProducts,
+                          onRefresh: _refresh,
                           child: ListView.builder(
                             padding: EdgeInsets.fromLTRB(hPad, 12, hPad, MediaQuery.of(context).padding.bottom + 80),
                             itemCount: filtered.length,
@@ -283,7 +338,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                                   'inventoryDetail',
                                   pathParameters: {'id': filtered[index].id},
                                 );
-                                if (changed == true && mounted) _loadProducts();
+                                if (changed == true && mounted) _refresh();
                               },
                             ),
                           ),
@@ -294,7 +349,9 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   }
 }
 
-// _HeaderDelegate removed — header is now a plain Column child, no sliver needed.
+// ─────────────────────────────────────────────────────────────────────────────
+// Product list tile
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ProductTile extends StatelessWidget {
   final Product product;
@@ -412,11 +469,10 @@ class _ProductTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared live-connection indicator dot
+// Live connection dot
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// A small animated dot that shows the Socket.IO connection status.
-/// Green = live, Red = disconnected / reconnecting.
+/// Green = connected, red = disconnected.
 class _LiveDot extends ConsumerWidget {
   final ProviderBase<AsyncValue<bool>> provider;
   const _LiveDot({required this.provider});

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:async';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/helper/screen_type_utils.dart';
@@ -20,6 +21,7 @@ import '../../../../core/services/connectivity_monitor.dart';
 import '../../../../core/services/error_handler.dart';
 import '../../../../shared/widgets/error_page.dart';
 import 'superadmin_dashboard_page.dart';
+import 'admin_dashboard_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -28,8 +30,7 @@ class HomePage extends ConsumerStatefulWidget {
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage>
-    with TickerProviderStateMixin {
+class _HomePageState extends ConsumerState<HomePage> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late List<Animation<Offset>> _slideAnimations;
   late List<Animation<double>> _fadeAnimations;
@@ -42,12 +43,17 @@ class _HomePageState extends ConsumerState<HomePage>
   ProviderSubscription<RealtimeTransactionState>? _txSub;
   ProviderSubscription<RealtimeProductState>? _productSub;
   ProviderSubscription<AsyncValue<ConnectivityStatus>>? _connectivitySub;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
     _loadDashboard();
+    // Periodic fallback — keeps karyawan dashboard live every 30 s
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadDashboard(forceRefresh: true);
+    });
     // Request location permission silently on load for timezone awareness
     LocationService.requestPermission();
   }
@@ -62,8 +68,7 @@ class _HomePageState extends ConsumerState<HomePage>
       if (next.lastUpdateTime != prev?.lastUpdateTime) _loadDashboard();
     });
     _connectivitySub ??= ref.listenManual(connectivityProvider, (previous, next) {
-      if (previous?.valueOrNull == ConnectivityStatus.offline &&
-          next.valueOrNull == ConnectivityStatus.online) {
+      if (previous?.valueOrNull == ConnectivityStatus.offline && next.valueOrNull == ConnectivityStatus.online) {
         if (mounted) _loadDashboard();
       }
     });
@@ -105,10 +110,13 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Future<void> _loadDashboard({bool forceRefresh = false}) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    // Only show full spinner on first load; background refreshes update silently
+    if (_stats == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     try {
       final stats = await DashboardService.getStats(forceRefresh: forceRefresh);
       if (mounted) {
@@ -117,7 +125,7 @@ class _HomePageState extends ConsumerState<HomePage>
           _isLoading = false;
           _isDataStale = DashboardService.lastFetchWasStale;
         });
-        _animationController.forward(from: 0);
+        if (_stats == null) _animationController.forward(from: 0);
       }
     } catch (e) {
       if (mounted) {
@@ -134,6 +142,7 @@ class _HomePageState extends ConsumerState<HomePage>
     _txSub?.close();
     _productSub?.close();
     _connectivitySub?.close();
+    _pollTimer?.cancel();
     _animationController.dispose();
     super.dispose();
   }
@@ -156,17 +165,19 @@ class _HomePageState extends ConsumerState<HomePage>
       return const SuperAdminDashboardPage();
     }
 
+    // Admin gets the branch-scoped admin dashboard
+    if (user?.role == 'admin') {
+      return const AdminDashboardPage();
+    }
+
     final isKaryawan = user?.isEmployee ?? false;
 
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
-    final horizontalPadding =
-        Breakpoints.getHorizontalPadding(screenType, orientation);
-    final statsColumns =
-        Breakpoints.getGridColumns(screenType, orientation);
-    final quickActionsColumns = screenType == ScreenType.tablet
-        ? (orientation == OrientationType.landscape ? 5 : 4)
-        : 3;
+    final horizontalPadding = Breakpoints.getHorizontalPadding(screenType, orientation);
+    final statsColumns = Breakpoints.getGridColumns(screenType, orientation);
+    final quickActionsColumns =
+        screenType == ScreenType.tablet ? (orientation == OrientationType.landscape ? 5 : 4) : 3;
 
     return SafeArea(
       child: Column(
@@ -174,11 +185,9 @@ class _HomePageState extends ConsumerState<HomePage>
           Expanded(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                    maxWidth: Breakpoints.maxContentWidth),
+                constraints: const BoxConstraints(maxWidth: Breakpoints.maxContentWidth),
                 child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: AppTheme.gold))
+                    ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
                     : _error != null
                         ? _buildError()
                         : _buildContent(
@@ -214,8 +223,7 @@ class _HomePageState extends ConsumerState<HomePage>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline,
-              size: 48, color: AppTheme.destructive),
+          const Icon(Icons.error_outline, size: 48, color: AppTheme.destructive),
           const SizedBox(height: 16),
           const Text('Gagal memuat dashboard'),
           const SizedBox(height: 16),
@@ -245,295 +253,263 @@ class _HomePageState extends ConsumerState<HomePage>
     return PullToRefresh(
       onRefresh: () => _loadDashboard(forceRefresh: true),
       child: SingleChildScrollView(
-      padding: EdgeInsets.symmetric(
-          horizontal: horizontalPadding, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          SlideTransition(
-            position: _slideAnimations[0],
-            child: FadeTransition(
-              opacity: _fadeAnimations[0],
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppTheme.gold.withValues(alpha: 0.05),
-                      Colors.transparent,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _getGreeting(),
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyLarge
-                              ?.copyWith(
-                                color: AppTheme.mutedForeground,
-                                fontSize: screenType == ScreenType.tablet
-                                    ? 18
-                                    : null,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          userName,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: screenType == ScreenType.tablet
-                                    ? 36
-                                    : null,
-                              ),
-                        ),
-                        if (isDataStale) ...[
-                          const SizedBox(height: 4),
-                          const Tooltip(
-                            message: 'Data mungkin tidak terbaru',
-                            child: Icon(
-                              Icons.cloud_off,
-                              size: 14,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        ],
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            SlideTransition(
+              position: _slideAnimations[0],
+              child: FadeTransition(
+                opacity: _fadeAnimations[0],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppTheme.gold.withValues(alpha: 0.05),
+                        Colors.transparent,
                       ],
                     ),
-                    Row(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _getGreeting(),
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: AppTheme.mutedForeground,
+                                  fontSize: screenType == ScreenType.tablet ? 18 : null,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            userName,
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: screenType == ScreenType.tablet ? 36 : null,
+                                ),
+                          ),
+                          if (isDataStale) ...[
+                            const SizedBox(height: 4),
+                            const Tooltip(
+                              message: 'Data mungkin tidak terbaru',
+                              child: Icon(
+                                Icons.cloud_off,
+                                size: 14,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const LiveClock(),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: _loadDashboard,
+                            icon: const Icon(Icons.refresh, color: AppTheme.mutedForeground),
+                            tooltip: 'Refresh',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Stats Grid
+            SlideTransition(
+              position: _slideAnimations[1],
+              child: FadeTransition(
+                opacity: _fadeAnimations[1],
+                child: GridView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: statsColumns,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    mainAxisExtent: screenType == ScreenType.tablet ? 160 : 140,
+                  ),
+                  children: [
+                    StatCard(
+                      icon: Icons.attach_money,
+                      label: 'Pendapatan Hari Ini',
+                      value: CurrencyFormatter.formatToCompactRupiah(stats.todayRevenue),
+                      isHighlighted: true,
+                    ),
+                    StatCard(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Transaksi Hari Ini',
+                      value: stats.todayTransactions.toString(),
+                    ),
+                    StatCard(
+                      icon: Icons.shopping_bag_outlined,
+                      label: 'Transaksi Bulan Ini',
+                      value: stats.monthlyTransactions.toString(),
+                    ),
+                    StatCard(
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Stok Kritis',
+                      value: (stats.lowStockCount + stats.outOfStockCount).toString(),
+                      isPositive: stats.lowStockCount + stats.outOfStockCount == 0,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Quick Actions
+            SlideTransition(
+              position: _slideAnimations[2],
+              child: FadeTransition(
+                opacity: _fadeAnimations[2],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Aksi Cepat',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: screenType == ScreenType.tablet ? 26 : null,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    GridView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: quickActionsColumns,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        mainAxisExtent: screenType == ScreenType.tablet ? 150 : 130,
+                      ),
                       children: [
-                        const LiveClock(),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: _loadDashboard,
-                          icon: const Icon(Icons.refresh,
-                              color: AppTheme.mutedForeground),
-                          tooltip: 'Refresh',
+                        QuickActionCard(
+                          icon: Icons.shopping_cart_outlined,
+                          label: 'Transaksi Baru',
+                          onTap: () => context.go(AppRouter.cashier),
                         ),
+                        QuickActionCard(
+                          icon: Icons.local_offer_outlined,
+                          label: 'Pasang Kupon',
+                          onTap: () => context.go(AppRouter.cashier),
+                        ),
+                        QuickActionCard(
+                          icon: Icons.inventory_2_outlined,
+                          label: 'Cek Stok',
+                          onTap: () => context.go(AppRouter.inventory),
+                        ),
+                        QuickActionCard(
+                          icon: Icons.bluetooth,
+                          label: 'Kontrol Perangkat',
+                          onTap: () => context.go(AppRouter.cashier),
+                        ),
+                        if (!isKaryawan)
+                          QuickActionCard(
+                            icon: Icons.add,
+                            label: 'Tambah Stok',
+                            onTap: () => context.go(AppRouter.inventory),
+                          ),
                       ],
                     ),
                   ],
                 ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-          // Stats Grid
-          SlideTransition(
-            position: _slideAnimations[1],
-            child: FadeTransition(
-              opacity: _fadeAnimations[1],
-              child: GridView(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: statsColumns,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  mainAxisExtent:
-                      screenType == ScreenType.tablet ? 160 : 140,
-                ),
-                children: [
-                  StatCard(
-                    icon: Icons.attach_money,
-                    label: 'Pendapatan Hari Ini',
-                    value: CurrencyFormatter.formatToCompactRupiah(
-                        stats.todayRevenue),
-                    isHighlighted: true,
-                  ),
-                  StatCard(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'Transaksi Hari Ini',
-                    value: stats.todayTransactions.toString(),
-                  ),
-                  StatCard(
-                    icon: Icons.shopping_bag_outlined,
-                    label: 'Transaksi Bulan Ini',
-                    value: stats.monthlyTransactions.toString(),
-                  ),
-                  StatCard(
-                    icon: Icons.inventory_2_outlined,
-                    label: 'Stok Kritis',
-                    value: (stats.lowStockCount + stats.outOfStockCount)
-                        .toString(),
-                    isPositive: stats.lowStockCount + stats.outOfStockCount == 0,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // Quick Actions
-          SlideTransition(
-            position: _slideAnimations[2],
-            child: FadeTransition(
-              opacity: _fadeAnimations[2],
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Aksi Cepat',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize:
-                              screenType == ScreenType.tablet ? 26 : null,
+            // Recent Transactions
+            SlideTransition(
+              position: _slideAnimations[3],
+              child: FadeTransition(
+                opacity: _fadeAnimations[3],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Transaksi Terbaru',
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: screenType == ScreenType.tablet ? 26 : null,
+                              ),
                         ),
-                  ),
-                  const SizedBox(height: 16),
-                  GridView(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: quickActionsColumns,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      mainAxisExtent:
-                          screenType == ScreenType.tablet ? 150 : 130,
-                    ),
-                    children: [
-                      QuickActionCard(
-                        icon: Icons.shopping_cart_outlined,
-                        label: 'Transaksi Baru',
-                        onTap: () => context.go(AppRouter.cashier),
-                      ),
-                      QuickActionCard(
-                        icon: Icons.local_offer_outlined,
-                        label: 'Pasang Kupon',
-                        onTap: () => context.go(AppRouter.cashier),
-                      ),
-                      QuickActionCard(
-                        icon: Icons.inventory_2_outlined,
-                        label: 'Cek Stok',
-                        onTap: () => context.go(AppRouter.inventory),
-                      ),
-                      QuickActionCard(
-                        icon: Icons.bluetooth,
-                        label: 'Kontrol Perangkat',
-                        onTap: () => context.go(AppRouter.cashier),
-                      ),
-                      if (!isKaryawan)
-                        QuickActionCard(
-                          icon: Icons.add,
-                          label: 'Tambah Stok',
-                          onTap: () => context.go(AppRouter.inventory),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // Recent Transactions
-          SlideTransition(
-            position: _slideAnimations[3],
-            child: FadeTransition(
-              opacity: _fadeAnimations[3],
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Transaksi Terbaru',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              fontSize: screenType == ScreenType.tablet
-                                  ? 26
-                                  : null,
-                            ),
-                      ),
-                      TextButton(
-                        onPressed: () {},
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Lihat Semua',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelLarge
-                                  ?.copyWith(color: AppTheme.gold),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.chevron_right,
-                                size: 16, color: AppTheme.gold),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (stats.recentTransactions.isEmpty)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 32),
-                        child: Text(
-                          'Belum ada transaksi hari ini',
-                          style: TextStyle(color: AppTheme.mutedForeground),
-                        ),
-                      ),
-                    )
-                  else
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: stats.recentTransactions.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final tx = stats.recentTransactions[index];
-                        return SlideTransition(
-                          position: _slideAnimations[4],
-                          child: FadeTransition(
-                            opacity: _fadeAnimations[4],
-                            child: TransactionItem(
-                              id: tx.id.toString(),
-                              time: tx.relativeTime,
-                              items: tx.itemCount,
-                              total: tx.finalAmount,
-                              paymentMethod:
-                                  tx.paymentMethod ?? 'cash',
-                            ),
+                        TextButton(
+                          onPressed: () {},
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Lihat Semua',
+                                style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.gold),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.chevron_right, size: 16, color: AppTheme.gold),
+                            ],
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
-                ],
+                    const SizedBox(height: 16),
+                    if (stats.recentTransactions.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Text(
+                            'Belum ada transaksi hari ini',
+                            style: TextStyle(color: AppTheme.mutedForeground),
+                          ),
+                        ),
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: stats.recentTransactions.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final tx = stats.recentTransactions[index];
+                          return SlideTransition(
+                            position: _slideAnimations[4],
+                            child: FadeTransition(
+                              opacity: _fadeAnimations[4],
+                              child: TransactionItem(
+                                id: tx.id.toString(),
+                                time: tx.relativeTime,
+                                items: tx.itemCount,
+                                total: tx.finalAmount,
+                                paymentMethod: tx.paymentMethod ?? 'cash',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 100),
-        ],
-      ),
-    ), // SingleChildScrollView
+            const SizedBox(height: 100),
+          ],
+        ),
+      ), // SingleChildScrollView
     ); // PullToRefresh
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/services/connectivity_monitor.dart';
 import 'package:gg_store_cashier/core/services/notification_service.dart';
@@ -20,11 +21,12 @@ class ScaffoldWithBottomNavbar extends ConsumerStatefulWidget {
 class _ScaffoldWithBottomNavbarState extends ConsumerState<ScaffoldWithBottomNavbar> {
   ProviderSubscription<AsyncValue<ConnectivityStatus>>? _connectivitySub;
 
+  // "Press again to exit" guard
+  DateTime? _lastBackPress;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Start connectivity monitoring now that the user is logged in.
-    // This ensures the HTTP probe never runs on the login page.
     ConnectivityMonitor.instance.start();
     _connectivitySub ??= ref.listenManual(connectivityProvider, (previous, next) {
       final prev = previous?.valueOrNull;
@@ -52,20 +54,51 @@ class _ScaffoldWithBottomNavbarState extends ConsumerState<ScaffoldWithBottomNav
     );
   }
 
+  /// Called by [PopScope] before the system back is processed.
+  /// Returns false (block pop) to handle navigation ourselves.
+  Future<bool> _onBackPressed() async {
+    final currentIndex = widget.navigationShell.currentIndex;
+
+    // If not on tab 0, go home instead of exiting.
+    if (currentIndex != 0) {
+      _onTap(0);
+      return false;
+    }
+
+    // On tab 0 — double-tap to exit.
+    final now = DateTime.now();
+    if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+      _lastBackPress = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Tekan sekali lagi untuk keluar'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          backgroundColor: AppTheme.surfaceElevated,
+        ),
+      );
+      return false; // don't exit yet
+    }
+
+    // Second tap within 2 s → exit
+    await SystemNavigator.pop();
+    return false; // let SystemNavigator handle it
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-    if (isLandscape) {
-      return _LandscapeLayout(
-        navigationShell: widget.navigationShell,
-        onTap: _onTap,
-      );
-    }
-
-    return _PortraitLayout(
-      navigationShell: widget.navigationShell,
-      onTap: _onTap,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _onBackPressed();
+      },
+      child: isLandscape
+          ? _LandscapeLayout(navigationShell: widget.navigationShell, onTap: _onTap)
+          : _PortraitLayout(navigationShell: widget.navigationShell, onTap: _onTap),
     );
   }
 }
@@ -219,10 +252,10 @@ class _NavItemData {
 }
 
 List<_NavItemData> _navItems(int pendingCount) => [
-      const _NavItemData(Icons.home_outlined, Icons.home, 'Home'),
-      _NavItemData(Icons.shopping_cart_outlined, Icons.shopping_cart, 'Cashier', badge: pendingCount),
-      const _NavItemData(Icons.inventory_2_outlined, Icons.inventory_2, 'Inventory'),
-      const _NavItemData(Icons.settings_outlined, Icons.settings, 'Settings'),
+      const _NavItemData(Icons.home_outlined, Icons.home, 'Beranda'),
+      _NavItemData(Icons.shopping_cart_outlined, Icons.shopping_cart, 'Kasir', badge: pendingCount),
+      const _NavItemData(Icons.inventory_2_outlined, Icons.inventory_2, 'Inventori'),
+      const _NavItemData(Icons.settings_outlined, Icons.settings, 'Pengaturan'),
     ];
 
 // ── Portrait bottom nav item widget ──────────────────────────────────────────

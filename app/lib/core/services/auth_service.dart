@@ -103,29 +103,7 @@ class AuthService {
           role: user.role,
           onAuthFailed: (errorMessage) {
             dev.log("Auth Failed: $errorMessage");
-
-            final context = AppRouter.rootNavigatorKey.currentContext;
-            if (context == null || !context.mounted) return;
-
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => AlertDialog(
-                title: const Text('Sesi Berakhir'),
-                content: const Text(
-                  'Sesi Anda telah berakhir. Silahkan login kembali.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      logout();
-                    },
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-            );
+            handleSessionExpired();
           },
         );
 
@@ -238,10 +216,22 @@ class AuthService {
     }
   }
 
+  /// Save updated user data to SharedPreferences (used after profile updates).
+  static Future<void> saveUser(Map<String, dynamic> userMap) async {
+    final prefs = await _getPrefs();
+    // Merge with existing stored user to preserve fields not returned by the update endpoint
+    final existing = prefs.getString(_userKey);
+    Map<String, dynamic> merged = existing != null ? Map<String, dynamic>.from(json.decode(existing)) : {};
+    merged.addAll(userMap);
+    await prefs.setString(_userKey, json.encode(merged));
+  }
+
   static Future<void> _storeAuthData(String token, User user, {bool rememberMe = false}) async {
     final prefs = await _getPrefs();
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_userKey, json.encode(user.toJson()));
+    // rememberMe kept in storage for future use but no longer controls
+    // whether the session survives a cold start — it always does now.
     await prefs.setBool(_rememberMeKey, rememberMe);
   }
 
@@ -254,13 +244,53 @@ class AuthService {
     _prefs = null;
   }
 
+  /// Previously wiped the session when rememberMe=false on cold start.
+  /// Now a no-op — session lifetime is controlled by JWT expiry on the server
+  /// and explicit logout only. The socket's onAuthFailed callback handles the
+  /// "token rejected by server" path and shows the session-expired modal.
   static Future<void> clearSessionIfNotRemembered() async {
-    final prefs = await _getPrefs();
-    final remembered = prefs.getBool(_rememberMeKey) ?? false;
-    if (!remembered) {
-      await prefs.remove(_tokenKey);
-      await prefs.remove(_userKey);
-    }
+    // Intentionally empty — kept for call-site compatibility.
+  }
+
+  static bool consumeSessionClearedFlag() => false;
+
+  /// Shows the "Sesimu sudah habis" modal and clears local auth data.
+  /// Called when the server rejects the JWT (socket auth failure or 401).
+  static Future<void> handleSessionExpired() async {
+    await logout(); // wipe local storage + disconnect socket
+
+    final ctx = AppRouter.rootNavigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+
+    // Pop any open dialogs first so we don't stack modals.
+    // Then show the session-expired modal on top of whatever is visible.
+    showDialog(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: const Icon(Icons.lock_clock_outlined, size: 40, color: Color(0xFFF59E0B)),
+        title: const Text(
+          'Sesimu sudah habis',
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'Silahkan login kembali untuk melanjutkan.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              // Navigate to login — GoRouter redirect will handle auth state.
+              AppRouter.router.go('/');
+            },
+            child: const Text('Login Kembali'),
+          ),
+        ],
+      ),
+    );
   }
 
   // Get error message from exception

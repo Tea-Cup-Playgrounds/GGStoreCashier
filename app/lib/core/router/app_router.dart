@@ -8,8 +8,6 @@ import '../../features/inventory/presentation/pages/inventory_detail_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import 'package:gg_store_cashier/core/router/transition_factory.dart';
 import 'package:gg_store_cashier/core/router/auth_guard.dart';
-import 'package:gg_store_cashier/features/devices/presentation/pages/printer_devices_page.dart';
-import 'package:gg_store_cashier/features/devices/presentation/pages/scanner_devices_page.dart';
 import 'package:gg_store_cashier/features/devices/presentation/pages/device_manager_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/receipt_editor_page.dart';
 import 'package:gg_store_cashier/features/inventory/presentation/pages/inventory_add_item_page.dart';
@@ -22,6 +20,9 @@ import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_ma
 import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_form_page.dart';
 import 'package:gg_store_cashier/core/models/voucher.dart';
 import 'package:gg_store_cashier/shared/layout/scaffold_with_bottom_navbar.dart';
+import 'package:gg_store_cashier/features/settings/presentation/pages/branch_management_page.dart';
+import 'package:gg_store_cashier/features/settings/presentation/pages/privacy_security_page.dart';
+import 'package:gg_store_cashier/features/settings/presentation/pages/help_center_page.dart';
 
 mixin AppRouter {
   static const String login = '/';
@@ -32,8 +33,6 @@ mixin AppRouter {
   static const String inventoryAddItem = '/inventory/add';
   static const String devices = '/devices';
   static const String apprearance = '/appearance';
-  static const String scannerDevices = '/devices/scanner';
-  static const String printerDevices = '/devices/printer';
   static const String deviceManager = '/devices/manager';
   static const String receiptEditor = '/settings/receipt-editor';
   static const String settings = '/settings';
@@ -44,6 +43,9 @@ mixin AppRouter {
   static const String categoryForm = '/inventory/category/form';
   static const String voucherCreate = '/vouchers/new';
   static const String voucherEdit = '/vouchers/edit/:id';
+  static const String branchManagement = '/branches/manage';
+  static const String privacySecurity = '/settings/privacy';
+  static const String helpCenter = '/settings/help';
 
   static final rootNavigatorKey = GlobalKey<NavigatorState>();
   static final homeNavKey = GlobalKey<NavigatorState>();
@@ -99,18 +101,6 @@ mixin AppRouter {
         name: 'appearance',
         pageBuilder: (context, state) =>
             TransitionFactory.getSlideBuilder(context: context, state: state, child: const AppearancePage()),
-      ),
-      GoRoute(
-        path: scannerDevices,
-        name: 'scannerDevices',
-        pageBuilder: (context, state) =>
-            TransitionFactory.getSlideBuilder(context: context, state: state, child: const ScannerDevicesPage()),
-      ),
-      GoRoute(
-        path: printerDevices,
-        name: 'printerDevices',
-        pageBuilder: (context, state) =>
-            TransitionFactory.getSlideBuilder(context: context, state: state, child: const PrinterDevicesPage()),
       ),
       GoRoute(
         path: deviceManager,
@@ -173,6 +163,24 @@ mixin AppRouter {
         name: 'cashierCoupon',
         pageBuilder: (context, state) =>
             TransitionFactory.getSlideBuilder(context: context, state: state, child: const CouponPage()),
+      ),
+      GoRoute(
+        path: AppRouter.branchManagement,
+        name: 'branchManagement',
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const BranchManagementPage()),
+      ),
+      GoRoute(
+        path: AppRouter.privacySecurity,
+        name: 'privacySecurity',
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const PrivacySecurityPage()),
+      ),
+      GoRoute(
+        path: AppRouter.helpCenter,
+        name: 'helpCenter',
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const HelpCenterPage()),
       ),
       // Pages with bottom nav scaffold
       StatefulShellRoute.indexedStack(

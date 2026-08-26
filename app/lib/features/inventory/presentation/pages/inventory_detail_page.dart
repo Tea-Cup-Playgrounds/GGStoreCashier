@@ -289,13 +289,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    TextInput(
-                        label: 'Deskripsi (Opsional)',
-                        hintText: 'Tambahkan deskripsi produk',
-                        controller: _descriptionController,
-                        maxLines: 4,
-                        prefixIcon: Icons.description_outlined),
                     const SizedBox(height: 32),
                     CustomButton(
                         text: 'Simpan Perubahan',

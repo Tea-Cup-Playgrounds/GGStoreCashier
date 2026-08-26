@@ -118,8 +118,28 @@ class _InventoryAddItemState extends ConsumerState<InventoryAddItemPage> {
       final response = await dio.post('/api/products', data: formData);
 
       if (response.statusCode == 201 && mounted) {
-        SnackBarService.success('Produk berhasil ditambahkan');
-        context.pop();
+        setState(() => _isLoading = false);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            icon: const Icon(Icons.check_circle, color: Colors.green, size: 56),
+            title: const Text('Berhasil!', textAlign: TextAlign.center),
+            content: const Text('Produk berhasil ditambahkan', textAlign: TextAlign.center),
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                child: CustomButton(
+                  text: 'Oke',
+                  size: ButtonSize.medium,
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (mounted) context.pop(true); // signal caller to refresh
       }
     } catch (e) {
       if (mounted) {

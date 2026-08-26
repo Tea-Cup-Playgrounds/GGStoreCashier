@@ -29,6 +29,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   final _valueCtrl = TextEditingController();
   final _fromCtrl = TextEditingController();
   final _toCtrl = TextEditingController();
+  final _maxUsesCtrl = TextEditingController();
   String? _fromApi;
   String? _toApi;
 
@@ -60,6 +61,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       _isActive = v.isActive;
       _targetType = v.targetType;
       _selectedTargetId = v.targetId;
+      if (v.maxUses != null) _maxUsesCtrl.text = v.maxUses.toString();
       if (v.targetType != null) _loadTargets(v.targetType!);
     }
   }
@@ -71,6 +73,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     _valueCtrl.dispose();
     _fromCtrl.dispose();
     _toCtrl.dispose();
+    _maxUsesCtrl.dispose();
     super.dispose();
   }
 
@@ -165,6 +168,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       'valid_from': _fromApi,
       'valid_to': _toApi,
       'is_active': _isActive ? 1 : 0,
+      'max_uses': _maxUsesCtrl.text.trim().isEmpty ? null : int.tryParse(_maxUsesCtrl.text.trim()),
     };
 
     try {
@@ -334,6 +338,25 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+
+              // ── Batas Penggunaan ───────────────────────────────────────
+              w.TextInput(
+                label: 'Batas Penggunaan (opsional)',
+                hintText: 'Kosongkan untuk tak terbatas',
+                controller: _maxUsesCtrl,
+                prefixIcon: Icons.repeat_outlined,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null;
+                  final n = int.tryParse(v.trim());
+                  if (n == null || n <= 0) return 'Harus lebih dari 0';
+                  return null;
+                },
               ),
               const SizedBox(height: 8),
 

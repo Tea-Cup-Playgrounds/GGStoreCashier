@@ -139,4 +139,31 @@ class DeviceService {
 
   /// Returns current Bluetooth adapter state stream.
   static Stream<BluetoothAdapterState> get adapterState => FlutterBluePlus.adapterState;
+
+  /// Check if Bluetooth is currently enabled.
+  static Future<bool> isBluetoothEnabled() async {
+    try {
+      final state = await FlutterBluePlus.adapterState.first;
+      return state == BluetoothAdapterState.on;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Prompts the user to enable Bluetooth.
+  /// Returns true if Bluetooth was successfully enabled, false otherwise.
+  /// Android Only — on iOS, this is a no-op and always returns current state.
+  static Future<bool> enableBluetooth({int timeout = 60}) async {
+    try {
+      if (defaultTargetPlatform != TargetPlatform.android) {
+        // iOS doesn't allow programmatic BT enable — user must do it in Settings
+        return await isBluetoothEnabled();
+      }
+      await FlutterBluePlus.turnOn(timeout: timeout);
+      return await isBluetoothEnabled();
+    } catch (e) {
+      dev.log('BT enable error: $e');
+      return false;
+    }
+  }
 }

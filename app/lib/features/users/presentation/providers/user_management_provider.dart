@@ -38,8 +38,9 @@ class UserManagementState {
     int? currentPage,
     int? totalPages,
     String? searchQuery,
-    String? roleFilter,
-    String? branchFilter,
+    // Use a sentinel to distinguish "not provided" from "explicitly null"
+    Object? roleFilter = _keep,
+    Object? branchFilter = _keep,
   }) {
     return UserManagementState(
       users: users ?? this.users,
@@ -49,10 +50,13 @@ class UserManagementState {
       currentPage: currentPage ?? this.currentPage,
       totalPages: totalPages ?? this.totalPages,
       searchQuery: searchQuery ?? this.searchQuery,
-      roleFilter: roleFilter ?? this.roleFilter,
-      branchFilter: branchFilter ?? this.branchFilter,
+      roleFilter: identical(roleFilter, _keep) ? this.roleFilter : roleFilter as String?,
+      branchFilter: identical(branchFilter, _keep) ? this.branchFilter : branchFilter as String?,
     );
   }
+
+  // Sentinel value used to distinguish "not provided" from explicit null in copyWith
+  static const Object _keep = Object();
 }
 
 class UserManagementNotifier extends StateNotifier<UserManagementState> {
@@ -79,10 +83,9 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     ));
   }
 
-  bool get _isOffline =>
-      ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
+  bool get _isOffline => ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
 
-  Future<void> loadUsers({int page = 1, int limit = 10}) async {
+  Future<void> loadUsers({int page = 1, int limit = 200}) async {
     const cacheKey = 'users:list';
 
     final noFilters = (state.searchQuery == null || state.searchQuery!.isEmpty) &&
@@ -96,9 +99,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
       if (noFilters && CacheManager.isValid(cacheKey)) {
         final entry = CacheManager.get(cacheKey);
         if (entry != null) {
-          final users = (entry.data as List)
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
+          final users = (entry.data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
           state = state.copyWith(users: users, isLoading: false, isStale: entry.isStale);
           return;
         }
@@ -136,13 +137,10 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
         if (entry != null) {
           entry.isStale = true;
           await entry.save();
-          final users = (entry.data as List)
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
+          final users = (entry.data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
           state = state.copyWith(users: users, isLoading: false, isStale: true);
           return;
         }
-        // No cache — check if offline and give a friendly message
         if (_isOffline) {
           state = state.copyWith(
             isLoading: false,
@@ -236,9 +234,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
       await PendingOperationsQueue.enqueue(op);
 
       // Optimistic local removal
-      final updated = state.users
-          .where((u) => u['id'].toString() != userId.toString())
-          .toList();
+      final updated = state.users.where((u) => u['id'].toString() != userId.toString()).toList();
       state = state.copyWith(users: updated);
       await _updateUsersCache(updated);
       return;
@@ -257,17 +253,55 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
   }
 
   void searchUsers(String query) {
-    state = state.copyWith(searchQuery: query);
+    state = UserManagementState(
+      users: state.users,
+      isLoading: state.isLoading,
+      isStale: state.isStale,
+      currentPage: state.currentPage,
+      totalPages: state.totalPages,
+      searchQuery: query.isEmpty ? null : query,
+      roleFilter: state.roleFilter,
+      branchFilter: state.branchFilter,
+    );
     loadUsers();
   }
 
   void filterUsers({String? role, String? branchId}) {
-    state = state.copyWith(roleFilter: role, branchFilter: branchId);
+    state = UserManagementState(
+      users: state.users,
+      isLoading: state.isLoading,
+      isStale: state.isStale,
+      currentPage: state.currentPage,
+      totalPages: state.totalPages,
+      searchQuery: state.searchQuery,
+      roleFilter: role,
+      branchFilter: branchId,
+    );
+    loadUsers();
+  }
+
+  /// Update search while keeping existing role/branch filters locked in place.
+  /// Use this instead of [searchUsers] when role/branch must not change.
+  void searchWithinFilter(String query) {
+    state = UserManagementState(
+      users: state.users,
+      isLoading: state.isLoading,
+      isStale: state.isStale,
+      currentPage: state.currentPage,
+      totalPages: state.totalPages,
+      searchQuery: query.isEmpty ? null : query,
+      roleFilter: state.roleFilter,
+      branchFilter: state.branchFilter,
+    );
     loadUsers();
   }
 
   void clearFilters() {
-    state = state.copyWith(searchQuery: null, roleFilter: null, branchFilter: null);
+    state = UserManagementState(
+      users: state.users,
+      isLoading: state.isLoading,
+      isStale: state.isStale,
+    );
     loadUsers();
   }
 
@@ -293,7 +327,13 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
   }
 }
 
-final userManagementProvider =
-    StateNotifierProvider<UserManagementNotifier, UserManagementState>(
+final userManagementProvider = StateNotifierProvider<UserManagementNotifier, UserManagementState>(
+  (ref) => UserManagementNotifier(),
+);
+
+/// Separate provider scoped to superadmin — prevents filter state bleed
+/// between the admin and superadmin pages (they both use the same notifier
+/// class but maintain independent state).
+final superAdminUserManagementProvider = StateNotifierProvider<UserManagementNotifier, UserManagementState>(
   (ref) => UserManagementNotifier(),
 );

@@ -95,13 +95,40 @@ class _CategoryFormPageState extends State<CategoryFormPage> {
 
       if (_isEditing) {
         await dio.put('/api/categories/${widget.category!['id']}', data: formData);
-        if (mounted) SnackBarService.success('Kategori berhasil diperbarui');
       } else {
         await dio.post('/api/categories', data: formData);
-        if (mounted) SnackBarService.success('Kategori berhasil ditambahkan');
       }
 
-      if (mounted) context.pop(true); // true = refresh list
+      if (mounted) {
+        setState(() => _isLoading = false);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            icon: const Icon(Icons.check_circle, color: Colors.green, size: 56),
+            title: Text(
+              _isEditing ? 'Berhasil Diperbarui!' : 'Berhasil Ditambahkan!',
+              textAlign: TextAlign.center,
+            ),
+            content: Text(
+              _isEditing ? 'Kategori berhasil diperbarui' : 'Kategori berhasil ditambahkan',
+              textAlign: TextAlign.center,
+            ),
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                child: CustomButton(
+                  text: 'Oke',
+                  size: ButtonSize.medium,
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (mounted) context.pop(true); // true = refresh list
+      }
     } catch (e) {
       if (mounted) {
         String msg = _isEditing ? 'Gagal memperbarui kategori' : 'Gagal menambahkan kategori';

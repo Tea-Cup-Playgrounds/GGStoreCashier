@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 class CurrencyFormatter {
   static final NumberFormat _rupiahFormat = NumberFormat.currency(
     locale: 'id_ID',
-    symbol: 'Rp',
+    symbol: 'Rp ',
     decimalDigits: 0,
   );
 
@@ -18,7 +18,7 @@ class CurrencyFormatter {
   static String formatToRupiahWithDecimal(num amount, {int decimalDigits = 2}) {
     final formatter = NumberFormat.currency(
       locale: 'id_ID',
-      symbol: 'Rp',
+      symbol: 'Rp ',
       decimalDigits: decimalDigits,
     );
     return formatter.format(amount);
@@ -28,11 +28,11 @@ class CurrencyFormatter {
   /// Example: 1500000 -> Rp1,5 Jt
   static String formatToCompactRupiah(num amount) {
     if (amount >= 1000000000) {
-      return 'Rp${(amount / 1000000000).toStringAsFixed(1)} M';
+      return 'Rp ${(amount / 1000000000).toStringAsFixed(1)} M';
     } else if (amount >= 1000000) {
-      return 'Rp${(amount / 1000000).toStringAsFixed(1)} Jt';
+      return 'Rp ${(amount / 1000000).toStringAsFixed(1)} Jt';
     } else if (amount >= 1000) {
-      return 'Rp${(amount / 1000).toStringAsFixed(1)} Rb';
+      return 'Rp ${(amount / 1000).toStringAsFixed(1)} Rb';
     }
     return formatToRupiah(amount);
   }

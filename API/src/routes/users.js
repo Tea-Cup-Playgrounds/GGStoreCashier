@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { broadcastToEntity } = require('../utils/socket_broadcast');
 
 const router = express.Router();
 
@@ -331,6 +332,19 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
             [sanitizedName, sanitizedUsername, hashedPassword, sanitizedRole, userBranchId]
         );
 
+        // Broadcast user-created event to subscribed clients
+        const io = req.app.get('io');
+        const branchIdForBroadcast = userBranchId ?? null;
+        broadcastToEntity(io, 'users', 'user-created', {
+          id: result.insertId,
+          name: sanitizedName,
+          username: sanitizedUsername,
+          role: sanitizedRole,
+          branch_id: userBranchId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, branchIdForBroadcast);
+
         res.status(201).json({ 
             message: 'Pengguna berhasil dibuat',
             userId: result.insertId 
@@ -339,6 +353,72 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     } catch (error) {
         console.error('Create user error:', error);
         res.status(500).json({ error: 'Gagal membuat pengguna' });
+    }
+});
+
+// Update own profile — any authenticated user (name, username, password)
+router.put('/me/profile', async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { name, username, currentPassword, newPassword } = req.body;
+
+        // At least one field required
+        if (!name && !username && !newPassword) {
+            return res.status(400).json({ error: 'Tidak ada field yang diperbarui' });
+        }
+
+        const updates = [];
+        const params = [];
+
+        if (name !== undefined) {
+            const sanitizedName = sanitizeInput(name);
+            if (!validateInput(sanitizedName) || !SECURITY_PATTERNS.NAME.test(sanitizedName)) {
+                return res.status(400).json({ error: 'Format nama tidak valid' });
+            }
+            updates.push('name = ?');
+            params.push(sanitizedName);
+        }
+
+        if (username !== undefined) {
+            const sanitizedUsername = sanitizeInput(username);
+            if (!validateInput(sanitizedUsername) || !SECURITY_PATTERNS.USERNAME.test(sanitizedUsername)) {
+                return res.status(400).json({ error: 'Format username tidak valid' });
+            }
+            const [dup] = await pool.execute('SELECT id FROM users WHERE username = ? AND id != ?', [sanitizedUsername, userId]);
+            if (dup.length > 0) return res.status(400).json({ error: 'Username sudah digunakan' });
+            updates.push('username = ?');
+            params.push(sanitizedUsername);
+        }
+
+        if (newPassword !== undefined && newPassword !== '') {
+            if (!currentPassword) {
+                return res.status(400).json({ error: 'Password saat ini wajib diisi untuk mengganti password' });
+            }
+            const [rows] = await pool.execute('SELECT password FROM users WHERE id = ?', [userId]);
+            const match = await bcrypt.compare(currentPassword, rows[0].password);
+            if (!match) return res.status(401).json({ error: 'Password saat ini salah' });
+
+            const pwdValidation = validatePasswordStrength(newPassword);
+            if (!pwdValidation.isValid) {
+                return res.status(400).json({ error: 'Password baru tidak memenuhi persyaratan keamanan', passwordRequirements: pwdValidation.requirements });
+            }
+            const hashed = await bcrypt.hash(newPassword, 12);
+            updates.push('password = ?');
+            params.push(hashed);
+        }
+
+        if (updates.length === 0) return res.status(400).json({ error: 'Tidak ada field yang valid untuk diperbarui' });
+
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(userId);
+        await pool.execute(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+
+        // Return updated user data
+        const [updated] = await pool.execute('SELECT id, name, username, role, branch_id FROM users WHERE id = ?', [userId]);
+        res.json({ message: 'Profil berhasil diperbarui', user: updated[0] });
+    } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({ error: 'Gagal memperbarui profil' });
     }
 });
 
@@ -501,6 +581,16 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
         await pool.execute(query, params);
 
+        // Fetch the updated user to broadcast
+        const [updatedRows] = await pool.execute(
+          `SELECT u.id, u.name, u.username, u.role, u.branch_id, u.last_active_at, u.created_at, u.updated_at
+           FROM users u WHERE u.id = ?`, [userId]
+        );
+        if (updatedRows.length > 0) {
+          const io = req.app.get('io');
+          broadcastToEntity(io, 'users', 'user-updated', updatedRows[0], updatedRows[0].branch_id);
+        }
+
         res.json({ message: 'Pengguna berhasil diperbarui' });
 
     } catch (error) {
@@ -546,6 +636,13 @@ router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => 
         }
 
         await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
+
+        // Broadcast user-deleted event
+        const io = req.app.get('io');
+        broadcastToEntity(io, 'users', 'user-deleted', {
+          id: userId,
+          branch_id: existingUser.branch_id,
+        }, existingUser.branch_id);
 
         res.json({ message: 'Pengguna berhasil dihapus' });
 

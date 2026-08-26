@@ -5,6 +5,8 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
+import '../../../../core/services/session_expired_notifier.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/text_input.dart';
 
@@ -25,6 +27,38 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
   void initState() {
     super.initState();
     _setupAnimations();
+    // Show the session-expired modal once if the flag was set in main().
+    if (SessionExpiredNotifier.consumeExpired()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showSessionExpiredModal();
+      });
+    }
+  }
+
+  void _showSessionExpiredModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: const Icon(Icons.lock_clock_outlined, size: 40, color: AppTheme.warning),
+        title: const Text(
+          'Sesimu sudah habis',
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'Silahkan login kembali untuk melanjutkan.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Login Kembali'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _setupAnimations() {

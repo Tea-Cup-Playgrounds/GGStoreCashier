@@ -21,13 +21,19 @@ class VoucherService {
     return Voucher.fromJson(response.data['voucher']);
   }
 
-  /// List all vouchers (admin / superadmin).
+  /// List all vouchers including unavailable ones (admin / superadmin).
   static Future<List<Voucher>> getAll() async {
     final dio = await _dio();
     final response = await dio.get('/api/vouchers');
-    return (response.data['vouchers'] as List)
-        .map((e) => Voucher.fromJson(e))
-        .toList();
+    return (response.data['vouchers'] as List).map((e) => Voucher.fromJson(e)).toList();
+  }
+
+  /// List all vouchers for cashier browsing — same endpoint, includes
+  /// `is_available` and `unavailable_reason` computed by the server.
+  static Future<List<Voucher>> getAllForCashier() async {
+    final dio = await _dio();
+    final response = await dio.get('/api/vouchers');
+    return (response.data['vouchers'] as List).map((e) => Voucher.fromJson(e)).toList();
   }
 
   /// Create a new voucher.

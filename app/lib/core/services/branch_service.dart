@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
-import '../config/api_config.dart';
 import '../models/branch.dart';
 import 'auth_service.dart';
 import 'cache_manager.dart';
@@ -14,33 +13,24 @@ class BranchService {
     final token = await AuthService.getToken();
     return Dio(BaseOptions(
       baseUrl: ApiConfig.apiUrl,
-      headers: {
-        'Authorization': 'Bearer $token',
-        ...ApiConfig.defaultHeaders,
-      },
+      headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
       connectTimeout: ApiConfig.connectTimeout,
       receiveTimeout: ApiConfig.receiveTimeout,
     ));
   }
 
-  /// Fetch a single branch by id. Returns cached data when offline.
   static Future<Branch> getBranch(int id, {bool forceRefresh = false}) async {
     lastFetchWasStale = false;
     final key = 'branch:$id';
-
     if (!forceRefresh && CacheManager.isValid(key)) {
       final entry = CacheManager.get(key);
-      if (entry != null) {
-        return Branch.fromJson(Map<String, dynamic>.from(entry.data as Map));
-      }
+      if (entry != null) return Branch.fromJson(Map<String, dynamic>.from(entry.data as Map));
     }
-
     try {
       final dio = await _dio();
-      final response = await dio.get('/api/branches/$id');
-      await CacheManager.put(key, response.data['branch'],
-          ttl: const Duration(minutes: 10));
-      return Branch.fromJson(response.data['branch']);
+      final res = await dio.get('/api/branches/$id');
+      await CacheManager.put(key, res.data['branch'], ttl: const Duration(minutes: 10));
+      return Branch.fromJson(res.data['branch']);
     } on DioException {
       final entry = CacheManager.get(key);
       if (entry != null) {
@@ -48,50 +38,44 @@ class BranchService {
         lastFetchWasStale = true;
         return Branch.fromJson(Map<String, dynamic>.from(entry.data as Map));
       }
-      final isOffline =
-          ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
-      throw Exception(isOffline
-          ? 'Kamu sedang offline dan belum ada data tersimpan untuk cabang ini.'
-          : 'Gagal memuat data cabang. Coba lagi.');
+      final offline = ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
+      throw Exception(
+          offline ? 'Kamu sedang offline dan belum ada data tersimpan.' : 'Gagal memuat data cabang. Coba lagi.');
     }
   }
 
-  /// Fetch all branches (superadmin).
   static Future<List<Branch>> getBranches() async {
     final dio = await _dio();
-    final response = await dio.get('/api/branches');
-    final list = response.data['branches'] as List;
-    return list.map((e) => Branch.fromJson(e)).toList();
+    final res = await dio.get('/api/branches');
+    final list = res.data['branches'] as List;
+    return list.map((e) => Branch.fromJson(Map<String, dynamic>.from(e as Map))).toList();
   }
 
-  /// Update branch fields.
-  /// When offline: queues the operation and updates the local cache optimistically.
-  /// Returns true if saved online, false if queued for later sync.
+  /// Update branch. Returns true if saved online, false if queued offline.
   static Future<bool> updateBranch(
-      int id, String name, String? address, String? phone) async {
+    int id,
+    String name,
+    String? address,
+    String? phone, {
+    double? targetPendapatan,
+  }) async {
     final body = <String, dynamic>{
       'name': name,
-      if (address != null) 'address': address,
-      if (phone != null) 'phone': phone,
+      'address': address,
+      'phone': phone,
+      'target_pendapatan': targetPendapatan,
     };
 
-    final isOffline =
-        ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
-
+    final isOffline = ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
     if (isOffline) {
-      // Optimistically update the local cache so the page reflects the change.
       final cacheKey = 'branch:$id';
       final existing = CacheManager.get(cacheKey);
-      final currentData = existing != null
-          ? Map<String, dynamic>.from(existing.data as Map)
-          : <String, dynamic>{'id': id};
-      currentData['name'] = name;
-      currentData['address'] = address;
-      currentData['phone'] = phone;
-      await CacheManager.put(cacheKey, currentData,
-          ttl: const Duration(minutes: 10));
-
-      // Queue for sync when back online.
+      final data = existing != null ? Map<String, dynamic>.from(existing.data as Map) : <String, dynamic>{'id': id};
+      data['name'] = name;
+      data['address'] = address;
+      data['phone'] = phone;
+      data['target_pendapatan'] = targetPendapatan;
+      await CacheManager.put(cacheKey, data, ttl: const Duration(minutes: 10));
       final op = PendingOperation()
         ..id = const Uuid().v4()
         ..method = 'PUT'
@@ -102,13 +86,43 @@ class BranchService {
         ..status = 'pending'
         ..description = 'Perubahan cabang';
       await PendingOperationsQueue.enqueue(op);
-      return false; // queued
+      return false;
     }
-
     final dio = await _dio();
     await dio.put('/api/branches/$id', data: body);
-    // Invalidate cache so next load fetches fresh data.
     await CacheManager.invalidate('branch:$id');
-    return true; // saved online
+    return true;
+  }
+
+  /// Delete a branch (superadmin only).
+  static Future<void> deleteBranch(int id) async {
+    final dio = await _dio();
+    await dio.delete('/api/branches/$id');
+    await CacheManager.invalidate('branch:$id');
+  }
+
+  /// Create branch + admin user atomically.
+  static Future<Map<String, dynamic>> createBranchWithAdmin({
+    required String name,
+    String? address,
+    String? phone,
+    double? targetPendapatan,
+    required String adminName,
+    required String adminUsername,
+    required String adminPassword,
+  }) async {
+    final dio = await _dio();
+    final res = await dio.post('/api/branches/with-admin', data: {
+      'name': name,
+      'address': address,
+      'phone': phone,
+      'target_pendapatan': targetPendapatan,
+      'admin': {
+        'name': adminName,
+        'username': adminUsername,
+        'password': adminPassword,
+      },
+    });
+    return Map<String, dynamic>.from(res.data as Map);
   }
 }

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
 import '../../../../core/models/cart_item.dart';
 import '../../../../core/models/transaction_model.dart';
+import '../../../../core/models/voucher.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../core/helper/currency_formatter.dart';
@@ -12,12 +12,11 @@ import '../../../../core/services/product_service.dart';
 import '../../../../core/services/voucher_service.dart';
 import '../../../../core/services/connectivity_monitor.dart';
 import '../../../../core/services/offline_queue.dart';
-import '../../../../core/config/api_config.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/provider/realtime_provider.dart';
+import '../../../../core/provider/realtime_store_provider.dart';
 import '../../../../core/provider/socket_provider.dart';
-import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/widgets/quantity_picker_modal.dart';
@@ -41,22 +40,18 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   CashierView _currentView = CashierView.products;
   final List<CartItem> _cart = [];
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _couponController = TextEditingController();
 
   Map<String, dynamic>? _appliedCoupon;
-  bool _isApplyingCoupon = false;
   bool _isProcessingPayment = false;
   int? _lastTransactionId;
   String _selectedPaymentMethod = 'cash';
   String _transactionUuid = const Uuid().v4();
 
-  // Products state
-  List<Product> _products = [];
+  // Products state — only needed to track loading/error; actual list comes from store
   bool _isLoadingProducts = true;
   String? _productsError;
 
   late AnimationController _viewAnimationController;
-  ProviderSubscription<RealtimeProductState>? _realtimeSub;
   ProviderSubscription<RealtimeTransactionState>? _realtimeTransactionSub;
 
   // Payment methods — cash always enabled; card/transfer/e-wallet require connectivity
@@ -81,19 +76,6 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Guard: only register once
-    _realtimeSub ??= ref.listenManual(realtimeProductProvider, (previous, next) {
-      if (next.lastUpdateTime != previous?.lastUpdateTime) {
-        // Apply delta in-place — no network round-trip needed.
-        if (mounted) {
-          setState(() {
-            _products = next.applyDelta(_products);
-          });
-          // Check if any cart item is now over-stocked.
-          _handleCartConflict(next);
-        }
-      }
-    });
-
     _realtimeTransactionSub ??= ref.listenManual(realtimeTransactionProvider, (previous, next) {
       if (next.lastPayment != null && next.lastUpdateTime != previous?.lastUpdateTime) {
         // Show a toast when a payment comes in from another terminal.
@@ -130,31 +112,22 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       _isLoadingProducts = true;
       _productsError = null;
     });
-
     try {
       final user = ref.read(authProvider).user;
       final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+      // Seed SQLite store — productStoreProvider picks up changes within 500 ms
       final products = await ProductService.getProducts(
         branchId: branchId,
         forceRefresh: forceRefresh,
       );
-      setState(() {
-        _products = products;
-        _isLoadingProducts = false;
-      });
+      await ref.read(productStoreProvider(branchId).notifier).seedFromHttp(products);
+      if (mounted) setState(() => _isLoadingProducts = false);
     } catch (e) {
-      setState(() {
-        _productsError = e.toString();
-        _isLoadingProducts = false;
-      });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal memuat produk: $e'),
-            backgroundColor: AppTheme.destructive,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        setState(() {
+          _productsError = e.toString();
+          _isLoadingProducts = false;
+        });
       }
     }
   }
@@ -176,42 +149,31 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
 
   @override
   void dispose() {
-    _realtimeSub?.close();
     _realtimeTransactionSub?.close();
     _viewAnimationController.dispose();
     _searchController.dispose();
-    _couponController.dispose();
     super.dispose();
   }
 
-  /// Apply a socket delta to the product list without a network call.
-  /// Also silently updates any matching cart item's price.
-  void _handleCartConflict(RealtimeProductState delta) {
-    final updated = delta.lastUpdated;
-    if (updated == null) return;
-
-    // Find cart item for the updated product.
+  /// Called when a product in the cart has been updated via WS.
+  /// Warns the cashier if available stock dropped below cart quantity.
+  void _handleCartConflict(Product updated) {
     final cartIdx = _cart.indexWhere((c) => c.id == updated.id);
     if (cartIdx < 0) return;
-
     final cartItem = _cart[cartIdx];
-
-    // If stock dropped below cart quantity, warn the cashier.
     if (updated.stock < cartItem.quantity) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Stok "${updated.name}" berkurang! Tersedia: ${updated.stock}, di keranjang: ${cartItem.quantity}',
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13),
-              ),
+        content: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Stok "${updated.name}" berkurang! Tersedia: ${updated.stock}, di keranjang: ${cartItem.quantity}',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13),
             ),
-          ],
-        ),
+          ),
+        ]),
         backgroundColor: AppTheme.warning,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 5),
@@ -330,48 +292,6 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     });
   }
 
-  Future<void> _applyCoupon() async {
-    final code = _couponController.text.trim().toUpperCase();
-    if (code.isEmpty) return;
-
-    setState(() => _isApplyingCoupon = true);
-
-    try {
-      final voucher = await VoucherService.validate(code);
-      if (mounted) {
-        setState(() {
-          _isApplyingCoupon = false;
-          _appliedCoupon = {
-            'code': voucher.code,
-            'discount': voucher.discountType == 'percent' ? voucher.discountValue : null,
-            'fixedDiscount': voucher.discountType == 'fixed' ? voucher.discountValue : null,
-            'discountType': voucher.discountType,
-            'description': voucher.description ?? voucher.discountLabel,
-          };
-          _currentView = CashierView.cart;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Voucher $code berhasil diterapkan!'),
-          backgroundColor: AppTheme.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isApplyingCoupon = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e is DioException
-              ? (e.response?.data?['error'] ?? 'Voucher tidak valid atau sudah kadaluarsa')
-              : 'Voucher tidak valid atau sudah kadaluarsa'),
-          backgroundColor: AppTheme.destructive,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ));
-      }
-    }
-  }
-
   Future<void> _processPayment(String method) async {
     if (_cart.isEmpty) return;
 
@@ -456,6 +376,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
         'discount': _discount,
         'payment_method': method,
         'payment_amount': _total,
+        if (_appliedCoupon != null) 'voucher_code': _appliedCoupon!['code'],
       };
 
       // Superadmin has branch_id = 0 in DB — must send the product's branch
@@ -496,12 +417,9 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     setState(() {
       _cart.clear();
       _appliedCoupon = null;
-      _couponController.clear();
       _currentView = CashierView.products;
       _transactionUuid = const Uuid().v4();
     });
-    // Force-refresh the product list so the broadcaster sees
-    // the stock already reduced by the transaction they just completed.
     _loadProducts(forceRefresh: true);
   }
 
@@ -521,12 +439,20 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   double get _total => _subtotal - _discount;
 
   List<Product> get _filteredProducts {
-    final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return _products;
+    // NOTE: call _getFilteredProducts(storeProducts) from build() where you have ref.watch.
+    // This getter is kept for backward compat; it reads (not watches) the store.
+    final user = ref.read(authProvider).user;
+    final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+    final all = ref.read(productStoreProvider(branchId));
+    return _applySearchFilter(all);
+  }
 
-    return _products.where((product) {
-      return product.name.toLowerCase().contains(query) || (product.category?.toLowerCase().contains(query) ?? false);
-    }).toList();
+  List<Product> _applySearchFilter(List<Product> all) {
+    final query = _searchController.text.toLowerCase();
+    if (query.isEmpty) return all;
+    return all
+        .where((p) => p.name.toLowerCase().contains(query) || (p.category?.toLowerCase().contains(query) ?? false))
+        .toList();
   }
 
   @override
@@ -542,6 +468,20 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     if (connectivityStatus == ConnectivityStatus.offline && _selectedPaymentMethod != 'cash') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _selectedPaymentMethod = 'cash');
+      });
+    }
+
+    // Watch product store — detects stock changes every 500 ms via WS.
+    // Check if any cart item's stock has dropped below its current quantity.
+    final user = ref.read(authProvider).user;
+    final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+    final storeProducts = ref.watch(productStoreProvider(branchId));
+    if (_cart.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        for (final updated in storeProducts) {
+          _handleCartConflict(updated);
+        }
       });
     }
 
@@ -576,7 +516,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
-          if (!isTablet && _currentView == CashierView.products && _cart.isNotEmpty)
+          if (!isTablet && _currentView == CashierView.products)
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Stack(
@@ -585,30 +525,31 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                     onPressed: () => _changeView(CashierView.cart),
                     icon: const Icon(Icons.shopping_cart_outlined),
                   ),
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.gold,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        '${_cart.length}',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.surface,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                  if (_cart.isNotEmpty)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.gold,
+                          shape: BoxShape.circle,
                         ),
-                        textAlign: TextAlign.center,
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '${_cart.length}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.surface,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -652,7 +593,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                   ),
                   // Products Grid
                   Expanded(
-                    child: _isLoadingProducts
+                    child: _isLoadingProducts && _filteredProducts.isEmpty
                         ? const Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -663,7 +604,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                               ],
                             ),
                           )
-                        : _productsError != null
+                        : _productsError != null && _filteredProducts.isEmpty
                             ? Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -679,7 +620,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                                     CustomButton(
                                       text: 'Coba Lagi',
                                       icon: Icons.refresh,
-                                      onPressed: _loadProducts,
+                                      onPressed: () => _loadProducts(forceRefresh: true),
                                     ),
                                   ],
                                 ),
@@ -1053,7 +994,12 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   }
 
   Widget _buildProductsView() {
-    if (_isLoadingProducts) {
+    final user = ref.read(authProvider).user;
+    final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
+    // Watch the SQLite-backed store — updates every 500 ms via WS
+    final filtered = _applySearchFilter(ref.watch(productStoreProvider(branchId)));
+
+    if (_isLoadingProducts && filtered.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1071,7 +1017,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       );
     }
 
-    if (_productsError != null) {
+    if (_productsError != null && filtered.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -1090,14 +1036,18 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              CustomButton(text: 'Coba Lagi', icon: Icons.refresh, onPressed: _loadProducts),
+              CustomButton(
+                text: 'Coba Lagi',
+                icon: Icons.refresh,
+                onPressed: () => _loadProducts(forceRefresh: true),
+              ),
             ],
           ),
         ),
       );
     }
 
-    if (_filteredProducts.isEmpty) {
+    if (filtered.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1130,17 +1080,17 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
             mainAxisSpacing: 16,
             childAspectRatio: 0.72,
           ),
-          itemCount: _filteredProducts.length,
+          itemCount: filtered.length,
           itemBuilder: (context, index) {
-            final product = _filteredProducts[index];
+            final product = filtered[index];
             return ProductCard(
               product: product,
               onAdd: () => _addToCart(product),
             );
           },
         ),
-      ), // Padding
-    ); // PullToRefresh
+      ),
+    );
   }
 
   Widget _buildCartView() {
@@ -1231,14 +1181,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                 )
               else
                 OutlinedButton.icon(
-                  onPressed: () async {
-                    final result = await context.push<Map<String, dynamic>>(
-                      AppRouter.cashierCoupon,
-                    );
-                    if (result != null && mounted) {
-                      setState(() => _appliedCoupon = result);
-                    }
-                  },
+                  onPressed: () => _changeView(CashierView.coupon),
                   icon: const Icon(Icons.local_offer_outlined, size: 16),
                   label: const Text('Tambah Voucher'),
                   style: OutlinedButton.styleFrom(
@@ -1399,78 +1342,21 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   }
 
   Widget _buildCouponView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Back button header
-        Container(
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
-                width: 0.8,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: () => _changeView(CashierView.cart),
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Text(
-                'Terapkan Voucher',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Masukkan Kode Voucher',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _couponController,
-                      decoration: InputDecoration(
-                        hintText: 'Contoh: DISKON20',
-                        prefixIcon: const Icon(Icons.local_offer_outlined, size: 20),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      textCapitalization: TextCapitalization.characters,
-                      onSubmitted: (_) => _isApplyingCoupon ? null : _applyCoupon(),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  CustomButton(
-                    text: 'Terapkan',
-                    onPressed: _isApplyingCoupon ? null : _applyCoupon,
-                    isLoading: _isApplyingCoupon,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
+    return _VoucherPickerView(
+      subtotal: _subtotal,
+      onBack: () => _changeView(CashierView.cart),
+      onSelected: (voucher) {
+        setState(() {
+          _appliedCoupon = {
+            'code': voucher.code,
+            'discount': voucher.discountType == 'percent' ? voucher.discountValue : null,
+            'fixedDiscount': voucher.discountType == 'fixed' ? voucher.discountValue : null,
+            'discountType': voucher.discountType,
+            'description': voucher.description ?? voucher.discountLabel,
+          };
+          _currentView = CashierView.cart;
+        });
+      },
     );
   }
 
@@ -1544,6 +1430,359 @@ class _LiveDot extends ConsumerWidget {
               ? [BoxShadow(color: AppTheme.success.withValues(alpha: 0.5), blurRadius: 6, spreadRadius: 1)]
               : null,
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Voucher picker — shows ALL vouchers; unavailable ones are greyed with reason
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _VoucherPickerView extends StatefulWidget {
+  final double subtotal;
+  final VoidCallback onBack;
+  final ValueChanged<Voucher> onSelected;
+
+  const _VoucherPickerView({
+    required this.subtotal,
+    required this.onBack,
+    required this.onSelected,
+  });
+
+  @override
+  State<_VoucherPickerView> createState() => _VoucherPickerViewState();
+}
+
+class _VoucherPickerViewState extends State<_VoucherPickerView> {
+  List<Voucher> _vouchers = [];
+  bool _loading = true;
+  String? _error;
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final list = await VoucherService.getAllForCashier();
+      if (mounted) {
+        setState(() {
+          _vouchers = list;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  List<Voucher> get _filtered {
+    if (_query.isEmpty) return _vouchers;
+    final q = _query.toLowerCase();
+    return _vouchers
+        .where((v) => v.code.toLowerCase().contains(q) || (v.description?.toLowerCase().contains(q) ?? false))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        // ── Header ────────────────────────────────────────────────────
+        Container(
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: cs.outlineVariant, width: 0.8)),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: widget.onBack,
+                icon: const Icon(Icons.arrow_back),
+              ),
+              Text('Pilih Voucher',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+
+        // ── Search ────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _query = v),
+            decoration: InputDecoration(
+              hintText: 'Cari kode atau deskripsi...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _query = '');
+                      })
+                  : null,
+              filled: true,
+              fillColor: cs.surfaceContainerHighest,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+          ),
+        ),
+
+        // ── List ──────────────────────────────────────────────────────
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator(color: AppTheme.gold))
+              : _error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline, size: 40, color: AppTheme.destructive),
+                          const SizedBox(height: 12),
+                          Text('Gagal memuat voucher', style: Theme.of(context).textTheme.bodyMedium),
+                          const SizedBox(height: 12),
+                          TextButton.icon(
+                            onPressed: _load,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Coba Lagi'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _filtered.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.local_offer_outlined,
+                                  size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.35)),
+                              const SizedBox(height: 12),
+                              Text(
+                                _query.isNotEmpty ? 'Voucher tidak ditemukan' : 'Belum ada voucher tersedia',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 80),
+                          itemCount: _filtered.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (_, i) => _VoucherPickerTile(
+                            voucher: _filtered[i],
+                            subtotal: widget.subtotal,
+                            onTap: _filtered[i].canUse ? () => widget.onSelected(_filtered[i]) : null,
+                          ),
+                        ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Single voucher row in the picker ─────────────────────────────────────────
+
+class _VoucherPickerTile extends StatelessWidget {
+  final Voucher voucher;
+  final double subtotal;
+  final VoidCallback? onTap; // null = unavailable
+
+  const _VoucherPickerTile({
+    required this.voucher,
+    required this.subtotal,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final available = onTap != null;
+    final reason = voucher.whyUnavailable;
+
+    // Compute preview discount
+    String discountPreview = '';
+    if (available) {
+      final amt = voucher.discountType == 'fixed'
+          ? voucher.discountValue.clamp(0, subtotal)
+          : subtotal * (voucher.discountValue / 100);
+      discountPreview = '- ${CurrencyFormatter.formatToCompactRupiah(amt)}';
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedOpacity(
+        opacity: available ? 1.0 : 0.5,
+        duration: const Duration(milliseconds: 200),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: available ? AppTheme.gold.withValues(alpha: 0.06) : cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: available ? AppTheme.gold.withValues(alpha: 0.30) : cs.outlineVariant.withValues(alpha: 0.5),
+              width: available ? 1.5 : 0.8,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Icon badge
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: available ? AppTheme.gold.withValues(alpha: 0.12) : cs.onSurface.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.local_offer_outlined,
+                  size: 20,
+                  color: available ? AppTheme.gold : cs.onSurface.withValues(alpha: 0.3),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            voucher.code,
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: available ? AppTheme.gold : cs.onSurface.withValues(alpha: 0.4),
+                                ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _Chip(
+                          voucher.discountLabel,
+                          available ? AppTheme.gold : cs.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                    if (voucher.description != null && voucher.description!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        voucher.description!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        // Usage counter
+                        _Chip(
+                          voucher.usageLabel,
+                          available ? cs.onSurfaceVariant : cs.onSurface.withValues(alpha: 0.3),
+                          filled: false,
+                        ),
+                        // Validity
+                        if (voucher.validTo != null) ...[
+                          const SizedBox(width: 6),
+                          _Chip(
+                            's/d ${_shortDate(voucher.validTo!)}',
+                            available ? cs.onSurfaceVariant : cs.onSurface.withValues(alpha: 0.3),
+                            filled: false,
+                          ),
+                        ],
+                        // Unavailable reason badge
+                        if (!available && reason != null) ...[
+                          const SizedBox(width: 6),
+                          _Chip(reason, AppTheme.destructive),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Right: discount preview or lock icon
+              const SizedBox(width: 8),
+              if (available && discountPreview.isNotEmpty)
+                Text(
+                  discountPreview,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppTheme.success,
+                        fontWeight: FontWeight.bold,
+                      ),
+                )
+              else if (!available)
+                Icon(Icons.lock_outline, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _shortDate(String iso) {
+    try {
+      final d = DateTime.parse(iso);
+      return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    } catch (_) {
+      return iso;
+    }
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool filled;
+
+  const _Chip(this.label, this.color, {this.filled = true});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: filled ? color.withValues(alpha: 0.12) : Colors.transparent,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: filled ? color.withValues(alpha: 0.3) : color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: filled ? FontWeight.w600 : FontWeight.normal,
+            ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

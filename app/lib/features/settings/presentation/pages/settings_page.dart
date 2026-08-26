@@ -13,8 +13,8 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    final isKaryawan = user?.isEmployee ?? false;
     final isAdminOrAbove = RoleGuard.isAdminOrAbove(user);
+    final isSuperAdmin = RoleGuard.isSuperAdmin(user);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -32,104 +32,105 @@ class SettingsPage extends ConsumerWidget {
           children: [
             const _StoreProfileHeader(),
             const SizedBox(height: 28),
-            const _SectionLabel('Store'),
+
+            // ── Store section (admin/superadmin only) ─────────────────
+            if (isAdminOrAbove) ...[
+              const _SectionLabel('Toko'),
+              const SizedBox(height: 8),
+              _SettingsGroup(tiles: [
+                _SettingsTile(
+                  title: isSuperAdmin ? 'Manajemen Cabang' : 'Cabang Saya',
+                  subtitle: isSuperAdmin ? 'Tambah, edit, dan hapus cabang' : 'Edit informasi cabang Anda',
+                  icon: Icons.business_outlined,
+                  onTap: () {
+                    if (isSuperAdmin) {
+                      context.push(AppRouter.branchManagement);
+                    } else {
+                      final branchId = user?.branchId ?? 0;
+                      context.push(AppRouter.branchEdit.replaceFirst(':id', '$branchId'));
+                    }
+                  },
+                ),
+                if (isAdminOrAbove)
+                  _SettingsTile(
+                    title: 'Manajemen Pengguna',
+                    subtitle: 'Kelola pengguna dan hak akses',
+                    icon: Icons.people_outline,
+                    onTap: () => context.push(AppRouter.userManagement),
+                  ),
+                if (isAdminOrAbove)
+                  _SettingsTile(
+                    title: 'Vouchers',
+                    subtitle: 'Buat dan kelola voucher diskon',
+                    icon: Icons.local_offer_outlined,
+                    onTap: () => context.push(AppRouter.voucherManagement),
+                  ),
+              ]),
+              const SizedBox(height: 28),
+            ],
+
+            // ── Devices ───────────────────────────────────────────────
+            const _SectionLabel('Perangkat Terhubung'),
             const SizedBox(height: 8),
             _SettingsGroup(tiles: [
               _SettingsTile(
-                title: 'Store Profile',
-                subtitle: 'Profil toko utama Anda',
-                icon: Icons.storefront_outlined,
-                onTap: () {},
+                title: 'Manajemen Perangkat Terhubung',
+                subtitle: 'Printer & scanner Bluetooth / USB',
+                icon: Icons.devices_outlined,
+                onTap: () => context.push(AppRouter.deviceManager),
               ),
-              if (isAdminOrAbove)
+              if (isSuperAdmin)
                 _SettingsTile(
-                  title: RoleGuard.isSuperAdmin(user) ? 'Branch Management' : 'My Branch',
-                  subtitle:
-                      RoleGuard.isSuperAdmin(user) ? 'Lihat dan kelola semua cabang' : 'Edit informasi cabang Anda',
-                  icon: Icons.business_outlined,
-                  onTap: () {
-                    final branchId = user?.branchId ?? 0;
-                    context.push(
-                      AppRouter.branchEdit.replaceFirst(':id', '$branchId'),
-                    );
-                  },
+                  title: 'Pengaturan Resi',
+                  subtitle: 'Kustomisasi format struk pembayaran',
+                  icon: Icons.receipt_long_outlined,
+                  onTap: () => context.push(AppRouter.receiptEditor),
                 ),
             ]),
             const SizedBox(height: 28),
-            const _SectionLabel('Devices'),
+
+            // ── Preferences ───────────────────────────────────────────
+            const _SectionLabel('Preferensi'),
             const SizedBox(height: 8),
             _SettingsGroup(tiles: [
               _SettingsTile(
-                title: 'Barcode Scanner',
-                subtitle: 'Zebra DS9308 - Terhubung',
-                icon: Icons.qr_code_scanner,
-                statusColor: AppTheme.success,
-                onTap: () => context.push(AppRouter.scannerDevices),
-              ),
-              _SettingsTile(
-                title: 'Receipt Printer',
-                subtitle: 'Epson TM-T88VI - Tidak terhubung',
-                icon: Icons.print_outlined,
-                statusColor: AppTheme.mutedForeground,
-                onTap: () => context.push(AppRouter.printerDevices),
-              ),
-            ]),
-            const SizedBox(height: 28),
-            const _SectionLabel('Preferences'),
-            const SizedBox(height: 8),
-            _SettingsGroup(tiles: [
-              _SettingsTile(
-                title: 'Notifications',
-                subtitle: 'Push & notifikasi peringatan',
+                title: 'Notifikasi',
+                subtitle: 'Atur notifikasi & peringatan',
                 icon: Icons.notifications_none_outlined,
                 onTap: () {},
               ),
               _SettingsTile(
-                title: 'Appearance',
-                subtitle: 'Tema & tampilan',
+                title: 'Tema Aplikasi',
+                subtitle: 'Ubah tampilan & tema warna',
                 icon: Icons.palette_outlined,
                 onTap: () => context.push(AppRouter.apprearance),
               ),
             ]),
             const SizedBox(height: 28),
-            const _SectionLabel('Support'),
+
+            // ── Account & support ─────────────────────────────────────
+            const _SectionLabel('Akun & Dukungan'),
             const SizedBox(height: 8),
             _SettingsGroup(tiles: [
-              if (!isKaryawan) ...[
-                _SettingsTile(
-                  title: 'User Management',
-                  subtitle: 'Kelola pengguna dan hak akses',
-                  icon: Icons.people_outline,
-                  onTap: () => context.push(AppRouter.userManagement),
-                ),
-                _SettingsTile(
-                  title: 'Vouchers',
-                  subtitle: 'Buat dan kelola voucher diskon',
-                  icon: Icons.local_offer_outlined,
-                  onTap: () => context.push(AppRouter.voucherManagement),
-                ),
-              ],
               _SettingsTile(
-                title: 'Privacy & Security',
-                subtitle: 'Kata sandi, autentikasi dua faktor',
+                title: 'Privasi & Keamanan',
+                subtitle: 'Kata sandi, username, login biometrik',
                 icon: Icons.security_outlined,
-                onTap: () {},
+                onTap: () => context.push(AppRouter.privacySecurity),
               ),
               _SettingsTile(
                 title: 'Help Center',
-                subtitle: 'FAQ, hubungi dukungan',
+                subtitle: 'Hubungi developer untuk bantuan',
                 icon: Icons.help_outline,
-                onTap: () {},
+                onTap: () => context.push(AppRouter.helpCenter),
               ),
             ]),
             const SizedBox(height: 32),
+
             _SignOutButton(ref: ref),
             const SizedBox(height: 16),
             Center(
-              child: Text(
-                'Versi 1.0.0',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              child: Text('Versi 1.0.0', style: Theme.of(context).textTheme.bodySmall),
             ),
             const SizedBox(height: 24),
           ],
@@ -214,14 +215,12 @@ class _SettingsTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color? statusColor;
   final VoidCallback onTap;
 
   const _SettingsTile({
     required this.title,
     required this.subtitle,
     required this.icon,
-    this.statusColor,
     required this.onTap,
   });
 
@@ -261,16 +260,6 @@ class _SettingsTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (statusColor != null)
-              Container(
-                width: 8,
-                height: 8,
-                margin: const EdgeInsets.only(right: 10),
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
             Icon(
               Icons.chevron_right_rounded,
               size: 20,

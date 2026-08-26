@@ -15,8 +15,7 @@ class DashboardService {
       final entry = CacheManager.get(_cacheKey);
       if (entry != null) {
         lastFetchWasStale = false;
-        return DashboardStats.fromJson(
-            Map<String, dynamic>.from(entry.data as Map));
+        return DashboardStats.fromJson(Map<String, dynamic>.from(entry.data as Map));
       }
     }
 
@@ -36,7 +35,7 @@ class DashboardService {
       final response = await dio.get('/api/dashboard');
       final data = response.data as Map<String, dynamic>;
 
-      await CacheManager.put(_cacheKey, data);
+      await CacheManager.put(_cacheKey, data, ttl: const Duration(seconds: 30));
       lastFetchWasStale = false;
       return DashboardStats.fromJson(data);
     } catch (e) {
@@ -45,8 +44,7 @@ class DashboardService {
       if (entry != null) {
         entry.isStale = true;
         lastFetchWasStale = true;
-        return DashboardStats.fromJson(
-            Map<String, dynamic>.from(entry.data as Map));
+        return DashboardStats.fromJson(Map<String, dynamic>.from(entry.data as Map));
       }
       rethrow;
     }

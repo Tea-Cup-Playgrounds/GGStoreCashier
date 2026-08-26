@@ -118,7 +118,7 @@ router.post('/', async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const { items, discount = 0, payment_method, payment_amount } = req.body;
+        const { items, discount = 0, payment_method, payment_amount, voucher_code } = req.body;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ error: 'Item transaksi wajib diisi' });
@@ -206,6 +206,14 @@ router.post('/', async (req, res) => {
             );
         }
 
+        // Increment voucher used_count if a code was supplied
+        if (voucher_code) {
+            await connection.execute(
+                'UPDATE vouchers SET used_count = used_count + 1 WHERE UPPER(code) = ?',
+                [voucher_code.trim().toUpperCase()]
+            );
+        }
+
         // Fetch completed transaction for response + socket
         const [transactions] = await connection.execute(
             `SELECT t.*, u.name as user_name, b.name as branch_name
@@ -221,6 +229,46 @@ router.post('/', async (req, res) => {
         // Emit real-time events
         const io = req.app.get('io');
         broadcastToRoom(io, branchId, 'transaction-created', transactions[0]);
+
+        // Broadcast superadmin high-frequency update (stock + transaction increment)
+        // Compute lightweight delta so the client can update cards without an API round-trip
+        try {
+            const [[todayAgg]] = await connection.execute(
+                `SELECT COALESCE(SUM(final_amount),0) AS revenue, COUNT(*) AS tx_count
+                 FROM transactions WHERE payment_status='paid' AND DATE(created_at)=CURDATE()`
+            );
+            const [[yestAgg]] = await connection.execute(
+                `SELECT COALESCE(SUM(final_amount),0) AS revenue
+                 FROM transactions WHERE payment_status='paid' AND DATE(created_at)=DATE_SUB(CURDATE(),INTERVAL 1 DAY)`
+            );
+            const [[lwAgg]] = await connection.execute(
+                `SELECT COALESCE(SUM(final_amount),0) AS revenue
+                 FROM transactions WHERE payment_status='paid' AND DATE(created_at)=DATE_SUB(CURDATE(),INTERVAL 7 DAY)`
+            );
+            const [[lowStock]]   = await connection.execute(`SELECT COUNT(*) AS cnt FROM products WHERE stock > 0 AND stock <= 50`);
+            const [[outOfStock]] = await connection.execute(`SELECT COUNT(*) AS cnt FROM products WHERE stock = 0`);
+            const [activeBranches] = await connection.execute(
+                `SELECT COUNT(DISTINCT branch_id) AS cnt FROM transactions WHERE payment_status='paid' AND DATE(created_at)=CURDATE()`
+            );
+
+            const todayRev = parseFloat(todayAgg.revenue);
+            const yestRev  = parseFloat(yestAgg.revenue);
+            const lwRev    = parseFloat(lwAgg.revenue);
+            const txCount  = parseInt(todayAgg.tx_count);
+            const avgOrderValue = txCount > 0 ? parseFloat((todayRev / txCount).toFixed(0)) : 0;
+            const vsYesterday = yestRev === 0 ? (todayRev > 0 ? 100 : 0) : parseFloat((((todayRev - yestRev) / yestRev) * 100).toFixed(1));
+            const vsLastWeek  = lwRev  === 0 ? (todayRev > 0 ? 100 : 0) : parseFloat((((todayRev - lwRev)  / lwRev)  * 100).toFixed(1));
+
+            broadcastToRoom(io, 0, 'dashboard:live-update', {
+                sales: { todayRevenue: todayRev, todayTxCount: txCount, avgOrderValue, vsYesterday, vsLastWeek },
+                activeBranches: parseInt(activeBranches[0].cnt),
+                stock: { lowCount: parseInt(lowStock.cnt), outCount: parseInt(outOfStock.cnt) },
+                newTransaction: transactions[0],
+            });
+        } catch (broadcastErr) {
+            // Non-fatal — don't abort the transaction response
+            console.error('dashboard live-update broadcast error:', broadcastErr.message);
+        }
 
         // Broadcast updated stock for every product sold.
         // Use branchId from the transaction as fallback in case product.branch_id

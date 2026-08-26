@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/socket_service.dart';
+import '../database/app_database.dart';
 
 class AuthState {
   final bool isAuthenticated;
@@ -43,7 +45,44 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(const AuthState());
+  AuthNotifier() : super(const AuthState()) {
+    _hydrate();
+  }
+
+  /// Restore session from SharedPreferences on cold start.
+  /// This is what makes the dashboard show the real user name and keeps
+  /// the app from treating every launch as a fresh session.
+  Future<void> _hydrate() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) return; // no stored session — stay unauthenticated
+
+      final user = await AuthService.getCurrentUser();
+      if (user == null) {
+        // Token exists but user data is corrupt/missing — wipe silently.
+        await AuthService.logout();
+        return;
+      }
+
+      // Reconnect Socket.IO so real-time events resume immediately.
+      // If the server rejects the JWT, onAuthFailed fires the session-expired
+      // modal and redirects to login — no extra handling needed here.
+      SocketService.connect(
+        token: token,
+        branchId: user.branchId ?? 0,
+        role: user.role,
+        onAuthFailed: (_) => AuthService.handleSessionExpired(),
+      );
+
+      state = state.copyWith(
+        isAuthenticated: true,
+        user: user,
+        isLoading: false,
+      );
+    } catch (_) {
+      // Hydration failure is non-fatal; user simply sees the login screen.
+    }
+  }
 
   Future<bool> login(String username, String password, {bool rememberMe = false}) async {
     state = state.copyWith(isLoading: true, error: null);
@@ -95,11 +134,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {
       // Continue with local logout even if server call fails.
     }
+    // Disconnect socket and wipe the SQLite store so no stale
+    // data from the previous session bleeds into the next login.
+    SocketService.disconnect();
+    await AppDatabase.clearAll();
     state = const AuthState();
   }
 
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  /// Update user data in state after a profile self-edit (name/username).
+  void refreshUser(Map<String, dynamic> userMap) {
+    if (state.user == null) return;
+    final updated = state.user!.copyWith(
+      name: userMap['name'] as String? ?? state.user!.name,
+      username: userMap['username'] as String? ?? state.user!.username,
+    );
+    state = state.copyWith(user: updated);
   }
 
   bool isLockoutExpired() {

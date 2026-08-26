@@ -20,7 +20,6 @@ class AdminUserManagementPage extends ConsumerStatefulWidget {
 
 class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPage> {
   final _searchController = TextEditingController();
-  String _selectedRole = 'all';
 
   @override
   void initState() {
@@ -29,6 +28,7 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
       final user = ref.read(authProvider).user;
       if (user != null && user.branchId != null) {
         ref.read(userManagementProvider.notifier).filterUsers(
+              role: 'karyawan',
               branchId: user.branchId.toString(),
             );
       }
@@ -45,6 +45,7 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
     final user = ref.read(authProvider).user;
     if (user != null && user.branchId != null) {
       ref.read(userManagementProvider.notifier).filterUsers(
+            role: 'karyawan',
             branchId: user.branchId.toString(),
           );
     }
@@ -76,17 +77,7 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
     ).then((_) => _reload());
   }
 
-  void _onSearch(String query) => ref.read(userManagementProvider.notifier).searchUsers(query);
-
-  void _onFilterChanged() {
-    final user = ref.read(authProvider).user;
-    if (user != null && user.branchId != null) {
-      ref.read(userManagementProvider.notifier).filterUsers(
-            role: _selectedRole == 'all' ? null : _selectedRole,
-            branchId: user.branchId.toString(),
-          );
-    }
-  }
+  void _onSearch(String query) => ref.read(userManagementProvider.notifier).searchWithinFilter(query);
 
   @override
   Widget build(BuildContext context) {
@@ -241,59 +232,16 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
 
   Widget _buildFilters(bool isDesktop) {
     if (isDesktop) {
-      return Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: CustomSearchBar(
-              controller: _searchController,
-              hintText: 'Cari karyawan berdasarkan nama atau username...',
-              onChanged: _onSearch,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Flexible(flex: 1, child: _buildRoleFilter()),
-        ],
+      return CustomSearchBar(
+        controller: _searchController,
+        hintText: 'Cari karyawan berdasarkan nama atau username...',
+        onChanged: _onSearch,
       );
     }
-    return Column(
-      children: [
-        CustomSearchBar(
-          controller: _searchController,
-          hintText: 'Cari karyawan...',
-          onChanged: _onSearch,
-        ),
-        const SizedBox(height: 16),
-        _buildRoleFilter(),
-      ],
-    );
-  }
-
-  Widget _buildRoleFilter() {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        border: Border.all(color: cs.outlineVariant),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedRole,
-          isExpanded: true,
-          dropdownColor: cs.surface,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface),
-          items: const [
-            DropdownMenuItem(value: 'all', child: Text('Semua Role')),
-            DropdownMenuItem(value: 'karyawan', child: Text('Karyawan')),
-          ],
-          onChanged: (value) {
-            setState(() => _selectedRole = value!);
-            _onFilterChanged();
-          },
-        ),
-      ),
+    return CustomSearchBar(
+      controller: _searchController,
+      hintText: 'Cari karyawan...',
+      onChanged: _onSearch,
     );
   }
 
@@ -347,14 +295,16 @@ class _AdminUserManagementPageState extends ConsumerState<AdminUserManagementPag
         itemCount: state.users.length,
         itemBuilder: (context, index) {
           final user = state.users[index];
-          final canEdit = user['role'] == 'karyawan';
-          final canDelete = user['role'] == 'karyawan';
+          // Admin can only manage karyawan — skip admins and superadmins
+          // to avoid showing confusing "View Only" tiles for uneditable rows
+          final role = user['role']?.toString() ?? '';
+          if (role == 'admin' || role == 'superadmin') return const SizedBox.shrink();
           return Container(
             margin: EdgeInsets.symmetric(horizontal: isDesktop ? 32 : 24, vertical: 8),
             child: UserListItem(
               user: user,
-              onEdit: canEdit ? () => _showUserForm(user: user) : null,
-              onDelete: canDelete ? () => _showDeleteDialog(user) : null,
+              onEdit: () => _showUserForm(user: user),
+              onDelete: () => _showDeleteDialog(user),
               isSuperAdmin: false,
             ),
           );
