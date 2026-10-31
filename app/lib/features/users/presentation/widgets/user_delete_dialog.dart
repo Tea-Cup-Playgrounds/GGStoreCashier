@@ -20,9 +20,9 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
   Future<void> _handleDelete() async {
     setState(() => _isLoading = true);
     try {
-      await ref.read(userManagementProvider.notifier).deleteUser(widget.user['id']);
+      final message = await ref.read(userManagementProvider.notifier).deleteUser(widget.user['id'] as int);
       if (mounted) {
-        SnackBarService.success('Pengguna berhasil dihapus');
+        SnackBarService.success(message);
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -32,35 +32,10 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
     }
   }
 
-  Color _getRoleColor(String role) {
-    switch (role.toLowerCase()) {
-      case 'superadmin':
-        return AppTheme.gold;
-      case 'admin':
-        return AppTheme.success;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _formatRole(String role) {
-    switch (role.toLowerCase()) {
-      case 'superadmin':
-        return 'Super Admin';
-      case 'admin':
-        return 'Admin';
-      case 'karyawan':
-        return 'Karyawan';
-      default:
-        return role;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final roleStr = widget.user['role']?.toString() ?? '';
-    final roleColor = _getRoleColor(roleStr);
+    final badgeColor = roleColor(widget.user['role_code']?.toString());
 
     return Dialog(
       backgroundColor: cs.surface,
@@ -100,7 +75,7 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
                     text: widget.user['name']?.toString() ?? 'pengguna ini',
                     style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600),
                   ),
-                  const TextSpan(text: '? Tindakan ini tidak dapat dibatalkan.'),
+                  const TextSpan(text: '? Pengguna yang sudah memiliki riwayat transaksi akan dinonaktifkan, bukan dihapus.'),
                 ],
               ),
             ),
@@ -158,16 +133,16 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: roleColor.withValues(alpha: 0.1),
+                      color: badgeColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: roleColor.withValues(alpha: 0.3)),
+                      border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
                     ),
                     child: Text(
-                      _formatRole(roleStr),
+                      widget.user['role_label']?.toString() ?? '',
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
-                          ?.copyWith(color: roleColor, fontWeight: FontWeight.w500, fontSize: 10),
+                          ?.copyWith(color: badgeColor, fontWeight: FontWeight.w500, fontSize: 10),
                     ),
                   ),
                 ],

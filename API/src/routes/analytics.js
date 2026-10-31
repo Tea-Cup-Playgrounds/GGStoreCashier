@@ -1,11 +1,11 @@
 const express = require('express');
 const pool = require('../db');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requirePermission } = require('../middleware/auth');
 const { DISPLAY_NAME_SQL } = require('../services/catalog');
 
 const router = express.Router();
 router.use(authenticateToken);
-router.use(requireRole(['superadmin']));
+router.use(requirePermission('reports.view_all'));
 
 // Revenue is what customers kept (total minus refunds); voided sales are excluded. Quantities
 // are net of returned items. Response keys predate the sales model and are kept for the app.
@@ -45,11 +45,12 @@ router.get('/branch-revenue', async (req, res) => {
             `SELECT b.id AS branch_id, b.name AS branch_name,
                     ${NET_REVENUE} AS revenue,
                     COUNT(s.id) AS transactions
-             FROM branches b
+             FROM locations b
              LEFT JOIN sales s
                ON s.location_id = b.id
                AND DATE(s.occurred_at) = ?
                AND s.status <> 'voided'
+             WHERE b.type = 'branch' AND b.deleted_at IS NULL
              GROUP BY b.id, b.name
              ORDER BY revenue DESC`,
             [date]
@@ -105,7 +106,7 @@ router.get('/top-products', async (req, res) => {
              JOIN sales s ON sl.sale_id = s.id
              JOIN product_variants v ON sl.variant_id = v.id
              JOIN products p ON v.product_id = p.id
-             LEFT JOIN branches b ON s.location_id = b.id
+             LEFT JOIN locations b ON s.location_id = b.id
              WHERE s.status <> 'voided'
                AND s.occurred_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
              GROUP BY v.id, name, b.name

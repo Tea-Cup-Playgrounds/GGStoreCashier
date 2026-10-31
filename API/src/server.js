@@ -5,7 +5,7 @@ const http = require("http");
 const socketIO = require("socket.io");
 const helmet = require("helmet");
 const cors = require("cors");
-const rateLimit = require("express-rate-limit");
+const { apiRateLimit } = require("./middleware/rateLimit");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const path = require("path");
@@ -13,6 +13,7 @@ const ngrok = require("@ngrok/ngrok");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("./db");
+const { loadAccess } = require("./services/access");
 const { ensureUploadDirs } = require("./utils/upload");
 
 // Track ngrok public URL
@@ -20,11 +21,7 @@ let ngrokUrl = null;
 
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
-const adminRoutes = require("./routes/admins");
-const superRoutes = require("./routes/super");
-const productRoutes = require("./routes/products");
 const categoryRoutes = require("./routes/categories");
-const branchRoutes = require("./routes/branches");
 const dashboardRoutes = require("./routes/dashboard");
 const voucherRoutes = require("./routes/vouchers");
 const analyticsRoutes = require("./routes/analytics");
@@ -77,14 +74,41 @@ const io = socketIO(server, {
   },
 });
 
+// Socket.IO clients authenticate with their API token (handshake auth.token or Authorization header).
+io.use(async (socket, next) => {
+  try {
+    const header = socket.handshake.headers.authorization;
+    const token = socket.handshake.auth?.token || (header && header.split(" ")[1]);
+    if (!token) return next(new Error("unauthorized"));
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const [users] = await pool.execute("SELECT id, is_active FROM users WHERE id = ?", [decoded.userId]);
+    if (users.length === 0 || !users[0].is_active) return next(new Error("unauthorized"));
+    socket.data.userId = users[0].id;
+    next();
+  } catch {
+    next(new Error("unauthorized"));
+  }
+});
+
 // Socket.IO connection handling
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
-  // Join branch-specific room
-  socket.on("join-branch", (branchId) => {
-    socket.join(`branch-${branchId}`);
-    console.log(`Socket ${socket.id} joined branch-${branchId}`);
+  // Room "branch-<id>" carries a location's live events; "branch-0" carries every location's and
+  // is only for users whose access covers all locations. Access is re-read on each join.
+  socket.on("join-branch", async (branchId) => {
+    try {
+      const id = Number(branchId);
+      if (!Number.isInteger(id) || id < 0) return;
+      const access = await loadAccess(pool, socket.data.userId);
+      const scope = access.locationsForAny("sales.create", "reports.view_location");
+      const allowed = id === 0 ? scope === null : scope === null || scope.includes(id);
+      if (!allowed) return;
+      socket.join(`branch-${id}`);
+      console.log(`Socket ${socket.id} joined branch-${id}`);
+    } catch (err) {
+      console.error("join-branch error:", err.message);
+    }
   });
 
   // Leave branch room
@@ -144,9 +168,10 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "Cookie", "ngrok-skip-browser-warning"],
   }),
 );
+// Goods receipts and stock counts from the back-office carry hundreds of lines/IMEIs.
 app.use(
   express.json({
-    limit: "10kb",
+    limit: "1mb",
   }),
 );
 app.use(cookieParser());
@@ -165,22 +190,13 @@ app.get("/favicon.ico", (req, res) => res.status(204).end());
 // '1' means trust the first hop (ngrok -> your server)
 app.set("trust proxy", 1);
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use(limiter);
+// Per signed-in user (per IP without a token); see middleware/rateLimit.js.
+app.use(apiRateLimit);
 
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/admins", adminRoutes);
-app.use("/api/super", superRoutes);
-app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
-app.use("/api/branches", branchRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/vouchers", voucherRoutes);
 app.use("/api/analytics", analyticsRoutes);
@@ -216,12 +232,16 @@ function recordDocsFailure(ip) {
   docsLoginAttempts.set(ip, rec);
 }
 
-function requireDocsSession(req, res, next) {
+// The docs are for owners only; ownership is re-checked on every request.
+async function requireDocsSession(req, res, next) {
   const token = req.cookies[DOCS_SESSION_COOKIE];
   if (!token) return res.redirect("/api/docs/login");
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "superadmin" || decoded.purpose !== "docs") {
+    const [users] = decoded.purpose === "docs"
+      ? await pool.execute("SELECT is_active FROM users WHERE id = ?", [decoded.userId])
+      : [[]];
+    if (users.length === 0 || !users[0].is_active || !(await loadAccess(pool, decoded.userId)).isOwner) {
       res.clearCookie(DOCS_SESSION_COOKIE);
       return res.redirect("/api/docs/login");
     }
@@ -252,12 +272,12 @@ app.post("/api/docs/login", async (req, res) => {
   }
 
   try {
-    const [users] = await pool.execute("SELECT id, username, password, role FROM users WHERE username = ?", [username]);
+    const [users] = await pool.execute("SELECT id, username, password, is_active FROM users WHERE username = ?", [username]);
 
     const user = users[0];
     const valid = user && (await bcrypt.compare(password, user.password));
 
-    if (!valid || user.role !== "superadmin") {
+    if (!valid || !user.is_active || !(await loadAccess(pool, user.id)).isOwner) {
       recordDocsFailure(clientIP);
       return res.status(401).json({ error: "Invalid credentials or insufficient permissions" });
     }
@@ -268,7 +288,7 @@ app.post("/api/docs/login", async (req, res) => {
     const expiresIn = remember ? "1d" : "8h";
 
     const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role, purpose: "docs" },
+      { userId: user.id, username: user.username, purpose: "docs" },
       process.env.JWT_SECRET,
       { expiresIn },
     );

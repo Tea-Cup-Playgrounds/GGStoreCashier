@@ -1,6 +1,6 @@
 const express = require("express");
 const pool = require("../db");
-const { authenticateToken, requireRole } = require("../middleware/auth");
+const { authenticateToken, requirePermission } = require("../middleware/auth");
 const { uploadCategory, deleteFile, validateUploadedImage } = require("../utils/upload");
 
 const router = express.Router();
@@ -35,8 +35,8 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Create new category (admin/superadmin only)
-router.post("/", requireRole(["admin", "superadmin"]), uploadCategory.single("category_image"), async (req, res) => {
+// Create new category (catalog.manage)
+router.post("/", requirePermission("catalog.manage"), uploadCategory.single("category_image"), async (req, res) => {
   try {
     const { name, description } = req.body;
 
@@ -85,8 +85,8 @@ router.post("/", requireRole(["admin", "superadmin"]), uploadCategory.single("ca
   }
 });
 
-// Update category (admin/superadmin only)
-router.put("/:id", requireRole(["admin", "superadmin"]), uploadCategory.single("category_image"), async (req, res) => {
+// Update category (catalog.manage)
+router.put("/:id", requirePermission("catalog.manage"), uploadCategory.single("category_image"), async (req, res) => {
   try {
     const { name, description } = req.body;
 
@@ -155,8 +155,8 @@ router.put("/:id", requireRole(["admin", "superadmin"]), uploadCategory.single("
   }
 });
 
-// Delete category (superadmin only)
-router.delete("/:id", requireRole(["superadmin"]), async (req, res) => {
+// Delete category (catalog.manage)
+router.delete("/:id", requirePermission("catalog.manage"), async (req, res) => {
   try {
     // Check if category has products
     const [products] = await pool.execute("SELECT COUNT(*) as count FROM products WHERE category_id = ?", [req.params.id]);

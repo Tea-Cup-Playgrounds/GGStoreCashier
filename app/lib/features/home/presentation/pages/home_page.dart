@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
+import '../../../../core/provider/access_provider.dart';
 import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/provider/realtime_provider.dart';
 import '../../../../core/models/dashboard_stats.dart';
@@ -151,12 +152,14 @@ class _HomePageState extends ConsumerState<HomePage>
     final authState = ref.watch(authProvider);
     final user = authState.user;
 
-    // SuperAdmin gets the full analytics dashboard
-    if (user?.isSuperAdmin == true) {
+    final access = ref.watch(currentAccessProvider);
+
+    // Users who read reports for every location get the all-locations analytics dashboard.
+    if (access.can('reports.view_all')) {
       return const SuperAdminDashboardPage();
     }
 
-    final isKaryawan = user?.isEmployee ?? false;
+    final canAddStock = access.can('stock.adjust') || access.can('purchases.manage');
 
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
@@ -187,7 +190,7 @@ class _HomePageState extends ConsumerState<HomePage>
                             horizontalPadding,
                             statsColumns,
                             quickActionsColumns,
-                            isKaryawan,
+                            canAddStock,
                             user?.name ?? 'User',
                             _isDataStale,
                           ),
@@ -236,7 +239,7 @@ class _HomePageState extends ConsumerState<HomePage>
     double horizontalPadding,
     int statsColumns,
     int quickActionsColumns,
-    bool isKaryawan,
+    bool canAddStock,
     String userName,
     bool isDataStale,
   ) {
@@ -431,7 +434,7 @@ class _HomePageState extends ConsumerState<HomePage>
                         label: 'Kontrol Perangkat',
                         onTap: () => context.go(AppRouter.cashier),
                       ),
-                      if (!isKaryawan)
+                      if (canAddStock)
                         QuickActionCard(
                           icon: Icons.add,
                           label: 'Tambah Stok',

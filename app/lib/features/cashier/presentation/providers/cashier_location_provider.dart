@@ -12,13 +12,13 @@ final salesLocationsProvider = FutureProvider<List<Location>>((ref) async {
 
 final selectedCashierLocationProvider = StateProvider<int?>((ref) => null);
 
-/// The location the cashier sells from: the picked one, else the user's branch, else the first
-/// branch they may sell at.
+/// The location the cashier sells from: the picked one, else the user's default location, else the
+/// first branch they may sell at.
 final cashierLocationProvider = Provider<Location?>((ref) {
   final locations = ref.watch(salesLocationsProvider).valueOrNull ?? const [];
   if (locations.isEmpty) return null;
   final picked = ref.watch(selectedCashierLocationProvider);
-  final own = ref.watch(authProvider.select((s) => s.user?.branchId));
+  final own = ref.watch(authProvider.select((s) => s.user?.defaultLocationId));
   for (final id in [picked, own]) {
     final match = locations.where((l) => l.id == id);
     if (match.isNotEmpty) return match.first;

@@ -21,7 +21,7 @@ class VoucherService {
     return Voucher.fromJson(response.data['voucher']);
   }
 
-  /// List all vouchers (admin / superadmin).
+  /// List all vouchers (needs vouchers.manage).
   static Future<List<Voucher>> getAll() async {
     final dio = await _dio();
     final response = await dio.get('/api/vouchers');

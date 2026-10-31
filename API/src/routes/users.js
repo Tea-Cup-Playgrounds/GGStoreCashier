@@ -1,9 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const pool = require('../db');
-const { authenticateToken, requireRole } = require('../middleware/auth');
-const { syncAssignmentsFromLegacy } = require('../services/access');
-const { assignDefaultLocationCode } = require('../services/locations');
+const { authenticateToken, requirePermission } = require('../middleware/auth');
+const { OWNER_ROLE_CODE } = require('../auth/permissions');
+const { loadAssignments, assertCanManageUser, normalizeAssignments, replaceAssignments } = require('../services/access');
+const { logAudit } = require('../services/audit');
+const { AppError, withTransaction } = require('../utils/transaction');
 
 const router = express.Router();
 
@@ -12,13 +14,12 @@ const SECURITY_PATTERNS = {
     // Prevent script injection and malicious code
     SCRIPT_INJECTION: /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
     HTML_TAGS: /<[^>]*>/g,
-    SQL_INJECTION: /(union|select|insert|update|delete|drop|create|alter|exec|execute|script|javascript|vbscript|onload|onerror|onclick)/gi,
-    XSS_PATTERNS: /(javascript:|data:|vbscript:|onload=|onerror=|onclick=|onmouseover=|onfocus=|onblur=)/gi,
-    
+    SQL_INJECTION: /(union|select|insert|update|delete|drop|create|alter|exec|execute|script|javascript|vbscript|onload|onerror|onclick)/i,
+    XSS_PATTERNS: /(javascript:|data:|vbscript:|onload=|onerror=|onclick=|onmouseover=|onfocus=|onblur=)/i,
+
     // Valid input patterns
     NAME: /^[a-zA-Z\s\-'\.]{2,50}$/,
     USERNAME: /^[a-zA-Z0-9_\-\.]{3,30}$/,
-    ROLE: /^(karyawan|admin|superadmin)$/,
 };
 
 // Password strength validation
@@ -28,7 +29,7 @@ const validatePasswordStrength = (password) => {
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumbers = /\d/.test(password);
     const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    
+
     const score = [
         password.length >= minLength,
         hasUpperCase,
@@ -36,7 +37,7 @@ const validatePasswordStrength = (password) => {
         hasNumbers,
         hasSpecialChar
     ].filter(Boolean).length;
-    
+
     return {
         isValid: score >= 3 && password.length >= minLength,
         score,
@@ -53,7 +54,7 @@ const validatePasswordStrength = (password) => {
 // Input sanitization function
 const sanitizeInput = (input) => {
     if (typeof input !== 'string') return input;
-    
+
     return input
         .replace(SECURITY_PATTERNS.SCRIPT_INJECTION, '')
         .replace(SECURITY_PATTERNS.HTML_TAGS, '')
@@ -63,530 +64,321 @@ const sanitizeInput = (input) => {
 // Validate input against malicious patterns
 const validateInput = (input) => {
     if (typeof input !== 'string') return true;
-    
+
     return !SECURITY_PATTERNS.SQL_INJECTION.test(input) &&
            !SECURITY_PATTERNS.XSS_PATTERNS.test(input) &&
            !SECURITY_PATTERNS.SCRIPT_INJECTION.test(input);
+};
+
+const checkName = (name) => {
+    const value = sanitizeInput(name);
+    if (!validateInput(value) || !SECURITY_PATTERNS.NAME.test(value)) {
+        throw new AppError('Nama harus 2–50 karakter dan hanya boleh mengandung huruf, spasi, tanda hubung, apostrof, dan titik');
+    }
+    return value;
+};
+
+const checkUsername = (username) => {
+    const value = sanitizeInput(username);
+    if (!validateInput(value) || !SECURITY_PATTERNS.USERNAME.test(value)) {
+        throw new AppError('Username harus 3–30 karakter dan hanya boleh mengandung huruf, angka, garis bawah, tanda hubung, dan titik');
+    }
+    return value;
+};
+
+const hashPassword = async (password) => {
+    const validation = validatePasswordStrength(String(password));
+    if (!validation.isValid) {
+        const error = new AppError('Password tidak memenuhi persyaratan keamanan');
+        error.passwordRequirements = validation.requirements;
+        throw error;
+    }
+    return bcrypt.hash(String(password), 12);
+};
+
+// Sends AppErrors raised outside a transaction (password requirements included).
+const sendError = (res, error, fallback) => {
+    if (error instanceof AppError) {
+        return res.status(error.status).json({
+            error: error.message,
+            ...(error.passwordRequirements ? { passwordRequirements: error.passwordRequirements } : {}),
+        });
+    }
+    console.error(`${fallback}:`, error);
+    return res.status(500).json({ error: fallback });
+};
+
+const USER_COLUMNS = 'u.id, u.name, u.username, u.is_active, u.last_active_at, u.created_at, u.updated_at';
+
+const toUser = (row, assignments) => ({
+    ...row,
+    is_active: !!row.is_active,
+    assignments: assignments.map((a) => ({
+        location_id: a.locationId,
+        location_code: a.locationCode,
+        location_name: a.locationName,
+        location_type: a.locationType,
+        role_id: a.roleId,
+        role_code: a.roleCode,
+        role_name: a.roleName,
+    })),
+});
+
+// Assignments for many users at once, keyed by user id.
+const assignmentsByUser = async (db, userIds) => {
+    const byUser = new Map(userIds.map((id) => [id, []]));
+    if (userIds.length === 0) return byUser;
+    const [rows] = await db.query(
+        `SELECT ul.user_id, ul.location_id, l.code AS location_code, l.name AS location_name, l.type AS location_type,
+                r.id AS role_id, r.code AS role_code, r.name AS role_name
+         FROM user_locations ul
+         JOIN roles r ON r.id = ul.role_id
+         LEFT JOIN locations l ON l.id = ul.location_id
+         WHERE ul.user_id IN (?)
+         ORDER BY ul.location_id IS NOT NULL, ul.location_id`,
+        [userIds]
+    );
+    for (const r of rows) {
+        byUser.get(r.user_id).push({
+            locationId: r.location_id, locationCode: r.location_code, locationName: r.location_name,
+            locationType: r.location_type, roleId: r.role_id, roleCode: r.role_code, roleName: r.role_name,
+        });
+    }
+    return byUser;
+};
+
+// users.username has no unique index (legacy schema), so uniqueness is checked here.
+const assertUsernameFree = async (db, username, exceptId = 0) => {
+    const [rows] = await db.execute('SELECT id FROM users WHERE username = ? AND id <> ?', [username, exceptId]);
+    if (rows.length > 0) throw new AppError('Username sudah digunakan');
+};
+
+// Loads a user the acting user may manage, or throws (404 / 403).
+const loadManagedUser = async (db, access, userId, { lock = false } = {}) => {
+    const [rows] = await db.execute(`SELECT ${USER_COLUMNS} FROM users u WHERE u.id = ?${lock ? ' FOR UPDATE' : ''}`, [userId]);
+    if (rows.length === 0) throw new AppError('Pengguna tidak ditemukan', 404);
+    const assignments = await loadAssignments(db, userId);
+    assertCanManageUser(access, assignments);
+    return { user: rows[0], assignments };
 };
 
 // Apply authentication to all routes
 router.use(authenticateToken);
 
 // Password strength check endpoint
-router.post('/check-password-strength', requireRole(['admin', 'superadmin']), (req, res) => {
-    try {
-        const { password } = req.body;
-        
-        if (!password) {
-            return res.status(400).json({ error: 'Password wajib diisi' });
-        }
-        
-        const validation = validatePasswordStrength(password);
-        res.json(validation);
-        
-    } catch (error) {
-        console.error('Password strength check error:', error);
-        res.status(500).json({ error: 'Gagal memeriksa kekuatan password' });
+router.post('/check-password-strength', requirePermission('users.manage'), (req, res) => {
+    const { password } = req.body;
+    if (!password) {
+        return res.status(400).json({ error: 'Password wajib diisi' });
     }
+    res.json(validatePasswordStrength(String(password)));
 });
 
-// Get all users (admin/superadmin only, with branch filtering)
-router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
+// GET /api/users?search=&location_id=&role_id=&include_inactive=true&page=1&limit=10
+// Owners see everyone. Others see non-owner users assigned to a location where they hold users.manage.
+router.get('/', requirePermission('users.manage'), async (req, res) => {
     try {
-        const { branch_id, role, search, page = 1, limit = 10 } = req.query;
-        
-        // Convert to integers immediately
-        const pageNum = parseInt(page, 10);
-        const limitNum = parseInt(limit, 10);
+        const pageNum = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limitNum = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
         const offsetNum = (pageNum - 1) * limitNum;
-        
-        let query = `
-            SELECT u.id, u.name, u.username, u.role, u.branch_id, u.last_active_at, u.created_at, u.updated_at,
-                   b.name as branch_name
-            FROM users u 
-            LEFT JOIN branches b ON u.branch_id = b.id 
-            WHERE 1=1
-        `;
+
+        const where = ['1=1'];
         const params = [];
 
-        // Admin can only see users from their own branch
-        if (req.user.role === 'admin') {
-            query += ' AND u.branch_id = ?';
-            params.push(req.user.branch_id);
-        } else if (branch_id && branch_id !== '0') {
-            // Superadmin can filter by branch
-            query += ' AND u.branch_id = ?';
-            params.push(parseInt(branch_id, 10));
+        const scope = req.access.locationsFor('users.manage');
+        if (scope !== null) {
+            if (scope.length === 0) return res.json({ users: [], pagination: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 } });
+            where.push(`EXISTS (SELECT 1 FROM user_locations s WHERE s.user_id = u.id AND s.location_id IN (${scope.map(() => '?').join(', ')}))`);
+            params.push(...scope);
+        }
+        if (!req.access.isOwner) {
+            where.push(`NOT EXISTS (SELECT 1 FROM user_locations o JOIN roles r ON r.id = o.role_id WHERE o.user_id = u.id AND r.code = ?)`);
+            params.push(OWNER_ROLE_CODE);
         }
 
-        if (role && SECURITY_PATTERNS.ROLE.test(role)) {
-            query += ' AND u.role = ?';
-            params.push(role);
+        const locationId = parseInt(req.query.location_id, 10);
+        if (locationId > 0) {
+            where.push('EXISTS (SELECT 1 FROM user_locations f WHERE f.user_id = u.id AND (f.location_id = ? OR f.location_id IS NULL))');
+            params.push(locationId);
         }
+        const roleId = parseInt(req.query.role_id, 10);
+        if (roleId > 0) {
+            where.push('EXISTS (SELECT 1 FROM user_locations f WHERE f.user_id = u.id AND f.role_id = ?)');
+            params.push(roleId);
+        }
+        if (req.query.include_inactive !== 'true') where.push('u.is_active = 1');
 
-        if (search) {
-            const sanitizedSearch = sanitizeInput(search);
-            if (validateInput(sanitizedSearch)) {
-                query += ' AND (u.name LIKE ? OR u.username LIKE ?)';
-                params.push(`%${sanitizedSearch}%`, `%${sanitizedSearch}%`);
+        if (req.query.search) {
+            const search = sanitizeInput(String(req.query.search));
+            if (validateInput(search)) {
+                where.push('(u.name LIKE ? OR u.username LIKE ?)');
+                params.push(`%${search}%`, `%${search}%`);
             }
         }
 
-        query += ' ORDER BY u.created_at DESC';
-        
-        // Use string interpolation for LIMIT/OFFSET to avoid parameter type issues
-        // These are safe since we validate and convert them to integers above
-        query += ` LIMIT ${limitNum} OFFSET ${offsetNum}`;
-        
-        console.log('Pagination params:', { pageNum, limitNum, offsetNum });
-        console.log('Query params:', params);
-
-        const [users] = await pool.execute(query, params);
-        
-        // Get total count for pagination
-        let countQuery = `
-            SELECT COUNT(*) as total
-            FROM users u 
-            WHERE 1=1
-        `;
-        const countParams = [];
-        
-        // Admin can only see users from their own branch
-        if (req.user.role === 'admin') {
-            countQuery += ' AND u.branch_id = ?';
-            countParams.push(req.user.branch_id);
-        } else if (branch_id && branch_id !== '0') {
-            countQuery += ' AND u.branch_id = ?';
-            countParams.push(parseInt(branch_id, 10));
-        }
-        
-        if (role && SECURITY_PATTERNS.ROLE.test(role)) {
-            countQuery += ' AND u.role = ?';
-            countParams.push(role);
-        }
-        
-        if (search) {
-            const sanitizedSearch = sanitizeInput(search);
-            if (validateInput(sanitizedSearch)) {
-                countQuery += ' AND (u.name LIKE ? OR u.username LIKE ?)';
-                countParams.push(`%${sanitizedSearch}%`, `%${sanitizedSearch}%`);
-            }
-        }
-        
-        const [countResult] = await pool.execute(countQuery, countParams);
-        const total = countResult[0].total;
-
-        res.json({ 
-            users,
-            pagination: {
-                page: pageNum,
-                limit: limitNum,
-                total,
-                totalPages: Math.ceil(total / limitNum)
-            }
-        });
-
-    } catch (error) {
-        console.error('Get users error:', error);
-        res.status(500).json({ error: 'Gagal mengambil data pengguna' });
-    }
-
-});
-
-// Get user by ID (admin/superadmin only)
-router.get('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
-    try {
-        const [users] = await pool.execute(
-            `SELECT u.id, u.name, u.username, u.role, u.branch_id, u.last_active_at, u.created_at, u.updated_at,
-                    b.name as branch_name
-             FROM users u 
-             LEFT JOIN branches b ON u.branch_id = b.id 
-             WHERE u.id = ?`,
-            [req.params.id]
+        const [rows] = await pool.execute(
+            `SELECT ${USER_COLUMNS} FROM users u WHERE ${where.join(' AND ')}
+             ORDER BY u.is_active DESC, u.name LIMIT ${limitNum} OFFSET ${offsetNum}`,
+            params
         );
+        const [[{ total }]] = await pool.execute(`SELECT COUNT(*) AS total FROM users u WHERE ${where.join(' AND ')}`, params);
+        const assignments = await assignmentsByUser(pool, rows.map((r) => r.id));
 
-        if (users.length === 0) {
-            return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
-        }
-
-        res.json({ user: users[0] });
-
+        res.json({
+            users: rows.map((r) => toUser(r, assignments.get(r.id))),
+            pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
+        });
     } catch (error) {
-        console.error('Get user error:', error);
-        res.status(500).json({ error: 'Gagal mengambil data pengguna' });
+        sendError(res, error, 'Gagal mengambil data pengguna');
     }
 });
 
-// Create new user (admin/superadmin only, with branch restrictions)
-router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
+router.get('/:id', requirePermission('users.manage'), async (req, res) => {
     try {
-        const { name, username, password, role, branch_id, branch_name } = req.body;
+        const { user, assignments } = await loadManagedUser(pool, req.access, parseInt(req.params.id, 10));
+        res.json({ user: toUser(user, assignments) });
+    } catch (error) {
+        sendError(res, error, 'Gagal mengambil data pengguna');
+    }
+});
 
-        // Input validation
+// Body: { name, username, password, assignments: [{ location_id, role_id }] }
+// At least one assignment is required so the new user is visible to whoever manages that location.
+router.post('/', requirePermission('users.manage'), async (req, res) => {
+    let prepared;
+    try {
+        const { name, username, password, assignments } = req.body;
         if (!name || !username || !password) {
-            return res.status(400).json({ 
-                error: 'Nama, username, dan password wajib diisi' 
-            });
+            throw new AppError('Nama, username, dan password wajib diisi');
         }
-
-        // Sanitize inputs
-        const sanitizedName = sanitizeInput(name);
-        const sanitizedUsername = sanitizeInput(username);
-        const sanitizedRole = role || 'karyawan';
-
-        // Handle branch - either use existing branch_id or create new branch from branch_name
-        let userBranchId = branch_id;
-        
-        // If branch_name is provided and no branch_id, create new branch (superadmin only)
-        if (branch_name && !branch_id) {
-            if (req.user.role !== 'superadmin') {
-                return res.status(403).json({ 
-                    error: 'Hanya superadmin yang dapat membuat cabang baru' 
-                });
-            }
-
-            const sanitizedBranchName = sanitizeInput(branch_name);
-            
-            // Check if branch with this name already exists
-            const [existingBranches] = await pool.execute(
-                'SELECT id FROM branches WHERE name = ?',
-                [sanitizedBranchName]
-            );
-
-            if (existingBranches.length > 0) {
-                userBranchId = existingBranches[0].id;
-            } else {
-                // Create new branch
-                const [branchResult] = await pool.execute(
-                    'INSERT INTO branches (name) VALUES (?)',
-                    [sanitizedBranchName]
-                );
-                userBranchId = branchResult.insertId;
-                await assignDefaultLocationCode(pool, userBranchId);
-            }
+        if (!Array.isArray(assignments) || assignments.length === 0) {
+            throw new AppError('Pengguna harus memiliki minimal satu penugasan lokasi dan role');
         }
+        prepared = {
+            name: checkName(name),
+            username: checkUsername(username),
+            passwordHash: await hashPassword(password),
+            assignments,
+        };
+    } catch (error) {
+        return sendError(res, error, 'Gagal membuat pengguna');
+    }
 
-        // Admin can only create users for their own branch
-        if (req.user.role === 'admin') {
-            userBranchId = req.user.branch_id;
-        }
-
-        // Validate inputs against malicious patterns
-        if (!validateInput(sanitizedName) || !validateInput(sanitizedUsername)) {
-            return res.status(400).json({ 
-                error: 'Input mengandung karakter yang tidak diizinkan' 
-            });
-        }
-
-        // Validate input formats
-        if (!SECURITY_PATTERNS.NAME.test(sanitizedName)) {
-            return res.status(400).json({ 
-                error: 'Nama harus 2–50 karakter dan hanya boleh mengandung huruf, spasi, tanda hubung, apostrof, dan titik' 
-            });
-        }
-
-        if (!SECURITY_PATTERNS.USERNAME.test(sanitizedUsername)) {
-            return res.status(400).json({ 
-                error: 'Username harus 3–30 karakter dan hanya boleh mengandung huruf, angka, garis bawah, tanda hubung, dan titik' 
-            });
-        }
-
-        if (!SECURITY_PATTERNS.ROLE.test(sanitizedRole)) {
-            return res.status(400).json({ 
-                error: 'Role yang dipilih tidak valid' 
-            });
-        }
-
-        // Admin cannot create superadmin or admin users
-        if (req.user.role === 'admin' && (sanitizedRole === 'superadmin' || sanitizedRole === 'admin')) {
-            return res.status(403).json({ 
-                error: 'Anda tidak memiliki izin untuk membuat pengguna admin atau superadmin' 
-            });
-        }
-
-        // Validate password strength
-        const passwordValidation = validatePasswordStrength(password);
-        if (!passwordValidation.isValid) {
-            return res.status(400).json({ 
-                error: 'Password tidak memenuhi persyaratan keamanan',
-                passwordRequirements: passwordValidation.requirements
-            });
-        }
-
-        // Check if username already exists
-        const [existingUsers] = await pool.execute(
-            'SELECT id FROM users WHERE username = ?',
-            [sanitizedUsername]
+    const result = await withTransaction(res, 'Gagal membuat pengguna', async (conn) => {
+        const normalized = await normalizeAssignments(conn, req.access, prepared.assignments);
+        await assertUsernameFree(conn, prepared.username);
+        const [insert] = await conn.execute(
+            'INSERT INTO users (name, username, password) VALUES (?, ?, ?)',
+            [prepared.name, prepared.username, prepared.passwordHash]
         );
-
-        if (existingUsers.length > 0) {
-            return res.status(400).json({ 
-                error: 'Username sudah digunakan' 
-            });
-        }
-
-        // Hash password
-        const saltRounds = 12;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-        const conn = await pool.getConnection();
-        let result;
-        try {
-            await conn.beginTransaction();
-            [result] = await conn.execute(
-                'INSERT INTO users (name, username, password, role, branch_id) VALUES (?, ?, ?, ?, ?)',
-                [sanitizedName, sanitizedUsername, hashedPassword, sanitizedRole, userBranchId || null]
-            );
-            await syncAssignmentsFromLegacy(conn, result.insertId, sanitizedRole, userBranchId || null);
-            await conn.commit();
-        } catch (err) {
-            await conn.rollback();
-            throw err;
-        } finally {
-            conn.release();
-        }
-
-        res.status(201).json({
-            message: 'Pengguna berhasil dibuat',
-            userId: result.insertId
+        await replaceAssignments(conn, req.access, insert.insertId, normalized);
+        const { user, assignments } = await loadManagedUser(conn, req.access, insert.insertId);
+        await logAudit(conn, req, {
+            action: 'create', entity: 'user', entityId: insert.insertId,
+            after: { name: user.name, username: user.username, assignments: normalized },
         });
-
-    } catch (error) {
-        console.error('Create user error:', error);
-        res.status(500).json({ error: 'Gagal membuat pengguna' });
-    }
+        return toUser(user, assignments);
+    });
+    if (result) res.status(201).json({ message: 'Pengguna berhasil dibuat', userId: result.id, user: result });
 });
 
-// Update user (admin/superadmin only, with branch restrictions)
-router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
+// Body: any of { name, username, password, is_active, assignments }.
+// assignments replaces the user's assignments at the locations the acting user manages.
+router.put('/:id', requirePermission('users.manage'), async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ error: 'ID pengguna tidak valid' });
+
+    const { name, username, password, is_active, assignments } = req.body;
+    const updates = [];
+    const params = [];
     try {
-        const userId = parseInt(req.params.id);
-        const { name, username, password, role, branch_id, branch_name } = req.body;
-
-        if (!userId || isNaN(userId)) {
-            return res.status(400).json({ error: 'ID pengguna tidak valid' });
-        }
-
-        // Check if user exists
-        const [existingUsers] = await pool.execute(
-            'SELECT id, role, branch_id FROM users WHERE id = ?',
-            [userId]
-        );
-
-        if (existingUsers.length === 0) {
-            return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
-        }
-
-        const existingUser = existingUsers[0];
-
-        // Admin can only update users from their own branch
-        if (req.user.role === 'admin' && existingUser.branch_id !== req.user.branch_id) {
-            return res.status(403).json({ error: 'Anda hanya dapat mengubah pengguna dari cabang Anda sendiri' });
-        }
-
-        // Admin cannot update superadmin or admin users
-        if (req.user.role === 'admin' && (existingUser.role === 'superadmin' || existingUser.role === 'admin')) {
-            return res.status(403).json({ error: 'Anda tidak memiliki izin untuk mengubah pengguna admin atau superadmin' });
-        }
-
-        const updates = [];
-        const params = [];
-
-        // Handle branch - either use existing branch_id or create new branch from branch_name
-        let userBranchId = branch_id;
-        
-        // If branch_name is provided and no branch_id, create new branch (superadmin only)
-        if (branch_name && !branch_id) {
-            if (req.user.role !== 'superadmin') {
-                return res.status(403).json({ 
-                    error: 'Hanya superadmin yang dapat membuat cabang baru' 
-                });
-            }
-
-            const sanitizedBranchName = sanitizeInput(branch_name);
-            
-            // Check if branch with this name already exists
-            const [existingBranches] = await pool.execute(
-                'SELECT id FROM branches WHERE name = ?',
-                [sanitizedBranchName]
-            );
-
-            if (existingBranches.length > 0) {
-                userBranchId = existingBranches[0].id;
-            } else {
-                // Create new branch
-                const [branchResult] = await pool.execute(
-                    'INSERT INTO branches (name) VALUES (?)',
-                    [sanitizedBranchName]
-                );
-                userBranchId = branchResult.insertId;
-                await assignDefaultLocationCode(pool, userBranchId);
-            }
-        }
-
-        // Validate and update name
         if (name !== undefined) {
-            const sanitizedName = sanitizeInput(name);
-            if (!validateInput(sanitizedName) || !SECURITY_PATTERNS.NAME.test(sanitizedName)) {
-                return res.status(400).json({ 
-                    error: 'Format nama tidak valid' 
-                });
-            }
             updates.push('name = ?');
-            params.push(sanitizedName);
+            params.push(checkName(name));
         }
-
-        // Validate and update username
         if (username !== undefined) {
-            const sanitizedUsername = sanitizeInput(username);
-            if (!validateInput(sanitizedUsername) || !SECURITY_PATTERNS.USERNAME.test(sanitizedUsername)) {
-                return res.status(400).json({ 
-                    error: 'Format username tidak valid' 
-                });
-            }
-
-            // Check if new username already exists (excluding current user)
-            const [duplicateUsers] = await pool.execute(
-                'SELECT id FROM users WHERE username = ? AND id != ?',
-                [sanitizedUsername, userId]
-            );
-
-            if (duplicateUsers.length > 0) {
-                return res.status(400).json({ 
-                    error: 'Username sudah digunakan' 
-                });
-            }
-
             updates.push('username = ?');
-            params.push(sanitizedUsername);
+            params.push(checkUsername(username));
         }
-
-        // Validate and update password
-        if (password !== undefined && password !== '') {
-            const passwordValidation = validatePasswordStrength(password);
-            if (!passwordValidation.isValid) {
-                return res.status(400).json({ 
-                    error: 'Password tidak memenuhi persyaratan keamanan',
-                    passwordRequirements: passwordValidation.requirements
-                });
-            }
-
-            const saltRounds = 12;
-            const hashedPassword = await bcrypt.hash(password, saltRounds);
+        if (password !== undefined && password !== null && password !== '') {
             updates.push('password = ?');
-            params.push(hashedPassword);
+            params.push(await hashPassword(password));
         }
-
-        // Validate and update role
-        if (role !== undefined) {
-            if (!SECURITY_PATTERNS.ROLE.test(role)) {
-                return res.status(400).json({ 
-                    error: 'Role yang dipilih tidak valid' 
-                });
-            }
-            
-            // Admin cannot change role to superadmin or admin
-            if (req.user.role === 'admin' && (role === 'superadmin' || role === 'admin')) {
-                return res.status(403).json({ 
-                    error: 'Anda tidak memiliki izin untuk menetapkan role admin atau superadmin' 
-                });
-            }
-            
-            updates.push('role = ?');
-            params.push(role);
+        if (is_active !== undefined) {
+            if (userId === req.user.id) throw new AppError('Anda tidak dapat menonaktifkan akun Anda sendiri');
+            updates.push('is_active = ?');
+            params.push(is_active ? 1 : 0);
         }
-
-        // Update branch_id (admin cannot change branch)
-        if (userBranchId !== undefined || branch_id !== undefined) {
-            if (req.user.role === 'admin') {
-                return res.status(403).json({ 
-                    error: 'Anda tidak memiliki izin untuk mengubah cabang pengguna' 
-                });
-            }
-            updates.push('branch_id = ?');
-            params.push(userBranchId || branch_id);
+        if (assignments !== undefined && userId === req.user.id) {
+            throw new AppError('Anda tidak dapat mengubah penugasan Anda sendiri');
         }
-
-        if (updates.length === 0) {
-            return res.status(400).json({ error: 'Tidak ada field yang valid untuk diperbarui' });
+        if (updates.length === 0 && assignments === undefined) {
+            throw new AppError('Tidak ada field yang valid untuk diperbarui');
         }
-
-        updates.push('updated_at = CURRENT_TIMESTAMP');
-        params.push(userId);
-
-        const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
-        const accessChanged = role !== undefined || userBranchId !== undefined || branch_id !== undefined;
-
-        const conn = await pool.getConnection();
-        try {
-            await conn.beginTransaction();
-            await conn.execute(query, params);
-            // Only a role/branch change rewrites the user's location assignments, so editing a
-            // name or password doesn't drop assignments made through /api/access.
-            if (accessChanged) {
-                const [[updated]] = await conn.execute('SELECT role, branch_id FROM users WHERE id = ?', [userId]);
-                await syncAssignmentsFromLegacy(conn, userId, updated.role, updated.branch_id);
-            }
-            await conn.commit();
-        } catch (err) {
-            await conn.rollback();
-            throw err;
-        } finally {
-            conn.release();
-        }
-
-        res.json({ message: 'Pengguna berhasil diperbarui' });
-
     } catch (error) {
-        console.error('Update user error:', error);
-        res.status(500).json({ error: 'Gagal memperbarui pengguna' });
+        return sendError(res, error, 'Gagal memperbarui pengguna');
     }
+
+    const result = await withTransaction(res, 'Gagal memperbarui pengguna', async (conn) => {
+        const before = await loadManagedUser(conn, req.access, userId, { lock: true });
+
+        if (username !== undefined) await assertUsernameFree(conn, params[updates.indexOf('username = ?')], userId);
+        if (updates.length > 0) {
+            await conn.execute(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, [...params, userId]);
+        }
+        if (assignments !== undefined) {
+            const normalized = await normalizeAssignments(conn, req.access, assignments);
+            await replaceAssignments(conn, req.access, userId, normalized);
+        }
+
+        const after = await loadManagedUser(conn, req.access, userId);
+        const summary = ({ user, assignments: a }) => ({
+            name: user.name, username: user.username, is_active: !!user.is_active,
+            assignments: a.map(({ locationId, roleId }) => ({ locationId, roleId })),
+        });
+        await logAudit(conn, req, {
+            action: 'update', entity: 'user', entityId: userId,
+            before: summary(before),
+            after: { ...summary(after), ...(updates.some((u) => u.startsWith('password')) ? { password_changed: true } : {}) },
+        });
+        return toUser(after.user, after.assignments);
+    });
+    if (result) res.json({ message: 'Pengguna berhasil diperbarui', user: result });
 });
 
-// Delete user (admin/superadmin only, with branch restrictions)
-router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
-    try {
-        const userId = parseInt(req.params.id);
+// Users with history (sales, stock movements, journals, ...) can't be removed without breaking
+// those records, so they are deactivated instead; users without history are deleted.
+router.delete('/:id', requirePermission('users.manage'), async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ error: 'ID pengguna tidak valid' });
+    if (userId === req.user.id) return res.status(400).json({ error: 'Anda tidak dapat menghapus akun Anda sendiri' });
 
-        if (!userId || isNaN(userId)) {
-            return res.status(400).json({ error: 'ID pengguna tidak valid' });
+    const result = await withTransaction(res, 'Gagal menghapus pengguna', async (conn) => {
+        const { user, assignments } = await loadManagedUser(conn, req.access, userId, { lock: true });
+        // A non-owner who manages only some of the user's locations removes just those assignments.
+        const scope = req.access.locationsFor('users.manage');
+        if (scope !== null && assignments.some((a) => a.locationId === null || !scope.includes(a.locationId))) {
+            await replaceAssignments(conn, req.access, userId, []);
+            await logAudit(conn, req, { action: 'unassign', entity: 'user', entityId: userId, before: { assignments } });
+            return { message: 'Penugasan pengguna di lokasi Anda telah dihapus (pengguna masih aktif di lokasi lain)', deleted: false };
         }
 
-        // Prevent self-deletion
-        if (userId === req.user.id) {
-            return res.status(400).json({ error: 'Anda tidak dapat menghapus akun Anda sendiri' });
+        // Deactivated users keep their assignments, so whoever manages them can still find and reactivate them.
+        await conn.query('SAVEPOINT before_delete');
+        try {
+            await conn.execute('DELETE FROM user_locations WHERE user_id = ?', [userId]);
+            await conn.execute('DELETE FROM users WHERE id = ?', [userId]);
+        } catch (error) {
+            if (error.code !== 'ER_ROW_IS_REFERENCED_2' && error.code !== 'ER_ROW_IS_REFERENCED') throw error;
+            await conn.query('ROLLBACK TO SAVEPOINT before_delete');
+            await conn.execute('UPDATE users SET is_active = 0 WHERE id = ?', [userId]);
+            await logAudit(conn, req, { action: 'deactivate', entity: 'user', entityId: userId, before: { name: user.name, username: user.username, assignments } });
+            return { message: 'Pengguna memiliki riwayat transaksi sehingga dinonaktifkan, bukan dihapus', deleted: false, deactivated: true };
         }
-
-        // Check if user exists
-        const [existingUsers] = await pool.execute(
-            'SELECT id, role, branch_id FROM users WHERE id = ?',
-            [userId]
-        );
-
-        if (existingUsers.length === 0) {
-            return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
-        }
-
-        const existingUser = existingUsers[0];
-
-        // Admin can only delete users from their own branch
-        if (req.user.role === 'admin' && existingUser.branch_id !== req.user.branch_id) {
-            return res.status(403).json({ error: 'Anda hanya dapat menghapus pengguna dari cabang Anda sendiri' });
-        }
-
-        // Prevent deletion of superadmin by admin
-        if (req.user.role === 'admin' && (existingUser.role === 'superadmin' || existingUser.role === 'admin')) {
-            return res.status(403).json({ error: 'Tidak dapat menghapus akun admin atau superadmin' });
-        }
-
-        await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
-
-        res.json({ message: 'Pengguna berhasil dihapus' });
-
-    } catch (error) {
-        console.error('Delete user error:', error);
-        res.status(500).json({ error: 'Gagal menghapus pengguna' });
-    }
+        await logAudit(conn, req, { action: 'delete', entity: 'user', entityId: userId, before: { name: user.name, username: user.username, assignments } });
+        return { message: 'Pengguna berhasil dihapus', deleted: true };
+    });
+    if (result) res.json(result);
 });
 
 module.exports = router;

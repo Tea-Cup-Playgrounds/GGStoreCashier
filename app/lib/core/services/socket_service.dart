@@ -33,6 +33,8 @@ class SocketService {
           .setReconnectionDelay(2000)
           .setReconnectionDelayMax(10000)
           .setReconnectionAttempts(3)
+          // The server refuses connections without a valid token (handshake auth or header).
+          .setAuth({'token': token})
           .setExtraHeaders({'Authorization': 'Bearer $token', 'ngrok-skip-browser-warning': 'true'})
           .build(),
     );
@@ -42,10 +44,9 @@ class SocketService {
       _isConnected = true;
       _currentBranchId = branchId;
 
-      // Join branch room
+      // Join the location room; the all-locations room (0) is only granted to users whose access
+      // covers every location, and the server ignores the request for anyone else.
       _socket!.emit('join-branch', branchId);
-
-      // Also join branch-0 for superadmin to receive all events
       _socket!.emit('join-branch', 0);
     });
 
@@ -67,35 +68,14 @@ class SocketService {
     _setupEventListeners();
   }
 
-  // Setup event listeners for real-time updates
+  // Events the API emits to location rooms (see API/src/server.js).
   static void _setupEventListeners() {
-    // Product events
-    _socket!.on('product-created', (data) {
-      dev.log('Product created: $data');
-      _notifyListeners('product-created', data);
-    });
-
-    _socket!.on('product-updated', (data) {
-      dev.log('Product updated: $data');
-      _notifyListeners('product-updated', data);
-    });
-
-    _socket!.on('product-deleted', (data) {
-      dev.log('Product deleted: $data');
-      _notifyListeners('product-deleted', data);
-    });
-
-    // Transaction events
-    _socket!.on('transaction-created', (data) {
-      dev.log('Transaction created: $data');
-      _notifyListeners('transaction-created', data);
-    });
-
-    // Payment events
-    _socket!.on('payment-completed', (data) {
-      dev.log('Payment completed: $data');
-      _notifyListeners('payment-completed', data);
-    });
+    for (final event in const ['sale-created', 'stock-changed']) {
+      _socket!.on(event, (data) {
+        dev.log('$event: $data');
+        _notifyListeners(event, data);
+      });
+    }
   }
 
   // Register event listener
@@ -136,7 +116,7 @@ class SocketService {
     _currentBranchId = newBranchId;
     _socket!.emit('join-branch', newBranchId);
 
-    // Also join branch-0 for superadmin
+    // All-locations room; ignored by the server unless the user's access covers every location.
     _socket!.emit('join-branch', 0);
 
     dev.log('Changed to branch: $newBranchId');

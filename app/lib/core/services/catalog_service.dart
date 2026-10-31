@@ -4,6 +4,7 @@ import 'package:http_parser/http_parser.dart';
 import '../models/access.dart';
 import '../models/catalog.dart';
 import 'api_client.dart';
+import 'auth_service.dart';
 
 export 'api_client.dart' show ApiException;
 
@@ -19,8 +20,10 @@ class CatalogService {
 
   /// Locations the user is assigned to; with [destinations], every active location
   /// (for picking a transfer destination; needs transfers.create).
+  /// Kept for offline use (per user, since the list depends on their assignments).
   static Future<List<Location>> getLocations({String? type, bool destinations = false}) async {
-    final body = await ApiClient.request('GET', '/api/locations', query: {
+    final user = (await AuthService.getCurrentUser())?.id;
+    final body = await ApiClient.getCached('/api/locations', 'locations:u$user:${type ?? 'all'}:$destinations', query: {
       if (type != null) 'type': type,
       if (destinations) 'scope': 'destinations',
     });
@@ -29,13 +32,23 @@ class CatalogService {
 
   // ── catalog ───────────────────────────────────────────────────────────────
 
+  /// True when the last [getProducts] call answered from the offline copy.
+  static bool lastFromCache = false;
+
+  /// The unfiltered list at a location is kept for offline selling; check [lastFromCache] after calling.
   static Future<List<CatalogProduct>> getProducts({int? locationId, String? search, int? categoryId}) async {
-    final body = await ApiClient.request('GET', '/api/catalog/products', query: {
+    final query = <String, dynamic>{
       'limit': 200,
       if (locationId != null) 'location_id': locationId,
       if (search != null && search.isNotEmpty) 'search': search,
       if (categoryId != null) 'category_id': categoryId,
-    });
+    };
+    final cacheable = (search == null || search.isEmpty) && categoryId == null;
+    final user = (await AuthService.getCurrentUser())?.id;
+    final body = cacheable
+        ? await ApiClient.getCached('/api/catalog/products', 'catalog:u$user:l${locationId ?? 'all'}', query: query)
+        : await ApiClient.request('GET', '/api/catalog/products', query: query);
+    lastFromCache = cacheable && ApiClient.lastFromCache;
     return ApiClient.list(body, 'products', CatalogProduct.fromJson);
   }
 

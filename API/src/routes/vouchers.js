@@ -1,12 +1,12 @@
 const express = require('express');
 const pool = require('../db');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 router.use(authenticateToken);
 
-// ── GET /api/vouchers — list all (admin + superadmin) ─────────────────────────
-router.get('/', requireRole(['admin', 'superadmin']), async (req, res) => {
+// ── GET /api/vouchers — list all (vouchers.manage) ─────────────────────────
+router.get('/', requirePermission('vouchers.manage'), async (req, res) => {
     try {
         const [rows] = await pool.execute(
             'SELECT * FROM vouchers ORDER BY created_at DESC'
@@ -45,8 +45,8 @@ router.get('/validate/:code', async (req, res) => {
     }
 });
 
-// ── POST /api/vouchers — create (admin + superadmin) ─────────────────────────
-router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
+// ── POST /api/vouchers — create (vouchers.manage) ─────────────────────────
+router.post('/', requirePermission('vouchers.manage'), async (req, res) => {
     try {
         const {
             code, description,
@@ -95,8 +95,8 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
     }
 });
 
-// ── PUT /api/vouchers/:id — update (admin + superadmin) ──────────────────────
-router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
+// ── PUT /api/vouchers/:id — update (vouchers.manage) ───────────────────────────
+router.put('/:id', requirePermission('vouchers.manage'), async (req, res) => {
     try {
         const {
             code, description,
@@ -144,8 +144,8 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
     }
 });
 
-// ── DELETE /api/vouchers/:id — delete (admin + superadmin) ───────────────────
-router.delete('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
+// ── DELETE /api/vouchers/:id — delete (vouchers.manage) ────────────────────
+router.delete('/:id', requirePermission('vouchers.manage'), async (req, res) => {
     try {
         const [result] = await pool.execute(
             'DELETE FROM vouchers WHERE id = ?',

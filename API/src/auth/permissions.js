@@ -6,6 +6,7 @@ const PERMISSIONS = {
     'sales.void': { group: 'sales', description: 'Membatalkan transaksi' },
     'sales.discount_override': { group: 'sales', description: 'Memberi diskon di luar batas' },
     'sales.price_override': { group: 'sales', description: 'Menjual di bawah harga minimum' },
+    'vouchers.manage': { group: 'sales', description: 'Mengelola voucher diskon' },
 
     'cash_session.open': { group: 'cash_session', description: 'Membuka shift kasir' },
     'cash_session.close': { group: 'cash_session', description: 'Menutup shift kasir' },

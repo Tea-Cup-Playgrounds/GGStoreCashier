@@ -31,6 +31,16 @@ class AccessAssignment {
       permissions: ((json['permissions'] as List?) ?? const []).map((p) => p.toString()).toSet(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'locationId': locationId,
+        'locationName': locationName,
+        'locationType': locationType,
+        'roleId': roleId,
+        'roleCode': roleCode,
+        'roleName': roleName,
+        'permissions': permissions.toList(),
+      };
 }
 
 class UserAccess {
@@ -48,6 +58,27 @@ class UserAccess {
           .map((a) => AccessAssignment.fromJson(Map<String, dynamic>.from(a as Map)))
           .toList(),
     );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'isOwner': isOwner,
+        'assignments': assignments.map((a) => a.toJson()).toList(),
+      };
+
+  /// The location the user normally works at: their first branch, else their first location of any
+  /// type; null for users who only have global (every-location) assignments.
+  int? get defaultLocationId {
+    final located = assignments.where((a) => a.locationId != null);
+    final branch = located.where((a) => a.locationType == 'branch');
+    if (branch.isNotEmpty) return branch.first.locationId;
+    return located.isEmpty ? null : located.first.locationId;
+  }
+
+  /// Role names for display, e.g. "Branch Manager · Cashier".
+  String get roleLabel {
+    if (isOwner) return 'Owner';
+    final names = assignments.map((a) => a.roleName).toSet();
+    return names.isEmpty ? 'Tanpa akses' : names.join(' · ');
   }
 
   /// With [locationId]: may the user do this there? Without: anywhere?

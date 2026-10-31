@@ -7,12 +7,12 @@ import 'package:gg_store_cashier/core/provider/auth_provider.dart';
 /// [effectiveInventoryLocationProvider] to read it with the default applied.
 final selectedInventoryLocationProvider = StateProvider<int?>((ref) => null);
 
-/// Selected location, defaulting to the user's own branch, then the first visible location.
+/// Selected location, defaulting to the user's default location, then the first visible location.
 final effectiveInventoryLocationProvider = Provider<Location?>((ref) {
   final locations = ref.watch(stockLocationsProvider).valueOrNull ?? const [];
   if (locations.isEmpty) return null;
   final selected = ref.watch(selectedInventoryLocationProvider);
-  final ownBranch = ref.watch(authProvider.select((s) => s.user?.branchId));
+  final ownBranch = ref.watch(authProvider.select((s) => s.user?.defaultLocationId));
   for (final id in [selected, ownBranch]) {
     if (id == null) continue;
     final match = locations.where((l) => l.id == id);

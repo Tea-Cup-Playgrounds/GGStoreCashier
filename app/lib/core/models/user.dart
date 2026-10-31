@@ -1,11 +1,15 @@
 import 'dart:developer' as dev;
 
+import 'access.dart';
+
 class User {
   final int id;
   final String name;
   final String username;
-  final String role;
-  final int? branchId;
+
+  /// Per-location roles and permissions from login (refreshed by accessProvider). Stored with the
+  /// user so the app knows what the user may do while offline.
+  final UserAccess access;
   final DateTime? lastActiveAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -14,8 +18,7 @@ class User {
     required this.id,
     required this.name,
     required this.username,
-    required this.role,
-    this.branchId,
+    this.access = UserAccess.empty,
     this.lastActiveAt,
     required this.createdAt,
     required this.updatedAt,
@@ -27,8 +30,9 @@ class User {
         id: _parseInt(json['id']),
         name: _parseString(json['name']) ?? 'Unknown',
         username: _parseString(json['username']) ?? 'unknown',
-        role: _parseString(json['role']) ?? 'karyawan',
-        branchId: _parseNullableInt(json['branch_id'] ?? json['branchId']),
+        access: json['access'] is Map
+            ? UserAccess.fromJson(Map<String, dynamic>.from(json['access'] as Map))
+            : UserAccess.empty,
         lastActiveAt: _parseDateTime(json['last_active_at'] ?? json['lastActiveAt']),
         createdAt: _parseDateTime(json['created_at'] ?? json['createdAt']) ?? DateTime.now(),
         updatedAt: _parseDateTime(json['updated_at'] ?? json['updatedAt']) ?? DateTime.now(),
@@ -46,13 +50,6 @@ class User {
     if (value is int) return value;
     if (value is String) return int.tryParse(value) ?? 0;
     return 0;
-  }
-
-  static int? _parseNullableInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is String) return int.tryParse(value);
-    return null;
   }
 
   static String? _parseString(dynamic value) {
@@ -79,8 +76,7 @@ class User {
       'id': id,
       'name': name,
       'username': username,
-      'role': role,
-      'branch_id': branchId,
+      'access': access.toJson(),
       'last_active_at': lastActiveAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -91,8 +87,7 @@ class User {
     int? id,
     String? name,
     String? username,
-    String? role,
-    int? branchId,
+    UserAccess? access,
     DateTime? lastActiveAt,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -101,15 +96,15 @@ class User {
       id: id ?? this.id,
       name: name ?? this.name,
       username: username ?? this.username,
-      role: role ?? this.role,
-      branchId: branchId ?? this.branchId,
+      access: access ?? this.access,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
-  bool get isSuperAdmin => role == 'superadmin';
-  bool get isAdmin => role == 'admin';
-  bool get isEmployee => role == 'karyawan';
+  bool get isOwner => access.isOwner;
+
+  /// The location the user normally works at (see [UserAccess.defaultLocationId]).
+  int? get defaultLocationId => access.defaultLocationId;
 }

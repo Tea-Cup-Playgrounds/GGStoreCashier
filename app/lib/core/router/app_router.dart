@@ -17,7 +17,7 @@ import 'package:gg_store_cashier/features/settings/presentation/pages/appearance
 import 'package:gg_store_cashier/features/inventory/presentation/pages/category_form_page.dart';
 import 'package:gg_store_cashier/features/cashier/presentation/pages/coupon_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/branch_edit_page.dart';
-import 'package:gg_store_cashier/features/users/presentation/pages/user_management_router_page.dart';
+import 'package:gg_store_cashier/features/users/presentation/pages/user_management_page.dart';
 import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_management_page.dart';
 import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_form_page.dart';
 import 'package:gg_store_cashier/core/models/voucher.dart';
@@ -129,7 +129,7 @@ mixin AppRouter {
         path: userManagement,
         name: 'userManagement',
         pageBuilder: (context, state) =>
-            TransitionFactory.getSlideBuilder(context: context, state: state, child: const UserManagementRouterPage()),
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const UserManagementPage()),
       ),
       GoRoute(
         path: branchEdit,

@@ -1,13 +1,7 @@
 const { PERMISSIONS, OWNER_ROLE_CODE } = require('../auth/permissions');
+const { AppError } = require('../utils/transaction');
 
 const ALL_PERMISSIONS = Object.keys(PERMISSIONS);
-
-// Legacy users.role <-> system role codes. Kept until the cleanup step removes users.role.
-const LEGACY_ROLE_TO_CODE = {
-    superadmin: OWNER_ROLE_CODE,
-    admin: 'branch_manager',
-    karyawan: 'cashier',
-};
 
 // What a user may do, built from their user_locations rows. An assignment with
 // locationId === null applies at every location.
@@ -33,6 +27,17 @@ class Access {
         const matching = this.assignments.filter((a) => a.permissions.has(permission));
         if (matching.some((a) => a.locationId === null)) return null;
         return [...new Set(matching.map((a) => a.locationId))];
+    }
+
+    // Union of locationsFor() over several permissions: null if any of them covers every location.
+    locationsForAny(...permissions) {
+        const ids = new Set();
+        for (const permission of permissions) {
+            const scope = this.locationsFor(permission);
+            if (scope === null) return null;
+            scope.forEach((id) => ids.add(id));
+        }
+        return [...ids];
     }
 
     toJSON() {
@@ -86,62 +91,125 @@ const loadAccess = async (db, userId) => {
     return new Access([...byLocation.values()]);
 };
 
-const getRoleIdByCode = async (db, code) => {
-    const [rows] = await db.execute('SELECT id FROM roles WHERE code = ?', [code]);
-    if (rows.length === 0) throw new Error(`System role "${code}" is missing; run npm run migrate`);
-    return rows[0].id;
-};
+// ── Assignment management (used by /api/users and /api/access) ───────────────
 
-// Called after the legacy /api/users endpoints change a user's role or branch: replaces the
-// user's assignments with the single assignment that role/branch implies.
-const syncAssignmentsFromLegacy = async (db, userId, legacyRole, branchId) => {
-    const roleId = await getRoleIdByCode(db, LEGACY_ROLE_TO_CODE[legacyRole] || 'cashier');
-
-    await db.execute('DELETE FROM user_locations WHERE user_id = ?', [userId]);
-    if (legacyRole === 'superadmin') {
-        await db.execute('INSERT INTO user_locations (user_id, location_id, role_id) VALUES (?, NULL, ?)', [userId, roleId]);
-    } else if (branchId) {
-        await db.execute('INSERT INTO user_locations (user_id, location_id, role_id) VALUES (?, ?, ?)', [userId, branchId, roleId]);
-    }
-};
-
-// Called after assignments change through /api/access: recomputes users.role / users.branch_id
-// so routes that still use requireRole() and filterByBranch see a consistent picture.
-const syncLegacyFromAssignments = async (db, userId) => {
+// A user's assignments with location and role names, including inactive locations.
+const loadAssignments = async (db, userId) => {
     const [rows] = await db.execute(
-        `SELECT ul.location_id, l.type AS location_type, r.code AS role_code
+        `SELECT ul.location_id, l.code AS location_code, l.name AS location_name, l.type AS location_type,
+                r.id AS role_id, r.code AS role_code, r.name AS role_name
          FROM user_locations ul
          JOIN roles r ON r.id = ul.role_id
          LEFT JOIN locations l ON l.id = ul.location_id
          WHERE ul.user_id = ?
-         ORDER BY ul.location_id`,
+         ORDER BY ul.location_id IS NOT NULL, ul.location_id`,
         [userId]
     );
+    return rows.map((r) => ({
+        locationId: r.location_id,
+        locationCode: r.location_code,
+        locationName: r.location_name,
+        locationType: r.location_type,
+        roleId: r.role_id,
+        roleCode: r.role_code,
+        roleName: r.role_name,
+    }));
+};
 
-    let role = 'karyawan';
-    let branchId = null;
+// Non-owners only see and change assignments at locations where they hold users.manage.
+const inScope = (scope, locationId) => scope === null || (locationId !== null && scope.includes(locationId));
 
-    if (rows.some((r) => r.role_code === OWNER_ROLE_CODE)) {
-        role = 'superadmin';
+// Throws unless the acting user may manage a user with these assignments: owners manage everyone;
+// others only non-owners who have at least one assignment at a location they manage.
+const assertCanManageUser = (access, assignments) => {
+    if (access.isOwner) return;
+    if (assignments.some((a) => a.roleCode === OWNER_ROLE_CODE)) {
+        throw new AppError('Anda tidak dapat mengelola pengguna owner', 403);
+    }
+    const scope = access.locationsFor('users.manage');
+    if (scope !== null && !assignments.some((a) => inScope(scope, a.locationId))) {
+        throw new AppError('Pengguna ini tidak berada di lokasi Anda', 403);
+    }
+};
+
+// Checks requested assignments ([{ location_id: number|null, role_id }]) against what the acting
+// user may grant and returns them as [{ locationId, roleId }]. location_id null = every location.
+const normalizeAssignments = async (db, access, requested) => {
+    if (!Array.isArray(requested)) throw new AppError('assignments harus berupa array');
+
+    const [roleRows] = await db.execute(
+        `SELECT r.id, r.code, GROUP_CONCAT(rp.permission) AS permissions
+         FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id
+         GROUP BY r.id`
+    );
+    const roles = new Map(roleRows.map((r) => [r.id, { code: r.code, permissions: r.permissions ? r.permissions.split(',') : [] }]));
+
+    const [locationRows] = await db.execute('SELECT id FROM locations WHERE is_active = 1 AND deleted_at IS NULL');
+    const activeLocations = new Set(locationRows.map((l) => l.id));
+    const scope = access.locationsFor('users.manage');
+
+    const seenLocations = new Set();
+    const normalized = [];
+    for (const item of requested) {
+        const locationId = item.location_id === null || item.location_id === undefined ? null : Number(item.location_id);
+        const roleId = Number(item.role_id);
+        const role = roles.get(roleId);
+
+        if (!role) throw new AppError(`Role ${item.role_id} tidak ditemukan`);
+        if (locationId !== null && !activeLocations.has(locationId)) {
+            throw new AppError(`Lokasi ${item.location_id} tidak ditemukan atau tidak aktif`);
+        }
+        const key = locationId === null ? 'all' : locationId;
+        if (seenLocations.has(key)) throw new AppError('Satu lokasi hanya boleh memiliki satu role per pengguna');
+        seenLocations.add(key);
+
+        if (role.code === OWNER_ROLE_CODE && locationId !== null) {
+            throw new AppError('Role owner berlaku untuk semua lokasi (location_id harus null)');
+        }
+        if (!access.isOwner) {
+            if (role.code === OWNER_ROLE_CODE || locationId === null) {
+                throw new AppError('Hanya owner yang dapat memberikan akses ke semua lokasi', 403);
+            }
+            if (!inScope(scope, locationId)) {
+                throw new AppError(`Anda tidak mengelola pengguna di lokasi ${locationId}`, 403);
+            }
+            const notHeld = role.permissions.filter((p) => !access.can(p, locationId));
+            if (notHeld.length > 0) {
+                throw new AppError(`Role ini memiliki izin yang tidak Anda miliki di lokasi tersebut: ${notHeld.join(', ')}`, 403);
+            }
+        }
+        normalized.push({ locationId, roleId });
+    }
+    return normalized;
+};
+
+// Replaces the assignments the acting user controls with `normalized`. A non-owner's change
+// leaves assignments outside their locations (and global ones) untouched.
+const replaceAssignments = async (db, access, userId, normalized) => {
+    if (access.isOwner) {
+        await db.execute('DELETE FROM user_locations WHERE user_id = ?', [userId]);
     } else {
-        const located = rows.filter((r) => r.location_id !== null);
-        const manager = located.find((r) => r.role_code === 'branch_manager' && r.location_type === 'branch');
-        const firstBranch = located.find((r) => r.location_type === 'branch');
-        if (manager) {
-            role = 'admin';
-            branchId = manager.location_id;
+        const scope = access.locationsFor('users.manage');
+        if (scope === null) {
+            await db.execute('DELETE FROM user_locations WHERE user_id = ? AND location_id IS NOT NULL', [userId]);
         } else {
-            branchId = (firstBranch || located[0] || {}).location_id ?? null;
+            for (const locationId of scope) {
+                await db.execute('DELETE FROM user_locations WHERE user_id = ? AND location_id = ?', [userId, locationId]);
+            }
         }
     }
-
-    await db.execute('UPDATE users SET role = ?, branch_id = ? WHERE id = ?', [role, branchId, userId]);
+    for (const a of normalized) {
+        await db.execute('INSERT INTO user_locations (user_id, location_id, role_id) VALUES (?, ?, ?)', [userId, a.locationId, a.roleId]);
+    }
 };
 
 module.exports = {
     Access,
     ALL_PERMISSIONS,
     loadAccess,
-    syncAssignmentsFromLegacy,
-    syncLegacyFromAssignments,
+    loadAssignments,
+    inScope,
+    assertCanManageUser,
+    normalizeAssignments,
+    replaceAssignments,
 };

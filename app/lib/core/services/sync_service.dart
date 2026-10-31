@@ -1,9 +1,18 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:gg_store_cashier/core/services/offline_queue.dart';
 import 'package:gg_store_cashier/core/services/pending_operations_queue.dart';
 import 'package:gg_store_cashier/core/services/auth_service.dart';
 import 'package:gg_store_cashier/core/config/api_config.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
+
+/// Thrown to stop a sync run without counting an attempt against the item: the server couldn't be
+/// reached, or asked us to slow down (429). [retryAfter] is set for the latter.
+class _SyncPaused implements Exception {
+  final Duration? retryAfter;
+  const _SyncPaused([this.retryAfter]);
+}
 
 class SyncService {
   static final _dio = Dio(BaseOptions(
@@ -13,10 +22,35 @@ class SyncService {
     headers: ApiConfig.defaultHeaders,
   ));
 
-  /// Syncs all pending items: generic operations first, then transactions.
+  static bool _running = false;
+  static Timer? _retryTimer;
+
+  /// Syncs all pending items: generic operations first, then transactions. Runs one at a time;
+  /// when the server rate-limits, it stops and tries again after the server's Retry-After.
   static Future<void> syncAll() async {
-    await _syncPendingOperations();
-    await _syncTransactions();
+    if (_running) return;
+    _running = true;
+    _retryTimer?.cancel();
+    try {
+      await _syncPendingOperations();
+      await _syncTransactions();
+    } on _SyncPaused catch (pause) {
+      if (pause.retryAfter != null) _retryTimer = Timer(pause.retryAfter!, syncAll);
+    } finally {
+      _running = false;
+    }
+  }
+
+  /// Rethrows network failures and 429s as [_SyncPaused]; other errors (the server rejected the
+  /// item) are left to the caller, which counts them as a failed attempt.
+  static void _pauseIfTransient(Object error) {
+    if (error is! DioException) return;
+    final status = error.response?.statusCode;
+    if (status == 429) {
+      final seconds = int.tryParse(error.response?.headers.value('retry-after') ?? '') ?? 30;
+      throw _SyncPaused(Duration(seconds: seconds.clamp(1, 300)));
+    }
+    if (error.response == null) throw const _SyncPaused();
   }
 
   // ── Generic pending operations (branch edits, user CRUD) ──────────────────
@@ -53,7 +87,8 @@ class SyncService {
 
       await PendingOperationsQueue.remove(op.id);
       SnackBarService.show('${op.description} berhasil disinkronkan');
-    } catch (_) {
+    } catch (e) {
+      _pauseIfTransient(e);
       op.retryCount += 1;
       if (op.retryCount >= 3) {
         await PendingOperationsQueue.markFailed(op.id);
@@ -91,7 +126,8 @@ class SyncService {
 
       await OfflineQueue.remove(entry.uuid);
       SnackBarService.show('Transaksi berhasil disinkronkan');
-    } catch (_) {
+    } catch (e) {
+      _pauseIfTransient(e);
       entry.retryCount += 1;
       if (entry.retryCount >= 3) {
         await OfflineQueue.markFailed(entry.uuid);

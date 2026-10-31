@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../config/api_config.dart';
 import 'auth_service.dart';
+import 'cache_manager.dart';
 
 /// Thrown with the API's own error message (Indonesian, user-facing).
 class ApiException implements Exception {
@@ -48,6 +49,26 @@ class ApiClient {
               ? 'Tidak dapat terhubung ke server'
               : 'Terjadi kesalahan (${e.response?.statusCode ?? e.type.name})';
       throw ApiException(message, e.response?.statusCode);
+    }
+  }
+
+  /// True when the last [getCached] call answered from the stored copy.
+  static bool lastFromCache = false;
+
+  /// GET that keeps the response for offline use: when the server can't be reached, the last stored
+  /// copy under [cacheKey] is returned instead (and [lastFromCache] is set). Errors the server
+  /// answered with (403, 404, ...) are still thrown.
+  static Future<Map<String, dynamic>> getCached(String path, String cacheKey, {Map<String, dynamic>? query}) async {
+    lastFromCache = false;
+    try {
+      final body = await request('GET', path, query: query);
+      await CacheManager.put(cacheKey, body, ttl: const Duration(days: 30));
+      return body;
+    } on ApiException catch (e) {
+      final cached = e.statusCode == null ? CacheManager.get(cacheKey) : null;
+      if (cached == null) rethrow;
+      lastFromCache = true;
+      return Map<String, dynamic>.from(cached.data as Map);
     }
   }
 

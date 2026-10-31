@@ -39,7 +39,7 @@ class Product {
     this.isSerialized = false,
   });
 
-  /// One catalog variant as seen at a location (id = variant id, like the legacy /api/products rows).
+  /// One catalog variant as seen at a location (id = variant id).
   factory Product.fromCatalog(CatalogProduct p, ProductVariant v, {int? locationId}) {
     final now = DateTime.now();
     return Product(

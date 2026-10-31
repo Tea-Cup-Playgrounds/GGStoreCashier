@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/helper/date_formatter.dart';
 import '../../../../shared/widgets/custom_button.dart';
+import '../providers/user_management_provider.dart';
 
 class UserListItem extends StatelessWidget {
   final Map<String, dynamic> user;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
-  final bool isSuperAdmin;
   final Widget? trailing;
 
   const UserListItem({
@@ -15,33 +15,8 @@ class UserListItem extends StatelessWidget {
     required this.user,
     this.onEdit,
     this.onDelete,
-    this.isSuperAdmin = false,
     this.trailing,
   });
-
-  Color _getRoleColor(String role) {
-    switch (role.toLowerCase()) {
-      case 'superadmin':
-        return AppTheme.gold;
-      case 'admin':
-        return AppTheme.success;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _formatRole(String role) {
-    switch (role.toLowerCase()) {
-      case 'superadmin':
-        return 'Super Admin';
-      case 'admin':
-        return 'Admin';
-      case 'karyawan':
-        return 'Karyawan';
-      default:
-        return role;
-    }
-  }
 
   String _formatLastActive(dynamic lastActive) {
     if (lastActive == null || lastActive.toString().isEmpty) {
@@ -88,7 +63,7 @@ class UserListItem extends StatelessWidget {
         Expanded(child: _buildRoleBadge(context)),
         const SizedBox(width: 20),
         Expanded(
-          child: Text(user['branch_name']?.toString() ?? 'Tidak ada cabang',
+          child: Text(user['branch_name']?.toString() ?? 'Tidak ada lokasi',
               style: Theme.of(context).textTheme.bodyMedium),
         ),
         const SizedBox(width: 20),
@@ -151,7 +126,7 @@ class UserListItem extends StatelessWidget {
                           .bodySmall
                           ?.copyWith(color: cs.onSurface.withValues(alpha: 0.5), fontSize: 11)),
                   const SizedBox(height: 2),
-                  Text(user['branch_name']?.toString() ?? 'Tidak ada cabang',
+                  Text(user['branch_name']?.toString() ?? 'Tidak ada lokasi',
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
@@ -238,8 +213,7 @@ class UserListItem extends StatelessWidget {
   }
 
   Widget _buildRoleBadge(BuildContext context) {
-    final roleStr = user['role']?.toString() ?? '';
-    final color = _getRoleColor(roleStr);
+    final color = roleColor(user['role_code']?.toString());
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -248,7 +222,7 @@ class UserListItem extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
-        _formatRole(roleStr),
+        user['role_label']?.toString() ?? '',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w500, fontSize: 11),
       ),
     );

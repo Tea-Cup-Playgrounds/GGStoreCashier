@@ -1,11 +1,52 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/models/catalog.dart';
+import '../../../../core/services/api_client.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/cache_manager.dart';
+import '../../../../core/services/catalog_service.dart';
 import '../../../../core/services/connectivity_monitor.dart';
 import '../../../../core/services/pending_operations_queue.dart';
+import '../../../../core/theme/app_theme.dart';
+
+/// A role from /api/access/roles, as offered in the user form.
+class AssignableRole {
+  final int id;
+  final String code;
+  final String name;
+
+  const AssignableRole({required this.id, required this.code, required this.name});
+
+  bool get isOwner => code == 'owner';
+}
+
+/// Roles that can be assigned (the API still checks the acting user may grant each one).
+final assignableRolesProvider = FutureProvider<List<AssignableRole>>((ref) async {
+  final body = await ApiClient.request('GET', '/api/access/roles');
+  return ApiClient.list(
+    body,
+    'roles',
+    (r) => AssignableRole(id: r['id'] as int, code: r['code']?.toString() ?? '', name: r['name']?.toString() ?? ''),
+  );
+});
+
+/// Locations the acting user can assign people to (their own; every location for owners).
+final assignableLocationsProvider = FutureProvider<List<Location>>((ref) => CatalogService.getLocations());
+
+/// Badge colour for a role code.
+Color roleColor(String? code) {
+  switch (code) {
+    case 'owner':
+      return AppTheme.gold;
+    case 'branch_manager':
+      return AppTheme.success;
+    default:
+      return Colors.grey;
+  }
+}
 
 class UserManagementState {
   final List<Map<String, dynamic>> users;
@@ -15,8 +56,8 @@ class UserManagementState {
   final int currentPage;
   final int totalPages;
   final String? searchQuery;
-  final String? roleFilter;
-  final String? branchFilter;
+  final int? roleFilter;
+  final int? locationFilter;
 
   const UserManagementState({
     this.users = const [],
@@ -27,7 +68,7 @@ class UserManagementState {
     this.totalPages = 1,
     this.searchQuery,
     this.roleFilter,
-    this.branchFilter,
+    this.locationFilter,
   });
 
   UserManagementState copyWith({
@@ -38,8 +79,8 @@ class UserManagementState {
     int? currentPage,
     int? totalPages,
     String? searchQuery,
-    String? roleFilter,
-    String? branchFilter,
+    int? Function()? roleFilter,
+    int? Function()? locationFilter,
   }) {
     return UserManagementState(
       users: users ?? this.users,
@@ -49,8 +90,8 @@ class UserManagementState {
       currentPage: currentPage ?? this.currentPage,
       totalPages: totalPages ?? this.totalPages,
       searchQuery: searchQuery ?? this.searchQuery,
-      roleFilter: roleFilter ?? this.roleFilter,
-      branchFilter: branchFilter ?? this.branchFilter,
+      roleFilter: roleFilter != null ? roleFilter() : this.roleFilter,
+      locationFilter: locationFilter != null ? locationFilter() : this.locationFilter,
     );
   }
 }
@@ -82,72 +123,63 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
   bool get _isOffline =>
       ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
 
-  Future<void> loadUsers({int page = 1, int limit = 10}) async {
-    const cacheKey = 'users:list';
+  /// Adds display fields derived from `assignments`: role_label, role_code (the first role, for the
+  /// badge colour) and branch_name (assigned locations).
+  static Map<String, dynamic> withLabels(Map<String, dynamic> user) {
+    final assignments = ((user['assignments'] as List?) ?? const [])
+        .map((a) => Map<String, dynamic>.from(a as Map))
+        .toList();
+    final roles = assignments.map((a) => a['role_name']?.toString() ?? '').where((n) => n.isNotEmpty).toSet();
+    final places = assignments.map((a) => a['location_id'] == null ? 'Semua lokasi' : a['location_name']?.toString() ?? '').toSet();
+    return {
+      ...user,
+      'assignments': assignments,
+      'role_label': roles.isEmpty ? 'Tanpa akses' : roles.join(' · '),
+      'role_code': assignments.isEmpty ? null : assignments.first['role_code'],
+      'branch_name': places.isEmpty ? 'Tidak ada lokasi' : places.join(', '),
+    };
+  }
+
+  Future<void> loadUsers({int page = 1, int limit = 50}) async {
+    // Cached per signed-in user: what a manager may see differs from what an owner sees.
+    final cacheKey = 'users:list:u${(await AuthService.getCurrentUser())?.id}';
 
     final noFilters = (state.searchQuery == null || state.searchQuery!.isEmpty) &&
         state.roleFilter == null &&
-        state.branchFilter == null;
+        state.locationFilter == null;
 
     try {
       state = state.copyWith(isLoading: true, error: null);
 
-      // Cache hit — only when no filters are active
-      if (noFilters && CacheManager.isValid(cacheKey)) {
-        final entry = CacheManager.get(cacheKey);
-        if (entry != null) {
-          final users = (entry.data as List)
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
-          state = state.copyWith(users: users, isLoading: false, isStale: entry.isStale);
-          return;
-        }
-      }
-
       final queryParams = <String, dynamic>{'page': page, 'limit': limit};
       if (state.searchQuery?.isNotEmpty == true) queryParams['search'] = state.searchQuery;
-      if (state.roleFilter != null) queryParams['role'] = state.roleFilter;
-      if (state.branchFilter != null) queryParams['branch_id'] = state.branchFilter;
+      if (state.roleFilter != null) queryParams['role_id'] = state.roleFilter;
+      if (state.locationFilter != null) queryParams['location_id'] = state.locationFilter;
 
       final response = await _dio.get('/api/users', queryParameters: queryParams);
+      final data = response.data;
+      final users = List<Map<String, dynamic>>.from(data['users'] ?? []).map(withLabels).toList();
+      final pagination = data['pagination'] ?? {};
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        final users = List<Map<String, dynamic>>.from(data['users'] ?? []);
-        final pagination = data['pagination'] ?? {};
+      if (noFilters) await CacheManager.put(cacheKey, users);
 
-        if (noFilters) {
-          await CacheManager.put(cacheKey, users);
-        }
-
-        state = state.copyWith(
-          users: users,
-          isLoading: false,
-          isStale: false,
-          currentPage: pagination['page'] ?? 1,
-          totalPages: pagination['totalPages'] ?? 1,
-        );
-      } else {
-        state = state.copyWith(isLoading: false, error: 'Gagal memuat pengguna');
-      }
+      state = state.copyWith(
+        users: users,
+        isLoading: false,
+        isStale: false,
+        currentPage: pagination['page'] ?? 1,
+        totalPages: pagination['totalPages'] ?? 1,
+      );
     } catch (e) {
-      if (e is DioException && noFilters) {
+      if (e is DioException && e.response == null && noFilters) {
         final entry = CacheManager.get(cacheKey);
         if (entry != null) {
-          entry.isStale = true;
-          await entry.save();
-          final users = (entry.data as List)
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
+          final users = (entry.data as List).map((e) => withLabels(Map<String, dynamic>.from(e as Map))).toList();
           state = state.copyWith(users: users, isLoading: false, isStale: true);
           return;
         }
-        // No cache — check if offline and give a friendly message
         if (_isOffline) {
-          state = state.copyWith(
-            isLoading: false,
-            error: 'Kamu sedang offline dan belum ada data tersimpan.',
-          );
+          state = state.copyWith(isLoading: false, error: 'Kamu sedang offline dan belum ada data tersimpan.');
           return;
         }
       }
@@ -155,7 +187,8 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     }
   }
 
-  /// Creates a user. When offline, queues the operation and adds optimistically to local state.
+  /// Creates a user. Body: name, username, password, assignments [{location_id, role_id}].
+  /// When offline, queues the operation and shows the user as pending.
   Future<void> createUser(Map<String, dynamic> userData) async {
     if (_isOffline) {
       final op = PendingOperation()
@@ -169,25 +202,27 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
         ..description = 'Tambah pengguna';
       await PendingOperationsQueue.enqueue(op);
 
-      // Optimistic local update
-      final optimistic = Map<String, dynamic>.from(userData)
-        ..['id'] = op.id
-        ..['_pending'] = true;
-      final updated = [...state.users, optimistic];
-      state = state.copyWith(users: updated);
-      await _updateUsersCache(updated);
+      // Optimistic local entry (without the password).
+      final optimistic = withLabels({
+        'id': op.id,
+        'name': userData['name'],
+        'username': userData['username'],
+        'assignments': const [],
+        '_pending': true,
+      });
+      state = state.copyWith(users: [...state.users, optimistic]);
       return;
     }
 
-    final response = await _dio.post('/api/users', data: userData);
-    if (response.statusCode != 201) {
-      throw Exception(response.data['error'] ?? 'Gagal membuat pengguna');
+    try {
+      await _dio.post('/api/users', data: userData);
+    } on DioException catch (e) {
+      throw Exception(_errorMessage(e));
     }
-    await CacheManager.invalidate('users:list');
     await loadUsers();
   }
 
-  /// Updates a user. When offline, queues and applies optimistically.
+  /// Updates a user (any of name, username, password, is_active, assignments).
   Future<void> updateUser(int userId, Map<String, dynamic> userData) async {
     if (_isOffline) {
       final op = PendingOperation()
@@ -201,28 +236,27 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
         ..description = 'Perubahan pengguna';
       await PendingOperationsQueue.enqueue(op);
 
-      // Optimistic local update
       final updated = state.users.map((u) {
         if (u['id'].toString() == userId.toString()) {
-          return {...u, ...userData, '_pending': true};
+          return {...u, if (userData['name'] != null) 'name': userData['name'], if (userData['username'] != null) 'username': userData['username'], '_pending': true};
         }
         return u;
       }).toList();
       state = state.copyWith(users: updated);
-      await _updateUsersCache(updated);
       return;
     }
 
-    final response = await _dio.put('/api/users/$userId', data: userData);
-    if (response.statusCode != 200) {
-      throw Exception(response.data['error'] ?? 'Gagal memperbarui pengguna');
+    try {
+      await _dio.put('/api/users/$userId', data: userData);
+    } on DioException catch (e) {
+      throw Exception(_errorMessage(e));
     }
-    await CacheManager.invalidate('users:list');
     await loadUsers();
   }
 
-  /// Deletes a user. When offline, queues and removes optimistically.
-  Future<void> deleteUser(int userId) async {
+  /// Deletes a user and returns the API's message: users with history are deactivated instead, and a
+  /// manager only removes the assignments at their own locations.
+  Future<String> deleteUser(int userId) async {
     if (_isOffline) {
       final op = PendingOperation()
         ..id = const Uuid().v4()
@@ -235,25 +269,17 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
         ..description = 'Hapus pengguna';
       await PendingOperationsQueue.enqueue(op);
 
-      // Optimistic local removal
-      final updated = state.users
-          .where((u) => u['id'].toString() != userId.toString())
-          .toList();
-      state = state.copyWith(users: updated);
-      await _updateUsersCache(updated);
-      return;
+      state = state.copyWith(users: state.users.where((u) => u['id'].toString() != userId.toString()).toList());
+      return 'Penghapusan akan dikirim saat online';
     }
 
-    final response = await _dio.delete('/api/users/$userId');
-    if (response.statusCode != 200) {
-      throw Exception(response.data['error'] ?? 'Gagal menghapus pengguna');
+    try {
+      final response = await _dio.delete('/api/users/$userId');
+      await loadUsers();
+      return response.data['message']?.toString() ?? 'Pengguna berhasil dihapus';
+    } on DioException catch (e) {
+      throw Exception(_errorMessage(e));
     }
-    await CacheManager.invalidate('users:list');
-    await loadUsers();
-  }
-
-  Future<void> _updateUsersCache(List<Map<String, dynamic>> users) async {
-    await CacheManager.put('users:list', users);
   }
 
   void searchUsers(String query) {
@@ -261,32 +287,28 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     loadUsers();
   }
 
-  void filterUsers({String? role, String? branchId}) {
-    state = state.copyWith(roleFilter: role, branchFilter: branchId);
-    loadUsers();
-  }
-
-  void clearFilters() {
-    state = state.copyWith(searchQuery: null, roleFilter: null, branchFilter: null);
+  void filterUsers({int? roleId, int? locationId}) {
+    state = state.copyWith(roleFilter: () => roleId, locationFilter: () => locationId);
     loadUsers();
   }
 
   String _errorMessage(dynamic error) {
     if (error is DioException) {
-      if (error.response?.data?['error'] != null) return error.response!.data['error'];
-      if (error.response?.statusCode == 401) return 'Authentication failed. Please login again.';
-      if (error.response?.statusCode == 403) return 'You do not have permission to access this resource.';
+      final data = error.response?.data;
+      if (data is Map && data['error'] != null) return data['error'].toString();
+      if (error.response?.statusCode == 401) return 'Sesi berakhir, silakan login kembali.';
+      if (error.response?.statusCode == 403) return 'Anda tidak memiliki izin untuk tindakan ini.';
       switch (error.type) {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
-          return 'Connection timeout. Please check your internet connection.';
+          return 'Koneksi timeout. Periksa koneksi internet Anda.';
         case DioExceptionType.connectionError:
           return _isOffline
               ? 'Kamu sedang offline dan belum ada data tersimpan.'
-              : 'Cannot connect to server. Please check your network.';
+              : 'Tidak dapat terhubung ke server.';
         default:
-          return 'An unexpected error occurred.';
+          return 'Terjadi kesalahan yang tidak terduga.';
       }
     }
     return error.toString();

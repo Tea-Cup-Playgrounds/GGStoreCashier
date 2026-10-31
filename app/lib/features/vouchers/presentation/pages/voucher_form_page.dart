@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/models/voucher.dart';
 import '../../../../core/services/voucher_service.dart';
-import '../../../../core/services/product_service.dart';
+import '../../../../core/services/catalog_service.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -101,14 +101,17 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                 ))
             .toList();
       } else {
-        final products = await ProductService.getProducts();
-        items = products
-            .map((p) => DropdownItem<int>(
-                  value: int.parse(p.id),
-                  label: p.name,
-                  icon: Icons.inventory_2_outlined,
-                ))
-            .toList();
+        // Product vouchers target a variant (what a sale line sells).
+        final products = await CatalogService.getProducts();
+        items = [
+          for (final p in products)
+            for (final v in p.variants)
+              DropdownItem<int>(
+                value: v.id,
+                label: v.name == null || v.name!.isEmpty ? p.name : '${p.name} ${v.name}',
+                icon: Icons.inventory_2_outlined,
+              ),
+        ];
       }
 
       if (mounted) {

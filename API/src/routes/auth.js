@@ -98,7 +98,7 @@ router.post('/login', async (req, res) => {
         }
 
         const user = users[0];
-        console.log('User found:', { id: user.id, username: user.username, role: user.role });
+        console.log('User found:', { id: user.id, username: user.username });
 
         // Compare hashed password
         const isValidPassword = await bcrypt.compare(password, user.password);
@@ -125,20 +125,17 @@ router.post('/login', async (req, res) => {
 
         // Generate JWT token
         const token = jwt.sign(
-            { 
-                userId: user.id, 
-                username: user.username, 
-                role: user.role,
-                branchId: user.branch_id 
-            },
+            { userId: user.id, username: user.username },
             process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
 
-        // Set cookie
+        // Session cookie for browser clients (the back-office web app). SameSite=Lax keeps it off
+        // cross-site form posts and fetches, so cookie auth can't be used for CSRF.
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
@@ -148,8 +145,6 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 name: user.name,
                 username: user.username,
-                role: user.role,
-                branchId: user.branch_id
             },
             access: await loadAccess(pool, user.id),
             token // Include token for Flutter app
@@ -163,7 +158,7 @@ router.post('/login', async (req, res) => {
 
 // Logout endpoint
 router.post('/logout', (req, res) => {
-    res.clearCookie('token');
+    res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
     res.json({ message: 'Berhasil keluar' });
 });
 
@@ -179,7 +174,7 @@ router.get('/me', async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
         const [users] = await pool.execute(
-            'SELECT id, name, username, role, branch_id, is_active, last_active_at FROM users WHERE id = ?',
+            'SELECT id, name, username, is_active, last_active_at FROM users WHERE id = ?',
             [decoded.userId]
         );
 

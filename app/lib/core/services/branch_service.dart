@@ -23,7 +23,7 @@ class BranchService {
     ));
   }
 
-  /// Fetch a single branch by id. Returns cached data when offline.
+  /// Fetch a single location (branch) by id from /api/locations. Returns cached data when offline.
   static Future<Branch> getBranch(int id, {bool forceRefresh = false}) async {
     lastFetchWasStale = false;
     final key = 'branch:$id';
@@ -37,10 +37,10 @@ class BranchService {
 
     try {
       final dio = await _dio();
-      final response = await dio.get('/api/branches/$id');
-      await CacheManager.put(key, response.data['branch'],
+      final response = await dio.get('/api/locations/$id');
+      await CacheManager.put(key, response.data['location'],
           ttl: const Duration(minutes: 10));
-      return Branch.fromJson(response.data['branch']);
+      return Branch.fromJson(response.data['location']);
     } on DioException {
       final entry = CacheManager.get(key);
       if (entry != null) {
@@ -56,11 +56,11 @@ class BranchService {
     }
   }
 
-  /// Fetch all branches (superadmin).
+  /// Branches the user is assigned to (all for owners).
   static Future<List<Branch>> getBranches() async {
     final dio = await _dio();
-    final response = await dio.get('/api/branches');
-    final list = response.data['branches'] as List;
+    final response = await dio.get('/api/locations', queryParameters: {'type': 'branch'});
+    final list = response.data['locations'] as List;
     return list.map((e) => Branch.fromJson(e)).toList();
   }
 
@@ -95,7 +95,7 @@ class BranchService {
       final op = PendingOperation()
         ..id = const Uuid().v4()
         ..method = 'PUT'
-        ..path = '/api/branches/$id'
+        ..path = '/api/locations/$id'
         ..body = body
         ..createdAt = DateTime.now()
         ..retryCount = 0
@@ -106,7 +106,7 @@ class BranchService {
     }
 
     final dio = await _dio();
-    await dio.put('/api/branches/$id', data: body);
+    await dio.put('/api/locations/$id', data: body);
     // Invalidate cache so next load fetches fresh data.
     await CacheManager.invalidate('branch:$id');
     return true; // saved online

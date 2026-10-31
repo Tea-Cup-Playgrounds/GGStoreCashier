@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/user.dart';
+import '../models/access.dart';
 import './socket_service.dart';
 
 class AuthService {
@@ -83,18 +84,19 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = response.data;
-        final user = User.fromJson(data['user']);
+        // The access block travels with the stored user so permissions are known offline.
+        final user = User.fromJson({...Map<String, dynamic>.from(data['user'] as Map), 'access': data['access']});
         final token = data['token'];
 
         // Store token and user data
         await _storeAuthData(token, user, rememberMe: rememberMe);
 
         // Connect to Socket.IO for real-time updates
-        SocketService.connect(token, user.branchId ?? 0);
+        SocketService.connect(token, user.defaultLocationId ?? 0);
 
         if (ApiConfig.enableLogging) {
           dev.log('Login successful for user: ${user.username}');
-          dev.log('Socket.IO connection initiated for branch: ${user.branchId}');
+          dev.log('Socket.IO connection initiated for location: ${user.defaultLocationId}');
         }
 
         return AuthResult.success(user);
@@ -166,6 +168,16 @@ class AuthService {
     } catch (e) {
       return null;
     }
+  }
+
+  /// Replaces the stored user's access with a fresh copy from the server.
+  static Future<User?> updateStoredAccess(UserAccess access) async {
+    final user = await getCurrentUser();
+    if (user == null) return null;
+    final updated = user.copyWith(access: access);
+    final prefs = await _getPrefs();
+    await prefs.setString(_userKey, json.encode(updated.toJson()));
+    return updated;
   }
 
   // Get stored token

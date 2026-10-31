@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
-import 'role_guard.dart';
 
 class AuthGuard {
   /// Redirect logic — local token check only, no network call.
@@ -33,16 +32,19 @@ class AuthGuard {
     return null;
   }
 
+  // Pages that need a permission. The access stored with the user is used, so this works offline;
+  // the API checks every request again.
+  static const _routePermissions = {
+    '/users': 'users.manage',
+    '/vouchers': 'vouchers.manage',
+  };
+
   static Future<bool> _checkRouteAccess(String route, User user) async {
-    final routeAccess = {
-      '/users': ['admin', 'superadmin'],
-      '/branches': ['superadmin'],
-      '/analytics': ['admin', 'superadmin'],
-    };
-    for (var entry in routeAccess.entries) {
-      if (route.startsWith(entry.key)) {
-        return RoleGuard.hasRole(user, entry.value);
-      }
+    // /branch/edit/:id needs locations.manage at that location.
+    final branchEdit = RegExp(r'^/branch/edit/(\d+)').firstMatch(route);
+    if (branchEdit != null) return user.access.can('locations.manage', int.parse(branchEdit.group(1)!));
+    for (final entry in _routePermissions.entries) {
+      if (route.startsWith(entry.key)) return user.access.can(entry.value);
     }
     return true;
   }

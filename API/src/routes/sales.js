@@ -7,7 +7,6 @@ const posting = require('../services/posting');
 const { nextDocumentNumber } = require('../services/documents');
 const { getSetting } = require('../services/settings');
 const { DISPLAY_NAME_SQL, ACTIVE_VARIANT_SQL } = require('../services/catalog');
-const { emitLegacyProduct } = require('../services/legacy-products');
 const { AppError, withTransaction } = require('../utils/transaction');
 const { ctxOf, parseDate, parseMoney } = require('../utils/request');
 const { uuidv7 } = require('../utils/uuid');
@@ -42,18 +41,29 @@ const allocate = (cents, weights) => {
 
 // ── payment methods ──────────────────────────────────────────────────────────
 
-const loadPaymentMethods = async (db, locationId) => {
+// Active methods usable at a location; with { all: true } every method, inactive ones included.
+const loadPaymentMethods = async (db, locationId, { all = false } = {}) => {
     const [rows] = await db.execute(
         `SELECT pm.id, pm.name, pm.type, pm.requires_reference, pm.location_id, pm.sort_order, pm.is_active, a.code AS account_code
          FROM payment_methods pm JOIN accounts a ON a.id = pm.account_id
-         WHERE pm.is_active = 1 AND (pm.location_id IS NULL OR pm.location_id = ?)
+         ${all ? '' : 'WHERE pm.is_active = 1 AND (pm.location_id IS NULL OR pm.location_id = ?)'}
          ORDER BY pm.sort_order, pm.id`,
-        [locationId || null]
+        all ? [] : [locationId || null]
     );
     return rows.map((r) => ({ ...r, requires_reference: !!r.requires_reference, is_active: !!r.is_active }));
 };
 
-router.get('/payment-methods', requirePermission('sales.create'), async (req, res) => {
+// ?all=true (settings.manage) lists every method for the settings screen.
+router.get('/payment-methods', async (req, res, next) => {
+    if (req.query.all === 'true' && req.access.can('settings.manage')) {
+        try {
+            return res.json({ paymentMethods: await loadPaymentMethods(pool, null, { all: true }) });
+        } catch (error) {
+            return next(error);
+        }
+    }
+    next();
+}, requirePermission('sales.create'), async (req, res) => {
     try {
         res.json({ paymentMethods: await loadPaymentMethods(pool, req.locationId) });
     } catch (error) {
@@ -519,8 +529,11 @@ router.post('/', requirePermission('sales.create', { location: (req) => req.body
         if (io) {
             io.to(`branch-${result.location_id}`).emit('sale-created', { id: result.id, number: result.number, grand_total: result.grand_total });
             io.to('branch-0').emit('sale-created', { id: result.id, number: result.number, grand_total: result.grand_total, location_id: result.location_id });
+            if (touchedVariants.size > 0) {
+                const change = { location_id: result.location_id, variant_ids: [...touchedVariants] };
+                io.to(`branch-${result.location_id}`).to('branch-0').emit('stock-changed', change);
+            }
         }
-        for (const variantId of touchedVariants) await emitLegacyProduct(req, 'product-updated', variantId, [result.location_id]);
         res.status(201).json({ message: 'Penjualan tersimpan', sale: result });
     }
 });

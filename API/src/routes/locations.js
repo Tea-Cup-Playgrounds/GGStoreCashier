@@ -50,7 +50,29 @@ router.get('/', async (req, res) => {
     }
 });
 
+// A single location the user is assigned to (any role), or any location for global assignments.
+router.get('/:locationId', async (req, res) => {
+    try {
+        const id = parseInt(req.params.locationId, 10);
+        const global = req.access.isOwner || req.access.assignments.some((a) => a.locationId === null);
+        if (!global && !req.access.assignments.some((a) => a.locationId === id)) {
+            return res.status(403).json({ error: 'Akses tidak diizinkan' });
+        }
+        const [[location]] = await pool.execute(`SELECT ${COLUMNS} FROM locations WHERE id = ? AND deleted_at IS NULL`, [id]);
+        if (!location) return res.status(404).json({ error: 'Lokasi tidak ditemukan' });
+        res.json({ location: toLocation(location) });
+    } catch (error) {
+        console.error('Get location error:', error);
+        res.status(500).json({ error: 'Gagal mengambil data lokasi' });
+    }
+});
+
+// locations.manage at one location lets a user edit that location's details; creating locations and
+// changing codes or active status need it at every location (owners).
+const managesAll = (req) => req.access.locationsFor('locations.manage') === null;
+
 router.post('/', requirePermission('locations.manage'), async (req, res) => {
+    if (!managesAll(req)) return res.status(403).json({ error: 'Hanya owner yang dapat menambah lokasi' });
     const { code, name, type = 'branch', address, phone, settings } = req.body;
     const normalizedCode = typeof code === 'string' ? code.trim().toUpperCase() : '';
 
@@ -90,6 +112,10 @@ router.put('/:locationId', requirePermission('locations.manage'), async (req, re
     const { code, name, address, phone, is_active, settings } = req.body;
     const updates = [];
     const params = [];
+
+    if ((code !== undefined || is_active !== undefined) && !managesAll(req)) {
+        return res.status(403).json({ error: 'Hanya owner yang dapat mengubah kode atau status lokasi' });
+    }
 
     if (code !== undefined) {
         const normalizedCode = String(code).trim().toUpperCase();

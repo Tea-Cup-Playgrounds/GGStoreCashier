@@ -14,7 +14,7 @@ class PendingOperation extends HiveObject {
   @HiveField(1)
   late String method;
 
-  /// Relative API path, e.g. '/api/branches/1'.
+  /// Relative API path, e.g. '/api/locations/1'.
   @HiveField(2)
   late String path;
 

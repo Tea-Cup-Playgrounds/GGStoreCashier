@@ -8,19 +8,28 @@ router.use(authenticateToken);
 // Revenue counts what customers kept: sale total minus refunds, voided sales excluded.
 const NET_REVENUE = 'COALESCE(SUM(s.grand_total - s.refunded_total), 0)';
 
-// GET /api/dashboard
-// Returns stats + recent sales, branch-filtered by role. Response keys predate the sales model
+// GET /api/dashboard?location_id=
+// Stats + recent sales for the locations the user sells at or reads reports for (every location with
+// reports.view_all), optionally narrowed to one of them. Response keys predate the sales model
 // (recentTransactions, final_amount, ...) and are kept for the app's home screen.
 router.get('/', async (req, res) => {
     try {
-        const { role, branch_id } = req.user;
-        const isSuperAdmin = role === 'superadmin';
-
-        const branchClause = isSuperAdmin ? '' : 'AND s.location_id = ?';
-        const branchParam = isSuperAdmin ? [] : [branch_id];
-
-        const productBranchClause = isSuperAdmin ? '' : 'AND soh.location_id = ?';
-        const productBranchParam = isSuperAdmin ? [] : [branch_id];
+        let scope = req.access.can('reports.view_all')
+            ? null
+            : req.access.locationsForAny('reports.view_location', 'sales.create');
+        const requested = parseInt(req.query.location_id, 10);
+        if (requested > 0) {
+            if (scope !== null && !scope.includes(requested)) {
+                return res.status(403).json({ error: 'Akses tidak diizinkan' });
+            }
+            scope = [requested];
+        }
+        // IN (NULL) matches nothing, for users with no location in scope.
+        const inScope = (column) => (scope === null ? '' : `AND ${column} IN (${scope.map(() => '?').join(', ') || 'NULL'})`);
+        const branchClause = inScope('s.location_id');
+        const branchParam = scope ?? [];
+        const productBranchClause = inScope('soh.location_id');
+        const productBranchParam = scope ?? [];
 
         // Stock rows (variant x branch) of active catalog items; see the stock_on_hand view.
         const stockFrom = `

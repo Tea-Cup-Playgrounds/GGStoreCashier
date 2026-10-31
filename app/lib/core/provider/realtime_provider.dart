@@ -1,156 +1,59 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:developer' as dev;
 import '../services/socket_service.dart';
-import '../models/product.dart';
 
-// Real-time product updates state
+// Live updates from the API's Socket.IO rooms (see SocketService). Pages watch lastUpdateTime and
+// reload what they show.
+
+/// Stock changed at a location (event `stock-changed`, e.g. after a sale).
 class RealtimeProductState {
-  final Product? lastCreated;
-  final Product? lastUpdated;
-  final String? lastDeleted;
+  final int? locationId;
+  final List<int> variantIds;
   final DateTime? lastUpdateTime;
 
-  const RealtimeProductState({
-    this.lastCreated,
-    this.lastUpdated,
-    this.lastDeleted,
-    this.lastUpdateTime,
-  });
-
-  RealtimeProductState copyWith({
-    Product? lastCreated,
-    Product? lastUpdated,
-    String? lastDeleted,
-    DateTime? lastUpdateTime,
-  }) {
-    return RealtimeProductState(
-      lastCreated: lastCreated ?? this.lastCreated,
-      lastUpdated: lastUpdated ?? this.lastUpdated,
-      lastDeleted: lastDeleted ?? this.lastDeleted,
-      lastUpdateTime: lastUpdateTime ?? this.lastUpdateTime,
-    );
-  }
+  const RealtimeProductState({this.locationId, this.variantIds = const [], this.lastUpdateTime});
 }
 
-// Real-time transaction updates state
+/// A sale was recorded (event `sale-created`).
 class RealtimeTransactionState {
   final Map<String, dynamic>? lastTransaction;
-  final Map<String, dynamic>? lastPayment;
   final DateTime? lastUpdateTime;
 
-  const RealtimeTransactionState({
-    this.lastTransaction,
-    this.lastPayment,
-    this.lastUpdateTime,
-  });
-
-  RealtimeTransactionState copyWith({
-    Map<String, dynamic>? lastTransaction,
-    Map<String, dynamic>? lastPayment,
-    DateTime? lastUpdateTime,
-  }) {
-    return RealtimeTransactionState(
-      lastTransaction: lastTransaction ?? this.lastTransaction,
-      lastPayment: lastPayment ?? this.lastPayment,
-      lastUpdateTime: lastUpdateTime ?? this.lastUpdateTime,
-    );
-  }
+  const RealtimeTransactionState({this.lastTransaction, this.lastUpdateTime});
 }
 
-// Product real-time notifier
 class RealtimeProductNotifier extends StateNotifier<RealtimeProductState> {
   RealtimeProductNotifier() : super(const RealtimeProductState()) {
-    _setupListeners();
-  }
-
-  void _setupListeners() {
-    // Listen for product created events
-    SocketService.on('product-created', (data) {
+    SocketService.on('stock-changed', (data) {
       try {
-        final product = Product.fromJson(data);
-        state = state.copyWith(
-          lastCreated: product,
+        final map = Map<String, dynamic>.from(data as Map);
+        state = RealtimeProductState(
+          locationId: map['location_id'] as int?,
+          variantIds: ((map['variant_ids'] as List?) ?? const []).map((e) => e as int).toList(),
           lastUpdateTime: DateTime.now(),
         );
       } catch (e) {
-        dev.log('Error parsing product-created event: $e');
+        dev.log('Error parsing stock-changed event: $e');
       }
     });
-
-    // Listen for product updated events
-    SocketService.on('product-updated', (data) {
-      try {
-        final product = Product.fromJson(data);
-        state = state.copyWith(
-          lastUpdated: product,
-          lastUpdateTime: DateTime.now(),
-        );
-      } catch (e) {
-        dev.log('Error parsing product-updated event: $e');
-      }
-    });
-
-    // Listen for product deleted events
-    SocketService.on('product-deleted', (data) {
-      try {
-        final productId = data['id'].toString();
-        state = state.copyWith(
-          lastDeleted: productId,
-          lastUpdateTime: DateTime.now(),
-        );
-      } catch (e) {
-        dev.log('Error parsing product-deleted event: $e');
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    // Clean up listeners if needed
-    super.dispose();
   }
 }
 
-// Transaction real-time notifier
 class RealtimeTransactionNotifier extends StateNotifier<RealtimeTransactionState> {
   RealtimeTransactionNotifier() : super(const RealtimeTransactionState()) {
-    _setupListeners();
-  }
-
-  void _setupListeners() {
-    // Listen for transaction created events
-    SocketService.on('transaction-created', (data) {
+    SocketService.on('sale-created', (data) {
       try {
-        state = state.copyWith(
-          lastTransaction: data as Map<String, dynamic>,
+        state = RealtimeTransactionState(
+          lastTransaction: Map<String, dynamic>.from(data as Map),
           lastUpdateTime: DateTime.now(),
         );
       } catch (e) {
-        dev.log('Error parsing transaction-created event: $e');
+        dev.log('Error parsing sale-created event: $e');
       }
     });
-
-    // Listen for payment completed events
-    SocketService.on('payment-completed', (data) {
-      try {
-        state = state.copyWith(
-          lastPayment: data as Map<String, dynamic>,
-          lastUpdateTime: DateTime.now(),
-        );
-      } catch (e) {
-        dev.log('Error parsing payment-completed event: $e');
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    // Clean up listeners if needed
-    super.dispose();
   }
 }
 
-// Providers
 final realtimeProductProvider = StateNotifierProvider<RealtimeProductNotifier, RealtimeProductState>(
   (ref) => RealtimeProductNotifier(),
 );

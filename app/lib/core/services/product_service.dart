@@ -1,46 +1,7 @@
-import 'dart:developer' as dev;
-import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
-import '../models/product.dart';
-import 'cache_manager.dart';
 
+/// Image helpers for catalog products. Product data comes from CatalogService (/api/catalog).
 class ProductService {
-  /// Set to `true` after a call to [getProducts] that returned stale cached data.
-  static bool lastFetchWasStale = false;
-  static final _dio = Dio(BaseOptions(
-    baseUrl: ApiConfig.apiUrl,
-    connectTimeout: ApiConfig.connectTimeout,
-    receiveTimeout: ApiConfig.receiveTimeout,
-    sendTimeout: ApiConfig.sendTimeout,
-    headers: ApiConfig.defaultHeaders,
-  ));
-
-  static void _initializeDio() {
-    if (ApiConfig.enableNetworkLogging) {
-      _dio.interceptors.add(LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        requestHeader: true,
-        responseHeader: false,
-        error: true,
-        logPrint: (obj) {
-          if (ApiConfig.enableLogging) {
-            dev.log('[PRODUCT SERVICE] $obj');
-          }
-        },
-      ));
-    }
-  }
-
-  static Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
-  }
-
-  /// Cache key scoped to the branch so different users never share cached lists.
-  static String _cacheKey(int? branchId) => branchId != null ? 'products:branch_$branchId' : 'products:all';
-
   static String getProductImageUrl(String? imageName) {
     if (imageName == null || imageName.isEmpty) {
       return '';
@@ -50,82 +11,5 @@ class ProductService {
 
   static String getPlaceholderImage() {
     return 'assets/products/example.jpg';
-  }
-
-  static Future<List<Product>> getProducts({
-    int? branchId,
-    int? categoryId,
-    String? search,
-    bool forceRefresh = false,
-  }) async {
-    _initializeDio();
-
-    // Reset stale flag at the start of every call.
-    lastFetchWasStale = false;
-
-    final bool noFilters = categoryId == null && (search == null || search.isEmpty);
-
-    final cacheKey = _cacheKey(branchId);
-
-    // --- Cache read (only when no extra filters are applied) ---
-    if (noFilters && !forceRefresh && CacheManager.isValid(cacheKey)) {
-      final entry = CacheManager.get(cacheKey);
-      if (entry != null) {
-        final cachedList =
-            (entry.data as List).map((json) => Product.fromJson(Map<String, dynamic>.from(json as Map))).toList();
-        return cachedList;
-      }
-    }
-
-    try {
-      final token = await _getToken();
-      if (token == null) {
-        throw Exception('Token autentikasi tidak ditemukan');
-      }
-
-      final queryParams = <String, dynamic>{};
-      if (branchId != null) queryParams['branch_id'] = branchId;
-      if (categoryId != null) queryParams['category_id'] = categoryId;
-      if (search != null && search.isNotEmpty) queryParams['search'] = search;
-
-      final response = await _dio.get(
-        '/api/products',
-        queryParameters: queryParams,
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-        final productsJson = data['products'] as List;
-        final products = productsJson.map((json) => Product.fromJson(json)).toList();
-
-        // Store raw JSON in cache (only when no extra filters).
-        if (noFilters) {
-          await CacheManager.put(cacheKey, productsJson);
-        }
-
-        return products;
-      } else {
-        throw Exception('Gagal memuat produk: ${response.statusCode}');
-      }
-    } on DioException catch (e) {
-      // Network failure — try to return stale cache if available.
-      if (noFilters) {
-        final staleEntry = CacheManager.get(cacheKey);
-        if (staleEntry != null) {
-          lastFetchWasStale = true;
-          staleEntry.isStale = true;
-          await staleEntry.save();
-          return (staleEntry.data as List)
-              .map((json) => Product.fromJson(Map<String, dynamic>.from(json as Map)))
-              .toList();
-        }
-      }
-      throw Exception('Kesalahan jaringan: ${e.message}');
-    } catch (e) {
-      rethrow;
-    }
   }
 }

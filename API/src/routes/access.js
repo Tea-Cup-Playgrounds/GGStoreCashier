@@ -2,7 +2,8 @@ const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
 const { PERMISSIONS, OWNER_ROLE_CODE, isValidPermission } = require('../auth/permissions');
-const { syncLegacyFromAssignments } = require('../services/access');
+const { loadAssignments, inScope, normalizeAssignments, replaceAssignments } = require('../services/access');
+const { AppError, withTransaction } = require('../utils/transaction');
 const { logAudit } = require('../services/audit');
 
 const router = express.Router();
@@ -205,31 +206,6 @@ router.delete('/roles/:id', requirePermission('roles.manage'), async (req, res) 
 
 // ── User assignments ─────────────────────────────────────────────────────────
 
-const loadAssignments = async (db, userId) => {
-    const [rows] = await db.execute(
-        `SELECT ul.location_id, l.code AS location_code, l.name AS location_name, l.type AS location_type,
-                r.id AS role_id, r.code AS role_code, r.name AS role_name
-         FROM user_locations ul
-         JOIN roles r ON r.id = ul.role_id
-         LEFT JOIN locations l ON l.id = ul.location_id
-         WHERE ul.user_id = ?
-         ORDER BY ul.location_id IS NOT NULL, ul.location_id`,
-        [userId]
-    );
-    return rows.map((r) => ({
-        locationId: r.location_id,
-        locationCode: r.location_code,
-        locationName: r.location_name,
-        locationType: r.location_type,
-        roleId: r.role_id,
-        roleCode: r.role_code,
-        roleName: r.role_name,
-    }));
-};
-
-// Non-owners only see and change assignments at locations where they hold users.manage.
-const inScope = (scope, locationId) => scope === null || (locationId !== null && scope.includes(locationId));
-
 router.get('/users/:id/assignments', requirePermission('users.manage'), async (req, res) => {
     try {
         const userId = parseInt(req.params.id, 10);
@@ -254,91 +230,20 @@ router.get('/users/:id/assignments', requirePermission('users.manage'), async (r
 // For a non-owner, assignments outside their own locations are left untouched.
 router.put('/users/:id/assignments', requirePermission('users.manage'), async (req, res) => {
     const userId = parseInt(req.params.id, 10);
-    const requested = req.body.assignments;
-
-    if (!Array.isArray(requested)) {
-        return res.status(400).json({ error: 'assignments harus berupa array' });
-    }
     if (userId === req.user.id) {
         return res.status(400).json({ error: 'Anda tidak dapat mengubah penugasan Anda sendiri' });
     }
 
-    const conn = await pool.getConnection();
-    try {
-        const [users] = await conn.execute('SELECT id FROM users WHERE id = ?', [userId]);
-        if (users.length === 0) return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+    const result = await withTransaction(res, 'Gagal memperbarui penugasan pengguna', async (conn) => {
+        const [users] = await conn.execute('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
+        if (users.length === 0) throw new AppError('Pengguna tidak ditemukan', 404);
 
         const before = await loadAssignments(conn, userId);
-        const isOwner = req.access.isOwner;
-        const scope = req.access.locationsFor('users.manage');
-
-        if (!isOwner && before.some((a) => a.roleCode === OWNER_ROLE_CODE)) {
-            return res.status(403).json({ error: 'Anda tidak dapat mengubah penugasan owner' });
+        if (!req.access.isOwner && before.some((a) => a.roleCode === OWNER_ROLE_CODE)) {
+            throw new AppError('Anda tidak dapat mengubah penugasan owner', 403);
         }
-
-        const [roleRows] = await conn.execute(
-            `SELECT r.id, r.code, GROUP_CONCAT(rp.permission) AS permissions
-             FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id
-             GROUP BY r.id`
-        );
-        const roles = new Map(roleRows.map((r) => [r.id, { code: r.code, permissions: r.permissions ? r.permissions.split(',') : [] }]));
-
-        const [locationRows] = await conn.execute('SELECT id FROM locations WHERE is_active = 1 AND deleted_at IS NULL');
-        const activeLocations = new Set(locationRows.map((l) => l.id));
-
-        const seenLocations = new Set();
-        const normalized = [];
-        for (const item of requested) {
-            const locationId = item.location_id === null || item.location_id === undefined ? null : Number(item.location_id);
-            const roleId = Number(item.role_id);
-            const role = roles.get(roleId);
-
-            if (!role) return res.status(400).json({ error: `Role ${item.role_id} tidak ditemukan` });
-            if (locationId !== null && !activeLocations.has(locationId)) {
-                return res.status(400).json({ error: `Lokasi ${item.location_id} tidak ditemukan atau tidak aktif` });
-            }
-            const key = locationId === null ? 'all' : locationId;
-            if (seenLocations.has(key)) {
-                return res.status(400).json({ error: 'Satu lokasi hanya boleh memiliki satu role per pengguna' });
-            }
-            seenLocations.add(key);
-
-            if (role.code === OWNER_ROLE_CODE && locationId !== null) {
-                return res.status(400).json({ error: 'Role owner berlaku untuk semua lokasi (location_id harus null)' });
-            }
-            if (!isOwner) {
-                if (role.code === OWNER_ROLE_CODE || locationId === null) {
-                    return res.status(403).json({ error: 'Hanya owner yang dapat memberikan akses ke semua lokasi' });
-                }
-                if (!inScope(scope, locationId)) {
-                    return res.status(403).json({ error: `Anda tidak mengelola pengguna di lokasi ${locationId}` });
-                }
-                const notHeld = role.permissions.filter((p) => !req.access.can(p, locationId));
-                if (notHeld.length > 0) {
-                    return res.status(403).json({ error: `Role ini memiliki izin yang tidak Anda miliki di lokasi tersebut: ${notHeld.join(', ')}` });
-                }
-            }
-            normalized.push({ locationId, roleId });
-        }
-
-        await conn.beginTransaction();
-        if (isOwner) {
-            await conn.execute('DELETE FROM user_locations WHERE user_id = ?', [userId]);
-        } else if (scope === null) {
-            // Non-owner with users.manage at every location: global assignments stay owner-only.
-            await conn.execute('DELETE FROM user_locations WHERE user_id = ? AND location_id IS NOT NULL', [userId]);
-        } else {
-            for (const locationId of scope) {
-                await conn.execute('DELETE FROM user_locations WHERE user_id = ? AND location_id = ?', [userId, locationId]);
-            }
-        }
-        for (const a of normalized) {
-            await conn.execute(
-                'INSERT INTO user_locations (user_id, location_id, role_id) VALUES (?, ?, ?)',
-                [userId, a.locationId, a.roleId]
-            );
-        }
-        await syncLegacyFromAssignments(conn, userId);
+        const normalized = await normalizeAssignments(conn, req.access, req.body.assignments);
+        await replaceAssignments(conn, req.access, userId, normalized);
 
         const after = await loadAssignments(conn, userId);
         await logAudit(conn, req, {
@@ -346,16 +251,9 @@ router.put('/users/:id/assignments', requirePermission('users.manage'), async (r
             before: before.map(({ locationId, roleId }) => ({ locationId, roleId })),
             after: after.map(({ locationId, roleId }) => ({ locationId, roleId })),
         });
-        await conn.commit();
-
-        res.json({ message: 'Penugasan pengguna berhasil diperbarui', assignments: after });
-    } catch (error) {
-        await conn.rollback();
-        console.error('Update assignments error:', error);
-        res.status(500).json({ error: 'Gagal memperbarui penugasan pengguna' });
-    } finally {
-        conn.release();
-    }
+        return after;
+    });
+    if (result) res.json({ message: 'Penugasan pengguna berhasil diperbarui', assignments: result });
 });
 
 module.exports = router;

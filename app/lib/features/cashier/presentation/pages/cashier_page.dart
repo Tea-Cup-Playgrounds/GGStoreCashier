@@ -7,7 +7,6 @@ import '../../../../core/models/cart_item.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../core/helper/currency_formatter.dart';
-import '../../../../core/services/product_service.dart';
 import '../../../../core/services/catalog_service.dart';
 import '../../../../core/services/sales_service.dart';
 import '../../../../core/services/cache_manager.dart';
@@ -104,6 +103,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
 
     try {
       final catalog = await CatalogService.getProducts(locationId: location.id);
+      final fromCache = CatalogService.lastFromCache;
       if (!mounted) return;
       setState(() {
         _products = [
@@ -113,29 +113,19 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
         _loadedLocationId = location.id;
         _isLoadingProducts = false;
       });
-      // Keep the cached goods list fresh for offline selling.
-      ProductService.getProducts(branchId: location.id, forceRefresh: true).ignore();
       _loadPaymentMethods(location.id).ignore();
-      _loadShift(location.id).ignore();
-    } catch (e) {
-      // Offline: fall back to the cached goods list (no services / pulsa, no IMEI checks).
-      try {
-        final cached = await ProductService.getProducts(branchId: location.id);
-        if (!mounted) return;
-        setState(() {
-          _products = cached;
-          _loadedLocationId = location.id;
-          _isLoadingProducts = false;
-        });
-        _loadPaymentMethods(location.id).ignore();
+      if (fromCache) {
+        // Offline: stock shown is from the last sync, and IMEI units can't be picked.
         _toast('Offline — menampilkan daftar produk tersimpan');
-      } catch (_) {
-        if (!mounted) return;
-        setState(() {
-          _productsError = e.toString();
-          _isLoadingProducts = false;
-        });
+      } else {
+        _loadShift(location.id).ignore();
       }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _productsError = e.toString();
+        _isLoadingProducts = false;
+      });
     }
   }
 

@@ -9,7 +9,6 @@ class ApiConfig {
   static String get meEndpoint => '$apiUrl/api/auth/me';
   static String get testEndpoint => '$apiUrl/api/test';
   static String get usersEndpoint => '$apiUrl/api/users';
-  static String get productsEndpoint => '$apiUrl/api/products';
   static String get categoriesEndpoint => '$apiUrl/api/categories';
 
   // Default headers for all requests (includes ngrok bypass header)

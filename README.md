@@ -80,6 +80,19 @@ npm run accounting:backfill
 
 Perintah ini aman dijalankan berulang kali; dokumen yang sudah punya jurnal dilewati.
 
+Migrasi langkah 6 (`cleanup_legacy_access`) menghapus `users.role`, `users.branch_id` dan view `branches`. Hak akses
+sepenuhnya berasal dari penugasan role per lokasi (`user_locations`), yang sudah dibuat dari data lama di langkah 2.
+Sebelum menjalankannya, pastikan setiap pengguna punya penugasan (cek di menu Manajemen Pengguna); pengguna tanpa penugasan
+masih bisa login tetapi tidak bisa melakukan apa pun sampai diberi role.
+
+Setelah migrasi, perbarui dokumentasi skema:
+
+```bash
+npm run db:docs
+```
+
+Perintah ini menulis ulang `Database.md` dari skema database yang sedang dipakai.
+
 ### 5. Jalankan proyek
 
 **Opsi A: Jalankan terpisah**
@@ -90,6 +103,30 @@ Perintah ini aman dijalankan berulang kali; dokumen yang sudah punya jurnal dile
 **Opsi B: Jalankan bersamaan**
 
 - Gunakan VS Code Run & Debug → "Full Stack (Flutter + API)"
+
+### 6. Back-office web (`web/`)
+
+Aplikasi web terpisah (React + Vite + TypeScript) untuk owner, manajer, gudang, dan akuntan: pengguna & role,
+lokasi, katalog, stok & IMEI, penerimaan barang, transfer, stok opname, penjualan (batal/retur), shift, pelanggan,
+voucher, analitik, dan akuntansi (jurnal, neraca saldo, laba rugi, bagan akun, periode, pemetaan akun). Laporan
+bisa diekspor ke CSV. Aplikasi Flutter tidak dibangun untuk web.
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Buka http://localhost:5173. Saat development, Vite meneruskan `/api` dan `/uploads` ke API (default
+`http://localhost:3000`; ubah dengan `API_URL=...` di `web/.env.local`), jadi browser melihat satu origin dan
+cookie sesi API (httpOnly, SameSite=Lax) langsung bekerja. Token tidak pernah disimpan di JavaScript.
+
+Produksi: `npm run build` menghasilkan file statis di `web/dist/`. Sajikan dari domain yang sama dengan API lewat
+reverse proxy (mis. nginx: `/` → `web/dist` dengan fallback ke `index.html`, `/api` dan `/uploads` → server
+Node). Jika web harus di domain lain, set `VITE_API_URL` saat build dan tambahkan origin web ke `CORS_ORIGIN`;
+cookie lintas situs juga perlu `SameSite=None; Secure`, jadi satu domain lebih disarankan.
+
+Menu dan halaman mengikuti izin pengguna (sama dengan aplikasi kasir); API tetap memeriksa setiap permintaan.
 
 ---
 
@@ -103,6 +140,7 @@ Perintah ini aman dijalankan berulang kali; dokumen yang sudah punya jurnal dile
 | `.env`           | Env      | Konfigurasi environment (database, JWT, ngrok URL).                    |
 | `API/`           | Folder   | Folder utama backend Express.js.                                       |
 | `app/`           | Folder   | Folder utama aplikasi Flutter.                                         |
+| `web/`           | Folder   | Back-office web (React + Vite), memakai API yang sama.                  |
 | `.vscode/`       | Folder   | Konfigurasi debug VS Code untuk menjalankan Flutter dan API sekaligus. |
 
 ### API/
@@ -112,20 +150,14 @@ Perintah ini aman dijalankan berulang kali; dokumen yang sudah punya jurnal dile
 | `API/src/server.js`              | JavaScript | Entry point server — inisialisasi Express, middleware, dan Socket.IO. |
 | `API/src/db.js`                  | JavaScript | Koneksi ke database MySQL menggunakan `mysql2`.                       |
 | `API/src/routes/auth.js`         | JavaScript | Route autentikasi: login, logout, dan cek user aktif.                 |
-| `API/src/routes/users.js`        | JavaScript | Route manajemen pengguna (CRUD) dengan filter role dan cabang.        |
-| `API/src/routes/admins.js`       | JavaScript | Route khusus admin — operasi yang hanya bisa dilakukan admin.         |
-| `API/src/routes/super.js`        | JavaScript | Route khusus superadmin — akses lintas cabang.                        |
-| `API/src/routes/products.js`     | JavaScript | Route manajemen produk termasuk upload gambar.                        |
+| `API/src/routes/users.js`        | JavaScript | Route manajemen pengguna beserta penugasan role per lokasi.           |
 | `API/src/routes/categories.js`   | JavaScript | Route manajemen kategori produk.                                      |
-| `API/src/routes/branches.js`     | JavaScript | Route manajemen cabang toko.                                          |
-| `API/src/routes/transactions.js` | JavaScript | Route transaksi kasir — validasi stok, potong stok, real-time event.  |
 | `API/src/routes/vouchers.js`     | JavaScript | Route manajemen voucher diskon.                                       |
 | `API/src/routes/dashboard.js`    | JavaScript | Route statistik dashboard (pendapatan, stok, transaksi terbaru).      |
-| `API/src/routes/analytics.js`    | JavaScript | Route analitik lanjutan khusus superadmin.                            |
+| `API/src/routes/analytics.js`    | JavaScript | Route analitik semua lokasi (izin `reports.view_all`).                |
 | `API/src/routes/catalog.js`      | JavaScript | Route katalog: produk, varian, merek, tarif pajak, gambar produk.     |
 | `API/src/routes/stock.js`        | JavaScript | Route stok per lokasi: penyesuaian, harga lokasi, unit IMEI, riwayat. |
 | `API/src/services/stock.js`      | JavaScript | Satu-satunya kode yang mengubah stok; selalu mencatat `stock_movements`. |
-| `API/src/services/legacy-products.js` | JavaScript | Lapisan kompatibilitas `/api/products` lama di atas tabel katalog. |
 | `API/src/routes/sales.js`        | JavaScript | Penjualan (harga termasuk PPN, IMEI, split payment), batal, retur, metode bayar. |
 | `API/src/routes/cash_sessions.js` | JavaScript | Shift kasir: buka, ringkasan, tutup dengan hitung kas.               |
 | `API/src/routes/customers.js`    | JavaScript | Pelanggan (dicari lewat nomor HP) beserta riwayat dan garansi IMEI.   |
@@ -133,15 +165,16 @@ Perintah ini aman dijalankan berulang kali; dokumen yang sudah punya jurnal dile
 | `API/src/services/journal.js`    | JavaScript | Mesin jurnal: harus seimbang, tidak bisa diedit (dibatalkan via jurnal pembalik). |
 | `API/src/services/posting.js`    | JavaScript | Aturan jurnal otomatis untuk penjualan, retur, pembelian, stok, dan shift. |
 | `API/scripts/backfill-journals.js` | JavaScript | `npm run accounting:backfill` — membuat jurnal untuk dokumen lama.   |
+| `API/scripts/schema-doc.js`      | JavaScript | `npm run db:docs` — menulis ulang `Database.md` dari skema database.  |
 | `API/src/routes/purchasing.js`   | JavaScript | Supplier, penerimaan barang (draf → posting ke stok), pembayaran supplier. |
 | `API/src/routes/transfers.js`    | JavaScript | Transfer stok antar lokasi: draf → kirim → terima / selesaikan selisih. |
 | `API/src/routes/opnames.js`      | JavaScript | Stok opname: snapshot, hitung jumlah, scan IMEI, setujui penyesuaian. |
 | `API/src/services/documents.js`  | JavaScript | Penomoran dokumen per lokasi per hari (mis. `GR-WH-261031-0001`).     |
 | `API/src/routes/locations.js`    | JavaScript | Route lokasi (cabang dan gudang): daftar, tambah, ubah, nonaktifkan.  |
 | `API/src/routes/access.js`       | JavaScript | Route role, daftar izin, dan penugasan role pengguna per lokasi.      |
-| `API/src/middleware/auth.js`     | JavaScript | Middleware JWT, `requireRole` (lama), dan `requirePermission`.        |
+| `API/src/middleware/auth.js`     | JavaScript | Middleware JWT dan `requirePermission` (izin per lokasi).             |
 | `API/src/auth/permissions.js`    | JavaScript | Daftar semua kunci izin (permission) yang diperiksa API.              |
-| `API/src/services/access.js`     | JavaScript | Memuat izin pengguna per lokasi; sinkronisasi dengan `users.role`.    |
+| `API/src/services/access.js`     | JavaScript | Memuat izin pengguna per lokasi dan memvalidasi penugasan role.       |
 | `API/src/services/audit.js`      | JavaScript | Pencatatan audit log perubahan data penting.                          |
 | `API/src/utils/upload.js`        | JavaScript | Konfigurasi Multer untuk upload gambar produk dan kategori.           |
 | `API/src/public/api-docs.js`     | JavaScript | Script frontend untuk halaman dokumentasi API berbasis web.           |
@@ -168,671 +201,79 @@ Perintah ini aman dijalankan berulang kali; dokumen yang sudah punya jurnal dile
 | `app/lib/shared/`   | Folder | Widget dan utilitas yang digunakan bersama antar fitur.             |
 | `app/android/`      | Folder | Konfigurasi native Android (NDK, permissions, build config).        |
 
+### web/
+
+| Nama File/Folder           | Tipe   | Deskripsi                                                               |
+| -------------------------- | ------ | ----------------------------------------------------------------------- |
+| `web/src/api/`             | Folder | Klien API (`fetch` dengan cookie sesi) dan tipe respons API.            |
+| `web/src/auth/`            | Folder | Sesi login dan `Access` (izin per lokasi, sama seperti di API).          |
+| `web/src/components/`      | Folder | Komponen UI bersama dan layout (sidebar sesuai izin, penjaga halaman).  |
+| `web/src/lib/`             | Folder | Format Rupiah/tanggal, pemilih lokasi, pemilih produk, ekspor CSV.      |
+| `web/src/pages/`           | Folder | Halaman per modul: admin, catalog, stock, purchasing, transfers, opnames, sales, accounting. |
+| `web/vite.config.ts`       | TS     | Konfigurasi Vite dan proxy `/api` ke API saat development.              |
+
 ---
 
 
 ## Peran Pengguna
 
-| Role         | Deskripsi                                                   |
-| ------------ | ----------------------------------------------------------- |
-| `karyawan`   | Kasir — bisa membuat transaksi dan melihat produk           |
-| `admin`      | Manajer cabang — mengelola pengguna dan produk di cabangnya |
-| `superadmin` | Akses penuh ke semua cabang                                 |
+Hak akses diberikan per lokasi: satu pengguna bisa menjadi manajer di BR01 dan kasir di BR02. Setiap role adalah
+kumpulan izin (`API/src/auth/permissions.js`); API memeriksa izin di lokasi yang diminta, aplikasi hanya
+menyembunyikan menu yang tidak bisa dipakai.
+
+| Role             | Deskripsi                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| `owner`          | Semua izin di semua lokasi.                                                                 |
+| `branch_manager` | Penjualan, batal/retur, shift, stok & opname, transfer, pelanggan, pengguna, voucher, data cabang, laporan cabang. |
+| `cashier`        | Penjualan, shift kasir, lihat katalog & stok, pelanggan.                                    |
+| `warehouse`      | Katalog, stok, IMEI, transfer, opname, penerimaan barang, supplier, impor/ekspor.           |
+| `accountant`     | Jurnal, tutup periode, laporan semua lokasi, pembelian & supplier, impor/ekspor.            |
+
+Role kustom bisa dibuat lewat `/api/access/roles` (izin `roles.manage`). Pengguna hanya bisa memberikan role yang
+izinnya ia miliki sendiri di lokasi tersebut.
 
 ---
 
 ## Dokumentasi API
----
 
-### 🔐 Autentikasi
-
-#### Login
-
-- URL
-  - `/api/auth/login`
-- Method
-  - `POST`
-- Request Body
-  - `username` as `string`
-  - `password` as `string`
-- Response
-
-```json
-{
-  "token": "jwt_token",
-  "user": {
-    "id": 1,
-    "name": "string",
-    "username": "string",
-    "role": "karyawan | admin | superadmin",
-    "branchId": 1
-  }
-}
-```
-
-> Rate limited: 5 percobaan gagal → lockout 15 menit per kombinasi IP+username.
-
----
-
-#### Logout
-
-- URL
-  - `/api/auth/logout`
-- Method
-  - `POST`
-- Response
-
-```json
-{ "message": "Logout berhasil" }
-```
-
----
-
-#### Cek User Aktif
-
-- URL
-  - `/api/auth/me`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Response
-
-```json
-{
-  "id": 1,
-  "name": "string",
-  "username": "string",
-  "role": "string",
-  "branchId": 1
-}
-```
-
----
-
-### 👤 Pengguna
-
-> `admin` hanya bisa mengelola pengguna di cabangnya sendiri.
-
-#### Daftar Pengguna
-
-- URL
-  - `/api/users`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Query Params
-  - `branch_id` — filter berdasarkan cabang (khusus superadmin)
-  - `role` — filter: `karyawan`, `admin`, `superadmin`
-  - `search` — cari berdasarkan nama atau username
-  - `page` — nomor halaman (default: 1)
-  - `limit` — jumlah per halaman (default: 10)
-- Response
-
-```json
-{
-  "users": [{ "id": 1, "name": "string", "username": "string", "role": "string", "branchId": 1 }],
-  "total": 10,
-  "page": 1
-}
-```
-
----
-
-#### Buat Pengguna
-
-- URL
-  - `/api/users`
-- Method
-  - `POST`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Request Body
-  - `name` as `string`
-  - `username` as `string`
-  - `password` as `string` — min 8 karakter, harus ada huruf besar, kecil, dan angka
-  - `role` as `string` — `karyawan | admin | superadmin`
-  - `branch_id` as `number`
-- Response
-
-```json
-{ "message": "Pengguna berhasil dibuat", "id": 5 }
-```
-
----
-
-#### Update Pengguna
-
-- URL
-  - `/api/users/:id`
-- Method
-  - `PUT`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Request Body — field yang ingin diubah (semua opsional)
-  - `name` as `string`
-  - `password` as `string`
-  - `role` as `string`
-  - `branch_id` as `number`
-- Response
-
-```json
-{ "message": "Pengguna berhasil diperbarui" }
-```
-
----
-
-#### Hapus Pengguna
-
-- URL
-  - `/api/users/:id`
-- Method
-  - `DELETE`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Response
-
-```json
-{ "message": "Pengguna berhasil dihapus" }
-```
-
----
-
-### 📦 Produk
-
-> Data otomatis difilter berdasarkan cabang sesuai role.
-
-#### Daftar Produk
-
-- URL
-  - `/api/products`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Query Params
-  - `branch_id` — filter berdasarkan cabang
-  - `category_id` — filter berdasarkan kategori
-  - `search` — cari berdasarkan nama atau barcode
-- Response
-
-```json
-{
-  "products": [
-    {
-      "id": 1,
-      "name": "string",
-      "barcode": "string",
-      "sell_price": 15000,
-      "stock": 10,
-      "category_name": "string",
-      "product_image": "filename.jpg",
-      "branch_id": 1
-    }
-  ]
-}
-```
-
----
-
-#### Buat Produk
-
-- URL
-  - `/api/products`
-- Method
-  - `POST`
-- Headers
-  - `Authorization`: `Bearer <token>`
-  - `Content-Type`: `multipart/form-data`
-- Request Body
-  - `name` as `string` — wajib
-  - `sell_price` as `number` — wajib
-  - `branch_id` as `number` — wajib
-  - `barcode` as `string` — opsional, auto-generate jika kosong
-  - `category_id` as `number` — opsional
-  - `stock` as `number` — opsional, default 0
-  - `product_image` as `file` — opsional, jpg/png
-- Response
-
-```json
-{ "message": "Produk berhasil dibuat", "id": 10 }
-```
-
-> Gambar diakses di: `GET /uploads/products/<nama_file>`
-
----
-
-#### Update Produk
-
-- URL
-  - `/api/products/:id`
-- Method
-  - `PUT`
-- Headers
-  - `Authorization`: `Bearer <token>`
-  - `Content-Type`: `multipart/form-data`
-- Request Body — sama seperti buat produk, semua opsional
-- Response
-
-```json
-{ "message": "Produk berhasil diperbarui" }
-```
-
----
-
-#### Hapus Produk
-
-- URL
-  - `/api/products/:id`
-- Method
-  - `DELETE`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Role
-  - `superadmin`
-- Response
-
-```json
-{ "message": "Produk berhasil dihapus" }
-```
-
----
-
-### 🗂️ Kategori
-
-#### Daftar Kategori
-
-- URL
-  - `/api/categories`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Response
-
-```json
-{
-  "categories": [{ "id": 1, "name": "string", "description": "string", "category_image": "filename.jpg" }]
-}
-```
-
----
-
-#### Buat Kategori
-
-- URL
-  - `/api/categories`
-- Method
-  - `POST`
-- Headers
-  - `Authorization`: `Bearer <token>`
-  - `Content-Type`: `multipart/form-data`
-- Request Body
-  - `name` as `string` — wajib
-  - `description` as `string` — opsional
-  - `category_image` as `file` — opsional, jpg/png
-- Response
-
-```json
-{ "message": "Kategori berhasil dibuat", "id": 3 }
-```
-
-> Gambar diakses di: `GET /uploads/categories/<nama_file>`
-
----
-
-#### Hapus Kategori
-
-- URL
-  - `/api/categories/:id`
-- Method
-  - `DELETE`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Role
-  - `superadmin`
-- Response
-
-```json
-{ "message": "Kategori berhasil dihapus" }
-```
-
-> Gagal jika kategori masih memiliki produk.
-
----
-
-### 🏪 Cabang
-
-#### Daftar Cabang
-
-- URL
-  - `/api/branches`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Response
-
-```json
-{
-  "branches": [{ "id": 1, "name": "string", "address": "string", "phone": "string" }]
-}
-```
-
----
-
-#### Buat Cabang
-
-- URL
-  - `/api/branches`
-- Method
-  - `POST`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Role
-  - `superadmin`
-- Request Body
-  - `name` as `string`
-  - `address` as `string`
-  - `phone` as `string`
-- Response
-
-```json
-{ "message": "Cabang berhasil dibuat", "id": 3 }
-```
-
----
-
-#### Update Cabang
-
-- URL
-  - `/api/branches/:id`
-- Method
-  - `PUT`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Role
-  - `admin` (cabang sendiri), `superadmin`
-- Request Body — field yang ingin diubah
-  - `name` as `string`
-  - `address` as `string`
-  - `phone` as `string`
-- Response
-
-```json
-{ "message": "Cabang berhasil diperbarui" }
-```
-
----
-
-### 🧾 Transaksi
-
-#### Daftar Transaksi
-
-- URL
-  - `/api/transactions`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Query Params
-  - `branch_id`, `user_id`, `payment_status`
-  - `start_date`, `end_date` — format `YYYY-MM-DD`
-- Response
-
-```json
-{
-  "transactions": [
-    {
-      "id": 1,
-      "uuid": "string",
-      "total_amount": 30000,
-      "discount": 0,
-      "final_amount": 30000,
-      "payment_status": "paid",
-      "created_at": "2025-01-01T10:00:00"
-    }
-  ]
-}
-```
-
----
-
-#### Buat Transaksi
-
-- URL
-  - `/api/transactions`
-- Method
-  - `POST`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Request Body
-  - `branch_id` as `number`
-  - `items` as `array` — `[{ "product_id": 1, "qty": 2, "price": 15000 }]`
-  - `discount` as `number`
-  - `payment_method` as `string` — `cash | transfer | e-wallet | card`
-  - `payment_amount` as `number`
-- Response
-
-```json
-{
-  "transactionId": 42,
-  "message": "Transaksi berhasil dibuat"
-}
-```
-
-> Validasi stok sebelum commit. Pengurangan stok dilakukan secara atomik. Mencatat pergerakan stok. Mengirim event `transaction-created`, `payment-completed`, `product-updated` via Socket.IO.
-
----
-
-### 📊 Dashboard
-
-#### Statistik Dashboard
-
-- URL
-  - `/api/dashboard`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Response
-
-```json
-{
-  "todayRevenue": 500000,
-  "todayTransactions": 12,
-  "monthlyRevenue": 15000000,
-  "monthlyTransactions": 320,
-  "lowStockCount": 3,
-  "outOfStockCount": 1,
-  "recentTransactions": []
-}
-```
-
-> Data otomatis difilter berdasarkan cabang untuk role `admin` dan `karyawan`.
-
----
-
-### 🎟️ Voucher
-
-#### Validasi Voucher
-
-- URL
-  - `/api/vouchers/validate/:code`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Response
-
-```json
-{
-  "voucher": {
-    "id": 1,
-    "code": "HEMAT10",
-    "discount_type": "percent",
-    "discount_value": 10,
-    "valid_to": "2025-12-31",
-    "is_active": 1
-  }
-}
-```
-
----
-
-#### Buat Voucher
-
-- URL
-  - `/api/vouchers`
-- Method
-  - `POST`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Role
-  - `admin`, `superadmin`
-- Request Body
-  - `code` as `string`
-  - `description` as `string` — opsional
-  - `discount_type` as `string` — `percent | fixed`
-  - `discount_value` as `number`
-  - `valid_from` as `string` — format `YYYY-MM-DD`, opsional
-  - `valid_to` as `string` — format `YYYY-MM-DD`, opsional
-  - `is_active` as `number` — `1` atau `0`
-  - `target_type` as `string` — `product | categories | null`
-  - `target_id` as `number` — opsional
-- Response
-
-```json
-{ "message": "Voucher berhasil dibuat", "id": 5 }
-```
-
----
-
-### 📈 Analitik
-
-> Semua endpoint analitik membutuhkan role `superadmin`.
-
-#### Ringkasan KPI
-
-- URL
-  - `/api/analytics/summary`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Response
-
-```json
-{
-  "todayRevenue": 500000,
-  "monthlyRevenue": 15000000,
-  "allTimeRevenue": 200000000
-}
-```
-
----
-
-#### Tren Pendapatan Harian
-
-- URL
-  - `/api/analytics/revenue-trend`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Query Params
-  - `days` — jumlah hari ke belakang, maks 90, default 30
-- Response
-
-```json
-{
-  "trend": [{ "date": "2025-01-01", "revenue": 500000 }]
-}
-```
-
----
-
-#### Pendapatan per Cabang
-
-- URL
-  - `/api/analytics/branch-revenue`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Query Params
-  - `date` — format `YYYY-MM-DD`
-- Response
-
-```json
-{
-  "branches": [{ "branch_id": 1, "name": "Cabang A", "revenue": 300000 }]
-}
-```
-
----
-
-#### Kategori Terlaris
-
-- URL
-  - `/api/analytics/category-sales`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Query Params
-  - `days` — maks 90, default 30
-- Response
-
-```json
-{
-  "categories": [{ "name": "Minuman", "total_qty": 150 }]
-}
-```
-
----
-
-#### Produk Terlaris
-
-- URL
-  - `/api/analytics/top-products`
-- Method
-  - `GET`
-- Headers
-  - `Authorization`: `Bearer <token>`
-- Query Params
-  - `days` — maks 90, default 30
-  - `limit` — maks 20
-- Response
-
-```json
-{
-  "products": [{ "id": 1, "name": "Teh Botol", "total_qty": 80 }]
-}
-```
-
----
+Dokumentasi lengkap (semua endpoint, izin yang dibutuhkan, body, contoh respons) tersedia di **`/api/docs`**
+saat server berjalan — login dengan akun owner. Ringkasan:
+
+| Prefix                     | Isi                                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------- |
+| `/api/auth`                | Login (mengembalikan token dan `access`: role & izin per lokasi), logout, `me`.           |
+| `/api/users`               | Pengguna + penugasan `assignments: [{ location_id, role_id }]` (izin `users.manage`).     |
+| `/api/access`              | Daftar izin, role (buat/ubah/hapus), penugasan pengguna.                                  |
+| `/api/locations`           | Cabang & gudang.                                                                          |
+| `/api/catalog`, `/api/categories` | Produk, varian, merek, tarif pajak, kategori.                                     |
+| `/api/stock`               | Stok per lokasi, penyesuaian, harga lokasi, unit IMEI, riwayat stok.                      |
+| `/api/purchasing`          | Supplier, penerimaan barang, pembayaran supplier.                                         |
+| `/api/transfers`           | Transfer stok antar lokasi.                                                               |
+| `/api/opnames`             | Stok opname.                                                                              |
+| `/api/sales`               | Penjualan (idempoten per UUID klien), `/quote`, batal, retur, metode pembayaran.          |
+| `/api/customers`, `/api/cash-sessions` | Pelanggan dan shift kasir.                                                  |
+| `/api/vouchers`            | Voucher (`vouchers.manage`); `/validate/:code` untuk kasir.                               |
+| `/api/accounting`          | Akun, jurnal, neraca saldo, laba rugi, periode, pemetaan akun.                            |
+| `/api/dashboard`, `/api/analytics` | Ringkasan untuk lokasi pengguna; analitik semua lokasi (`reports.view_all`).    |
+
+Endpoint lama `/api/products`, `/api/branches`, `/api/transactions`, `/api/admins` dan `/api/super` sudah dihapus;
+gunakan `/api/catalog`, `/api/locations` dan `/api/sales`.
 
 ### ⚡ Socket.IO Events
 
-Hubungkan ke server menggunakan `socket_io_client`. Bergabung ke room cabang untuk menerima update real-time:
+Koneksi wajib membawa token API (`auth: { token }` atau header `Authorization: Bearer <token>`). Bergabung ke room lokasi
+untuk menerima update real-time:
 
 ```dart
-socket.emit('join-branch', branchId);  // bergabung ke room cabang
-socket.emit('leave-branch', branchId); // keluar dari room cabang
+socket.emit('join-branch', locationId); // room satu lokasi (harus punya akses penjualan/laporan di sana)
+socket.emit('join-branch', 0);          // semua lokasi — hanya untuk akses yang mencakup semua lokasi
 ```
 
-| Event                 | Payload                                       | Dipicu saat                     |
-| --------------------- | --------------------------------------------- | ------------------------------- |
-| `transaction-created` | objek transaksi                               | Transaksi baru dibuat           |
-| `payment-completed`   | `{ transactionId, method, amount, branchId }` | Pembayaran selesai              |
-| `product-created`     | objek produk                                  | Produk baru ditambahkan         |
-| `product-updated`     | objek produk                                  | Produk diedit atau stok berubah |
-| `product-deleted`     | `{ id }`                                      | Produk dihapus                  |
-| `server-info`         | status server                                 | Setiap 10 detik                 |
-
-> Gunakan `branch_id = 0` untuk menerima event dari semua cabang (superadmin).
+| Event           | Payload                                        | Dipicu saat                          |
+| --------------- | ---------------------------------------------- | ------------------------------------ |
+| `sale-created`  | `{ id, number, grand_total, location_id? }`    | Penjualan baru tersimpan             |
+| `stock-changed` | `{ location_id, variant_ids }`                 | Stok berubah karena penjualan        |
+| `server-info`   | status server                                  | Setiap 10 detik (halaman docs)       |
 
 ---
 
@@ -850,3 +291,10 @@ socket.emit('leave-branch', branchId); // keluar dari room cabang
 | `CORS_ORIGIN`     | ❌    | Origin yang diizinkan untuk CORS (pisahkan dengan koma) |
 | `NGROK_AUTHTOKEN` | ❌    | Auth token ngrok (mengaktifkan tunnel)                  |
 | `API_TIMEOUT`     | ❌    | Timeout yang ditulis ke `app/.env` (default: 30000)     |
+| `RATE_LIMIT_WINDOW_MS` | ❌ | Jendela rate limit dalam ms (default: 60000)        |
+| `RATE_LIMIT_USER_MAX`  | ❌ | Maks. permintaan per pengguna per jendela (default: 300) |
+| `RATE_LIMIT_ANON_MAX`  | ❌ | Maks. permintaan tanpa token per IP per jendela (default: 60) |
+
+Rate limit dihitung per pengguna yang login (perangkat di satu toko biasanya memakai satu IP publik); permintaan tanpa
+token dihitung per IP. `/api/health` dan `/api/test` (cek koneksi aplikasi) tidak dibatasi. Percobaan login punya
+penguncian sendiri (5 kali gagal → 15 menit).

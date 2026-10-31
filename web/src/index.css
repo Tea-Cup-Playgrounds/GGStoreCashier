@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* Brand colours follow the Flutter app (AppTheme): gold accent on a dark sidebar. */
+@theme {
+  --color-brand-50: #fbf7e9;
+  --color-brand-100: #f5ecc8;
+  --color-brand-500: #d4af37;
+  --color-brand-600: #c19b26;
+  --color-brand-700: #9a7a1c;
+  --color-ink-900: #0a0a0a;
+  --color-ink-800: #141414;
+  --color-ink-700: #1f1f1f;
+  --color-ink-600: #292929;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-stone-50 text-stone-900 antialiased;
+}
+
+/* Native <dialog> used by Modal. */
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
-import 'package:gg_store_cashier/core/router/role_guard.dart';
+import 'package:gg_store_cashier/core/provider/access_provider.dart';
+import 'package:gg_store_cashier/core/models/branch.dart';
+import 'package:gg_store_cashier/core/services/branch_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,8 +15,11 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    final isKaryawan = user?.isEmployee ?? false;
-    final isAdminOrAbove = RoleGuard.isAdminOrAbove(user);
+    final access = ref.watch(currentAccessProvider);
+    final ownLocation = user?.defaultLocationId;
+    // Owners pick which branch to edit; others edit their own location when allowed.
+    final canEditBranches = access.isOwner || access.locationsFor('locations.manage') == null;
+    final canEditOwnBranch = ownLocation != null && access.can('locations.manage', ownLocation);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -41,17 +46,15 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.storefront_outlined,
                 onTap: () {},
               ),
-              if (isAdminOrAbove)
+              if (canEditBranches || canEditOwnBranch)
                 _SettingsTile(
-                  title: RoleGuard.isSuperAdmin(user) ? 'Branch Management' : 'My Branch',
-                  subtitle:
-                      RoleGuard.isSuperAdmin(user) ? 'Lihat dan kelola semua cabang' : 'Edit informasi cabang Anda',
+                  title: canEditBranches ? 'Branch Management' : 'My Branch',
+                  subtitle: canEditBranches ? 'Lihat dan kelola semua cabang' : 'Edit informasi cabang Anda',
                   icon: Icons.business_outlined,
-                  onTap: () {
-                    final branchId = user?.branchId ?? 0;
-                    context.push(
-                      AppRouter.branchEdit.replaceFirst(':id', '$branchId'),
-                    );
+                  onTap: () async {
+                    final branchId = canEditBranches ? await _pickBranch(context) : ownLocation;
+                    if (branchId == null || !context.mounted) return;
+                    context.push(AppRouter.branchEdit.replaceFirst(':id', '$branchId'));
                   },
                 ),
             ]),
@@ -95,20 +98,20 @@ class SettingsPage extends ConsumerWidget {
             const _SectionLabel('Support'),
             const SizedBox(height: 8),
             _SettingsGroup(tiles: [
-              if (!isKaryawan) ...[
+              if (access.can('users.manage'))
                 _SettingsTile(
                   title: 'User Management',
                   subtitle: 'Kelola pengguna dan hak akses',
                   icon: Icons.people_outline,
                   onTap: () => context.push(AppRouter.userManagement),
                 ),
+              if (access.can('vouchers.manage'))
                 _SettingsTile(
                   title: 'Vouchers',
                   subtitle: 'Buat dan kelola voucher diskon',
                   icon: Icons.local_offer_outlined,
                   onTap: () => context.push(AppRouter.voucherManagement),
                 ),
-              ],
               _SettingsTile(
                 title: 'Privacy & Security',
                 subtitle: 'Kata sandi, autentikasi dua faktor',
@@ -137,6 +140,39 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Lets an owner choose which branch to edit. Returns its id, or null when dismissed or unavailable.
+Future<int?> _pickBranch(BuildContext context) async {
+  List<Branch> branches;
+  try {
+    branches = await BranchService.getBranches();
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memuat cabang: $e')));
+    }
+    return null;
+  }
+  if (!context.mounted) return null;
+  return showModalBottomSheet<int>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          const ListTile(title: Text('Pilih cabang', style: TextStyle(fontWeight: FontWeight.w600))),
+          for (final b in branches)
+            ListTile(
+              leading: const Icon(Icons.storefront_outlined),
+              title: Text(b.name),
+              subtitle: b.address == null || b.address!.isEmpty ? null : Text(b.address!),
+              onTap: () => Navigator.of(context).pop(b.id),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 // ── Section label ─────────────────────────────────────────────────────────────

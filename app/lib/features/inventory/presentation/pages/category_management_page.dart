@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../core/services/auth_service.dart';
-import '../../../../core/provider/auth_provider.dart';
+import '../../../../core/provider/access_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/utils/snackbar_service.dart';
@@ -117,10 +117,8 @@ class _CategoryManagementPageState extends ConsumerState<CategoryManagementPage>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = cs.brightness == Brightness.dark;
-    final user = ref.watch(authProvider).user;
-    final role = user?.role ?? 'karyawan';
-    final canAddEdit = role == 'admin' || role == 'superadmin';
-    final canDelete = role == 'superadmin';
+    final canAddEdit = ref.watch(currentAccessProvider).can('catalog.manage');
+    final canDelete = canAddEdit;
 
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.gold));
