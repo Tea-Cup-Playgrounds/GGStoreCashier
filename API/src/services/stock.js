@@ -1,4 +1,5 @@
 const { uuidv7 } = require('../utils/uuid');
+const { AppError } = require('../utils/transaction');
 
 // The only code that changes stock. Every function here must be called with a connection that
 // is inside a transaction; each change locks the affected rows and writes its stock_movements
@@ -6,12 +7,7 @@ const { uuidv7 } = require('../utils/uuid');
 //
 // ctx = { userId, deviceId } — who is making the change.
 
-class StockError extends Error {
-    constructor(message, status = 400) {
-        super(message);
-        this.status = status;
-    }
-}
+class StockError extends AppError {}
 
 const toMoney = (value) => Math.round(Number(value) * 100) / 100;
 
@@ -302,6 +298,68 @@ const removeUnit = async (conn, ctx, { unitId, status, reason, refType, refId, n
     return unit;
 };
 
+// A sold unit coming back (void or customer return). Restocked units return to stock with a
+// +1 movement; defective ones are kept at the location as 'defective' without a movement, since
+// they never count as on-hand stock.
+const returnSoldUnit = async (conn, ctx, { unitId, locationId, defective = false, refType, refId, note }) => {
+    const unit = await lockUnit(conn, unitId);
+    if (unit.status !== 'sold') throw new StockError(`Unit ${unit.imei1 || unit.serial_number || unitId} tidak berstatus terjual`, 409);
+    await assertLocation(conn, locationId);
+    await lockLevel(conn, locationId, unit.variant_id);
+
+    await conn.execute(
+        'UPDATE product_units SET status = ?, location_id = ?, sold_sale_line_id = NULL, warranty_until = NULL WHERE id = ?',
+        [defective ? 'defective' : 'in_stock', locationId, unitId]
+    );
+    if (!defective) {
+        await writeMovement(conn, ctx, {
+            locationId, variantId: unit.variant_id, unitId, qtyChange: 1,
+            unitCost: unit.unit_cost, reason: 'sale_return', refType, refId, note,
+        });
+    }
+    return unit;
+};
+
+// ── transfers ───────────────────────────────────────────────────────────────
+
+// Sends a unit out of its location: in_stock -> in_transit (no location), -1 movement at the source.
+const shipUnit = async (conn, ctx, { unitId, fromLocationId, refType, refId, note }) => {
+    const unit = await lockUnit(conn, unitId);
+    if (unit.status !== 'in_stock') throw new StockError(`Unit ${unit.imei1 || unit.serial_number || unitId} tidak tersedia (status: ${unit.status})`, 409);
+    if (unit.location_id !== Number(fromLocationId)) throw new StockError(`Unit ${unit.imei1 || unit.serial_number || unitId} tidak berada di lokasi asal`, 409);
+
+    await conn.execute("UPDATE product_units SET status = 'in_transit', location_id = NULL WHERE id = ?", [unitId]);
+    await writeMovement(conn, ctx, {
+        locationId: unit.location_id, variantId: unit.variant_id, unitId, qtyChange: -1,
+        unitCost: unit.unit_cost, reason: 'transfer_out', refType, refId, note,
+    });
+    return unit;
+};
+
+// Brings an in-transit unit into a location: in_transit -> in_stock, +1 movement there.
+// Used when a transfer is received, and when an undelivered unit is returned to its source.
+const landUnit = async (conn, ctx, { unitId, locationId, refType, refId, note }) => {
+    const unit = await lockUnit(conn, unitId);
+    if (unit.status !== 'in_transit') throw new StockError(`Unit ${unit.imei1 || unit.serial_number || unitId} tidak sedang dalam pengiriman`, 409);
+    await assertLocation(conn, locationId);
+    await lockLevel(conn, locationId, unit.variant_id);
+
+    await conn.execute("UPDATE product_units SET status = 'in_stock', location_id = ? WHERE id = ?", [locationId, unitId]);
+    await writeMovement(conn, ctx, {
+        locationId, variantId: unit.variant_id, unitId, qtyChange: 1,
+        unitCost: unit.unit_cost, reason: 'transfer_in', refType, refId, note,
+    });
+    return unit;
+};
+
+// A unit lost in transit. It already left its source's ledger when shipped, so no movement.
+const writeOffInTransitUnit = async (conn, { unitId }) => {
+    const unit = await lockUnit(conn, unitId);
+    if (unit.status !== 'in_transit') throw new StockError('Unit tidak sedang dalam pengiriman', 409);
+    await conn.execute("UPDATE product_units SET status = 'written_off' WHERE id = ?", [unitId]);
+    return unit;
+};
+
 // ── per-location pricing ────────────────────────────────────────────────────
 
 // sellPrice null removes the override (the variant's base_price applies again).
@@ -325,5 +383,11 @@ module.exports = {
     receiveUnits,
     updateUnit,
     removeUnit,
+    returnSoldUnit,
+    shipUnit,
+    landUnit,
+    writeOffInTransitUnit,
     setLocationPrice,
+    getVariant,
+    normalizeIdentifier,
 };

@@ -1,32 +1,7 @@
 // Models for /api/locations, /api/catalog and /api/stock.
-// MySQL DECIMAL columns arrive as strings, so numbers go through _toDouble/_toInt.
+// Numbers are read with the lenient helpers in json_parse.dart.
 
-double _toDouble(dynamic value) {
-  if (value == null) return 0;
-  if (value is num) return value.toDouble();
-  return double.tryParse(value.toString()) ?? 0;
-}
-
-double? _toNullableDouble(dynamic value) {
-  if (value == null) return null;
-  if (value is num) return value.toDouble();
-  return double.tryParse(value.toString());
-}
-
-int _toInt(dynamic value) {
-  if (value == null) return 0;
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value.toString()) ?? 0;
-}
-
-int? _toNullableInt(dynamic value) {
-  if (value == null) return null;
-  if (value is int) return value;
-  return int.tryParse(value.toString());
-}
-
-DateTime? _toDate(dynamic value) => value == null ? null : DateTime.tryParse(value.toString());
+import 'json_parse.dart';
 
 class Location {
   final int id;
@@ -42,7 +17,7 @@ class Location {
   String get label => code != null ? '$code · $name' : name;
 
   factory Location.fromJson(Map<String, dynamic> json) => Location(
-        id: _toInt(json['id']),
+        id: parseInt(json['id']),
         code: json['code'] as String?,
         name: json['name']?.toString() ?? '',
         type: json['type']?.toString() ?? 'branch',
@@ -56,7 +31,7 @@ class Brand {
 
   const Brand({required this.id, required this.name});
 
-  factory Brand.fromJson(Map<String, dynamic> json) => Brand(id: _toInt(json['id']), name: json['name'].toString());
+  factory Brand.fromJson(Map<String, dynamic> json) => Brand(id: parseInt(json['id']), name: json['name'].toString());
 }
 
 enum SerialType { imei, imeiDual, serial }
@@ -116,20 +91,20 @@ class ProductVariant {
   });
 
   factory ProductVariant.fromJson(Map<String, dynamic> json) => ProductVariant(
-        id: _toInt(json['id']),
-        productId: _toInt(json['product_id']),
+        id: parseInt(json['id']),
+        productId: parseInt(json['product_id']),
         sku: json['sku']?.toString() ?? '',
         barcode: json['barcode'] as String?,
         name: json['name'] as String?,
         attributes: json['attributes'] is Map ? Map<String, dynamic>.from(json['attributes'] as Map) : null,
-        basePrice: _toDouble(json['base_price']),
-        minPrice: _toNullableDouble(json['min_price']),
+        basePrice: parseDouble(json['base_price']),
+        minPrice: parseNullableDouble(json['min_price']),
         isActive: json['is_active'] != false,
-        onHand: _toNullableInt(json['on_hand']),
-        sellPrice: _toNullableDouble(json['sell_price']),
-        locationPrice: _toNullableDouble(json['location_price']),
-        avgCost: _toNullableDouble(json['avg_cost']),
-        reorderLevel: _toNullableInt(json['reorder_level']),
+        onHand: parseNullableInt(json['on_hand']),
+        sellPrice: parseNullableDouble(json['sell_price']),
+        locationPrice: parseNullableDouble(json['location_price']),
+        avgCost: parseNullableDouble(json['avg_cost']),
+        reorderLevel: parseNullableInt(json['reorder_level']),
       );
 
   /// Effective price at the requested location, or the base price.
@@ -164,15 +139,15 @@ class LocationStock {
   });
 
   factory LocationStock.fromJson(Map<String, dynamic> json) => LocationStock(
-        locationId: _toInt(json['location_id']),
+        locationId: parseInt(json['location_id']),
         locationCode: json['location_code'] as String?,
         locationName: json['location_name']?.toString() ?? '',
         locationType: json['location_type']?.toString() ?? 'branch',
-        variantId: _toInt(json['variant_id']),
-        onHand: _toInt(json['on_hand']),
-        sellPrice: _toDouble(json['sell_price']),
-        locationPrice: _toNullableDouble(json['location_price']),
-        avgCost: _toNullableDouble(json['avg_cost']),
+        variantId: parseInt(json['variant_id']),
+        onHand: parseInt(json['on_hand']),
+        sellPrice: parseDouble(json['sell_price']),
+        locationPrice: parseNullableDouble(json['location_price']),
+        avgCost: parseNullableDouble(json['avg_cost']),
       );
 }
 
@@ -214,18 +189,18 @@ class CatalogProduct {
   });
 
   factory CatalogProduct.fromJson(Map<String, dynamic> json) => CatalogProduct(
-        id: _toInt(json['id']),
+        id: parseInt(json['id']),
         name: json['name']?.toString() ?? '',
         description: json['description'] as String?,
-        categoryId: _toNullableInt(json['category_id']),
+        categoryId: parseNullableInt(json['category_id']),
         categoryName: json['category_name'] as String?,
-        brandId: _toNullableInt(json['brand_id']),
+        brandId: parseNullableInt(json['brand_id']),
         brandName: json['brand_name'] as String?,
         kind: json['kind']?.toString() ?? 'goods',
         isSerialized: json['is_serialized'] == true,
         serialType: serialTypeFromApi(json['serial_type'] as String?),
-        warrantyMonths: _toInt(json['warranty_months']),
-        taxRateId: _toNullableInt(json['tax_rate_id']),
+        warrantyMonths: parseInt(json['warranty_months']),
+        taxRateId: parseNullableInt(json['tax_rate_id']),
         image: json['image'] as String?,
         isActive: json['is_active'] != false,
         variants: ((json['variants'] as List?) ?? const [])
@@ -292,10 +267,10 @@ class ProductUnit {
 
   factory ProductUnit.fromJson(Map<String, dynamic> json) => ProductUnit(
         id: json['id'].toString(),
-        variantId: _toInt(json['variant_id']),
+        variantId: parseInt(json['variant_id']),
         name: json['name']?.toString() ?? '',
         sku: json['sku'] as String?,
-        locationId: _toNullableInt(json['location_id']),
+        locationId: parseNullableInt(json['location_id']),
         locationCode: json['location_code'] as String?,
         locationName: json['location_name'] as String?,
         imei1: json['imei1'] as String?,
@@ -303,10 +278,10 @@ class ProductUnit {
         serialNumber: json['serial_number'] as String?,
         status: json['status']?.toString() ?? 'in_stock',
         conditionGrade: json['condition_grade']?.toString() ?? 'new',
-        unitCost: _toNullableDouble(json['unit_cost']),
-        sellPrice: _toDouble(json['sell_price']),
+        unitCost: parseNullableDouble(json['unit_cost']),
+        sellPrice: parseDouble(json['sell_price']),
         notes: json['notes'] as String?,
-        createdAt: _toDate(json['created_at']),
+        createdAt: parseDate(json['created_at']),
       );
 
   /// The best identifier to show: IMEI 1, else serial, else a placeholder.
@@ -362,18 +337,18 @@ class StockMovement {
 
   factory StockMovement.fromJson(Map<String, dynamic> json) => StockMovement(
         id: json['id'].toString(),
-        variantId: _toInt(json['variant_id']),
+        variantId: parseInt(json['variant_id']),
         name: json['name']?.toString() ?? '',
         imei1: json['imei1'] as String?,
         serialNumber: json['serial_number'] as String?,
-        qtyChange: _toInt(json['qty_change']),
-        unitCost: _toNullableDouble(json['unit_cost']),
+        qtyChange: parseInt(json['qty_change']),
+        unitCost: parseNullableDouble(json['unit_cost']),
         reason: json['reason']?.toString() ?? '',
         refType: json['ref_type'] as String?,
         refId: json['ref_id'] as String?,
         note: json['note'] as String?,
         userName: json['user_name'] as String?,
-        createdAt: _toDate(json['created_at']),
+        createdAt: parseDate(json['created_at']),
       );
 }
 

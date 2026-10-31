@@ -8,14 +8,16 @@ import '../../../../core/helper/currency_formatter.dart';
 class PaymentSuccessView extends StatefulWidget {
   final double total;
   final Map<String, dynamic>? appliedCoupon;
-  final int? transactionId;
+  final String? saleNumber;
+  final double change;
   final VoidCallback onNewTransaction;
 
   const PaymentSuccessView({
     super.key,
     required this.total,
     this.appliedCoupon,
-    this.transactionId,
+    this.saleNumber,
+    this.change = 0,
     required this.onNewTransaction,
   });
 
@@ -205,7 +207,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              '${widget.appliedCoupon!['discount']}% diskon diterapkan (${widget.appliedCoupon!['code']})',
+                              'Voucher ${widget.appliedCoupon!['code']} diterapkan',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppTheme.success,
                                     fontWeight: FontWeight.w500,
@@ -213,10 +215,20 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
                             ),
                           ),
                         ],
-                        if (widget.transactionId != null) ...[
+                        if (widget.change > 0) ...[
                           const SizedBox(height: 12),
                           Text(
-                            'Transaksi #${widget.transactionId}',
+                            'Kembalian ${CurrencyFormatter.formatToRupiah(widget.change)}',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: AppTheme.success,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ],
+                        if (widget.saleNumber != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.saleNumber!,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: AppTheme.mutedForeground,
                                 ),

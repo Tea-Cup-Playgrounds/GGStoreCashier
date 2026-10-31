@@ -4,39 +4,13 @@ const { authenticateToken, requirePermission } = require('../middleware/auth');
 const { logAudit } = require('../services/audit');
 const stock = require('../services/stock');
 const { ON_HAND_SQL, AVG_COST_SQL, DISPLAY_NAME_SQL, canSeeCost } = require('../services/catalog');
+const { withTransaction } = require('../utils/transaction');
+const posting = require('../services/posting');
+const { ctxOf, requireLocation } = require('../utils/request');
 
 const router = express.Router();
 
 router.use(authenticateToken);
-
-const ctxOf = (req) => ({ userId: req.user.id, deviceId: req.deviceId || null });
-
-// Runs fn(conn) in a transaction; StockError becomes a 4xx response.
-const withTransaction = async (res, fallbackMessage, fn) => {
-    const conn = await pool.getConnection();
-    try {
-        await conn.beginTransaction();
-        const result = await fn(conn);
-        await conn.commit();
-        return result;
-    } catch (error) {
-        await conn.rollback();
-        if (error instanceof stock.StockError) {
-            res.status(error.status).json({ error: error.message });
-        } else {
-            console.error(`${fallbackMessage}:`, error);
-            res.status(500).json({ error: fallbackMessage });
-        }
-        return undefined;
-    } finally {
-        conn.release();
-    }
-};
-
-const requireLocation = (req, res, next) => {
-    if (!req.locationId) return res.status(400).json({ error: 'location_id wajib diisi' });
-    next();
-};
 
 const unitLocation = async (req) => {
     const [rows] = await pool.execute('SELECT location_id FROM product_units WHERE id = ?', [req.params.id]);
@@ -93,6 +67,10 @@ router.post('/adjust', requirePermission('stock.adjust'), requireLocation, async
         const r = await stock.adjustQuantity(conn, ctxOf(req), {
             locationId: req.locationId, variantId: Number(variant_id), qtyChange: Number(qty_change),
             unitCost: unit_cost, reason: 'adjustment', note: String(note).trim(),
+        });
+        await posting.postStockValue(conn, ctxOf(req), {
+            sourceType: 'stock_adjustment', sourceId: r.movementId, locationId: req.locationId,
+            value: Number(qty_change) * r.unitCost, memo: `Penyesuaian stok: ${String(note).trim()}`,
         });
         await logAudit(conn, req, {
             action: 'adjust', entity: 'stock', entityId: variant_id, locationId: req.locationId,
@@ -205,6 +183,10 @@ router.post('/units', requirePermission('units.register'), requireLocation, asyn
             reason: 'adjustment', sourceType: 'adjustment', note: note || 'Pendaftaran unit',
             requireIdentifiers: !location || location.type !== 'warehouse',
         });
+        await posting.postStockValue(conn, ctxOf(req), {
+            sourceType: 'stock_adjustment', sourceId: created[0].id, locationId: req.locationId,
+            value: created.reduce((s, u) => s + u.unit_cost, 0), memo: `Pendaftaran ${created.length} unit`,
+        });
         await logAudit(conn, req, {
             action: 'register_units', entity: 'stock', entityId: variant_id, locationId: req.locationId,
             after: { count: created.length, units: created.map(({ id, imei1, imei2, serial_number }) => ({ id, imei1, imei2, serial_number })) },
@@ -234,6 +216,10 @@ router.post('/units/:id/write-off', requirePermission('stock.adjust', { location
     const result = await withTransaction(res, 'Gagal mengeluarkan unit', async (conn) => {
         const unit = await stock.removeUnit(conn, ctxOf(req), {
             unitId: req.params.id, status, reason: 'write_off', note: String(note).trim(),
+        });
+        await posting.postStockValue(conn, ctxOf(req), {
+            sourceType: 'stock_adjustment', sourceId: req.params.id, locationId: unit.location_id,
+            value: -Number(unit.unit_cost), memo: `Unit ${status === 'defective' ? 'rusak' : 'dihapus'}: ${String(note).trim()}`,
         });
         await logAudit(conn, req, { action: status, entity: 'unit', entityId: req.params.id, locationId: unit.location_id, after: { status, note } });
         return unit;

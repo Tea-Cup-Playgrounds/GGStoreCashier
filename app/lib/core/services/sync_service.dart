@@ -77,7 +77,9 @@ class SyncService {
     try {
       final token = await AuthService.getToken();
       await _dio.post(
-        '${ApiConfig.apiUrl}/api/transactions',
+        // The payload is a full POST /api/sales body with its own id, so a retry after a lost
+        // response returns the stored sale instead of creating a second one.
+        '${ApiConfig.apiUrl}/api/sales',
         data: Map<String, dynamic>.from(entry.payload),
         options: Options(
           headers: {

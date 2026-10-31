@@ -15,6 +15,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../providers/inventory_location_provider.dart';
 import '../widgets/inventory_header.dart';
 import '../widgets/imei_lookup_sheet.dart';
+import '../../../warehouse/presentation/widgets/warehouse_menu_button.dart';
 import '../widgets/location_selector.dart';
 import 'category_management_page.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
@@ -164,6 +165,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                         icon: const Icon(Icons.qr_code_scanner_rounded),
                         onPressed: () => ImeiLookupSheet.show(context),
                       ),
+                      if (location != null && access != null) WarehouseMenuButton(location: location, access: access, onClosed: _loadProducts),
                       if (canManageCatalog)
                         SizedBox(
                           height: 40,

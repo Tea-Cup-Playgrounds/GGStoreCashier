@@ -72,6 +72,14 @@ Skema database dikelola dengan migrasi [Knex](https://knexjs.org) di `API/migrat
 
 Setiap perubahan skema harus dibuat sebagai file migrasi baru — jangan ubah tabel langsung di database atau mengedit migrasi yang sudah dijalankan.
 
+Setelah migrasi akuntansi (penjualan & jurnal) pertama kali dijalankan, buat jurnal untuk transaksi, penerimaan barang, dan pembayaran supplier yang sudah ada:
+
+```bash
+npm run accounting:backfill
+```
+
+Perintah ini aman dijalankan berulang kali; dokumen yang sudah punya jurnal dilewati.
+
 ### 5. Jalankan proyek
 
 **Opsi A: Jalankan terpisah**
@@ -118,6 +126,17 @@ Setiap perubahan skema harus dibuat sebagai file migrasi baru — jangan ubah ta
 | `API/src/routes/stock.js`        | JavaScript | Route stok per lokasi: penyesuaian, harga lokasi, unit IMEI, riwayat. |
 | `API/src/services/stock.js`      | JavaScript | Satu-satunya kode yang mengubah stok; selalu mencatat `stock_movements`. |
 | `API/src/services/legacy-products.js` | JavaScript | Lapisan kompatibilitas `/api/products` lama di atas tabel katalog. |
+| `API/src/routes/sales.js`        | JavaScript | Penjualan (harga termasuk PPN, IMEI, split payment), batal, retur, metode bayar. |
+| `API/src/routes/cash_sessions.js` | JavaScript | Shift kasir: buka, ringkasan, tutup dengan hitung kas.               |
+| `API/src/routes/customers.js`    | JavaScript | Pelanggan (dicari lewat nomor HP) beserta riwayat dan garansi IMEI.   |
+| `API/src/routes/accounting.js`   | JavaScript | Bagan akun, jurnal manual, neraca saldo, laba rugi, tutup periode, pemetaan akun. |
+| `API/src/services/journal.js`    | JavaScript | Mesin jurnal: harus seimbang, tidak bisa diedit (dibatalkan via jurnal pembalik). |
+| `API/src/services/posting.js`    | JavaScript | Aturan jurnal otomatis untuk penjualan, retur, pembelian, stok, dan shift. |
+| `API/scripts/backfill-journals.js` | JavaScript | `npm run accounting:backfill` — membuat jurnal untuk dokumen lama.   |
+| `API/src/routes/purchasing.js`   | JavaScript | Supplier, penerimaan barang (draf → posting ke stok), pembayaran supplier. |
+| `API/src/routes/transfers.js`    | JavaScript | Transfer stok antar lokasi: draf → kirim → terima / selesaikan selisih. |
+| `API/src/routes/opnames.js`      | JavaScript | Stok opname: snapshot, hitung jumlah, scan IMEI, setujui penyesuaian. |
+| `API/src/services/documents.js`  | JavaScript | Penomoran dokumen per lokasi per hari (mis. `GR-WH-261031-0001`).     |
 | `API/src/routes/locations.js`    | JavaScript | Route lokasi (cabang dan gudang): daftar, tambah, ubah, nonaktifkan.  |
 | `API/src/routes/access.js`       | JavaScript | Route role, daftar izin, dan penugasan role pengguna per lokasi.      |
 | `API/src/middleware/auth.js`     | JavaScript | Middleware JWT, `requireRole` (lama), dan `requirePermission`.        |

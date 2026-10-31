@@ -12,7 +12,7 @@ const legacyProductSelect = (locationId) => {
                 SELECT v.id, ${DISPLAY_NAME_SQL} AS name, v.barcode, p.category_id,
                        COALESCE(sl.sell_price, v.base_price) AS sell_price,
                        ${ON_HAND_SQL} AS stock,
-                       p.image AS product_image, l.id AS branch_id, p.description,
+                       p.image AS product_image, p.is_serialized, l.id AS branch_id, p.description,
                        c.name AS category_name, l.name AS branch_name,
                        v.created_at, GREATEST(p.updated_at, v.updated_at) AS updated_at
                 FROM product_variants v
@@ -29,7 +29,7 @@ const legacyProductSelect = (locationId) => {
             SELECT v.id, ${DISPLAY_NAME_SQL} AS name, v.barcode, p.category_id, v.base_price AS sell_price,
                    COALESCE((SELECT SUM(soh.qty) FROM stock_on_hand soh JOIN locations bl ON bl.id = soh.location_id
                              WHERE soh.variant_id = v.id AND bl.type = 'branch'), 0) AS stock,
-                   p.image AS product_image, NULL AS branch_id, p.description,
+                   p.image AS product_image, p.is_serialized, NULL AS branch_id, p.description,
                    c.name AS category_name, NULL AS branch_name,
                    v.created_at, GREATEST(p.updated_at, v.updated_at) AS updated_at
             FROM product_variants v
@@ -40,7 +40,7 @@ const legacyProductSelect = (locationId) => {
     };
 };
 
-const normalize = (row) => ({ ...row, stock: Number(row.stock) });
+const normalize = (row) => ({ ...row, stock: Number(row.stock), is_serialized: !!row.is_serialized });
 
 const listLegacyProducts = async (db, { locationId, categoryId, search }) => {
     const base = legacyProductSelect(locationId);

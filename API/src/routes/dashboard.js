@@ -5,15 +5,18 @@ const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 router.use(authenticateToken);
 
+// Revenue counts what customers kept: sale total minus refunds, voided sales excluded.
+const NET_REVENUE = 'COALESCE(SUM(s.grand_total - s.refunded_total), 0)';
+
 // GET /api/dashboard
-// Returns stats + recent transactions, branch-filtered by role
+// Returns stats + recent sales, branch-filtered by role. Response keys predate the sales model
+// (recentTransactions, final_amount, ...) and are kept for the app's home screen.
 router.get('/', async (req, res) => {
     try {
         const { role, branch_id } = req.user;
         const isSuperAdmin = role === 'superadmin';
 
-        // Branch filter clause
-        const branchClause = isSuperAdmin ? '' : 'AND t.branch_id = ?';
+        const branchClause = isSuperAdmin ? '' : 'AND s.location_id = ?';
         const branchParam = isSuperAdmin ? [] : [branch_id];
 
         const productBranchClause = isSuperAdmin ? '' : 'AND soh.location_id = ?';
@@ -26,28 +29,21 @@ router.get('/', async (req, res) => {
             JOIN product_variants v ON v.id = soh.variant_id AND v.deleted_at IS NULL AND v.is_active = 1
             JOIN products p ON p.id = v.product_id AND p.deleted_at IS NULL AND p.is_active = 1`;
 
-        // Today's revenue (sum of final_amount for today)
         const [todayRevenue] = await pool.execute(
-            `SELECT COALESCE(SUM(final_amount), 0) AS revenue, COUNT(*) AS count
-             FROM transactions t
-             WHERE DATE(t.created_at) = CURDATE()
-               AND t.payment_status = 'paid'
-               ${branchClause}`,
+            `SELECT ${NET_REVENUE} AS revenue, COUNT(*) AS count
+             FROM sales s
+             WHERE DATE(s.occurred_at) = CURDATE() AND s.status <> 'voided' ${branchClause}`,
             branchParam
         );
 
-        // This month's transaction count
         const [monthlyStats] = await pool.execute(
-            `SELECT COUNT(*) AS count, COALESCE(SUM(final_amount), 0) AS revenue
-             FROM transactions t
-             WHERE YEAR(t.created_at) = YEAR(CURDATE())
-               AND MONTH(t.created_at) = MONTH(CURDATE())
-               AND t.payment_status = 'paid'
-               ${branchClause}`,
+            `SELECT COUNT(*) AS count, ${NET_REVENUE} AS revenue
+             FROM sales s
+             WHERE YEAR(s.occurred_at) = YEAR(CURDATE()) AND MONTH(s.occurred_at) = MONTH(CURDATE())
+               AND s.status <> 'voided' ${branchClause}`,
             branchParam
         );
 
-        // Low stock products (stock <= 5)
         const [lowStock] = await pool.execute(
             `SELECT COUNT(*) AS count
              ${stockFrom}
@@ -56,7 +52,6 @@ router.get('/', async (req, res) => {
             productBranchParam
         );
 
-        // Out of stock products (stock = 0)
         const [outOfStock] = await pool.execute(
             `SELECT COUNT(*) AS count
              ${stockFrom}
@@ -65,18 +60,20 @@ router.get('/', async (req, res) => {
             productBranchParam
         );
 
-        // Recent transactions (last 10) — use subquery for payment to avoid duplicate rows
         const [recentTransactions] = await pool.execute(
-            `SELECT t.id, t.final_amount, t.payment_status, t.created_at,
+            `SELECT s.id, s.number, s.grand_total - s.refunded_total AS final_amount,
+                    CASE s.status WHEN 'voided' THEN 'voided' ELSE 'paid' END AS payment_status, s.status,
+                    s.occurred_at AS created_at,
                     u.name AS user_name,
-                    b.name AS branch_name,
-                    (SELECT method FROM payments WHERE transaction_id = t.id LIMIT 1) AS payment_method,
-                    (SELECT COUNT(*) FROM transaction_items ti WHERE ti.transaction_id = t.id) AS item_count
-             FROM transactions t
-             LEFT JOIN users u ON t.user_id = u.id
-             LEFT JOIN branches b ON t.branch_id = b.id
+                    l.name AS branch_name,
+                    (SELECT pm.name FROM sale_payments sp JOIN payment_methods pm ON pm.id = sp.payment_method_id
+                     WHERE sp.sale_id = s.id ORDER BY sp.amount DESC LIMIT 1) AS payment_method,
+                    (SELECT COALESCE(SUM(sl.qty), 0) FROM sale_lines sl WHERE sl.sale_id = s.id) AS item_count
+             FROM sales s
+             LEFT JOIN users u ON s.cashier_id = u.id
+             LEFT JOIN locations l ON s.location_id = l.id
              WHERE 1=1 ${branchClause}
-             ORDER BY t.created_at DESC
+             ORDER BY s.occurred_at DESC
              LIMIT 10`,
             branchParam
         );
@@ -90,7 +87,7 @@ router.get('/', async (req, res) => {
                 lowStockCount: parseInt(lowStock[0].count),
                 outOfStockCount: parseInt(outOfStock[0].count),
             },
-            recentTransactions,
+            recentTransactions: recentTransactions.map((t) => ({ ...t, item_count: Number(t.item_count) })),
         });
 
     } catch (error) {

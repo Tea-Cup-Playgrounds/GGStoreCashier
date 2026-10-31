@@ -4,17 +4,18 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/product.dart';
 import '../../../../core/models/cart_item.dart';
-import '../../../../core/models/transaction_model.dart';
 import '../../../../core/helper/screen_type_utils.dart';
 import '../../../../core/constants/screen_breakpoints.dart';
 import '../../../../core/helper/currency_formatter.dart';
 import '../../../../core/services/product_service.dart';
+import '../../../../core/services/catalog_service.dart';
+import '../../../../core/services/sales_service.dart';
+import '../../../../core/services/cache_manager.dart';
+import '../../../../core/models/catalog.dart';
+import '../../../../core/models/sales.dart';
 import '../../../../core/services/voucher_service.dart';
 import '../../../../core/services/connectivity_monitor.dart';
 import '../../../../core/services/offline_queue.dart';
-import '../../../../core/config/api_config.dart';
-import '../../../../core/services/auth_service.dart';
-import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/provider/realtime_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/custom_button.dart';
@@ -24,6 +25,11 @@ import '../widgets/product_card.dart';
 import '../widgets/cart_item_widget.dart';
 import '../widgets/coupon_card.dart';
 import '../widgets/payment_success_view.dart';
+import '../widgets/payment_sheet.dart';
+import '../widgets/shift_sheet.dart';
+import '../widgets/service_item_dialog.dart';
+import '../providers/cashier_location_provider.dart';
+import '../../../warehouse/presentation/widgets/unit_picker_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -45,9 +51,15 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   Map<String, dynamic>? _appliedCoupon;
   bool _isApplyingCoupon = false;
   bool _isProcessingPayment = false;
-  int? _lastTransactionId;
-  String _selectedPaymentMethod = 'cash';
+  SaleResult? _lastSale;
+  // Sale id generated here, so a retried checkout (or the offline queue) never creates two sales.
   String _transactionUuid = const Uuid().v4();
+
+  // Location, payment methods and shift of this cashier
+  int? _loadedLocationId;
+  List<PaymentMethod> _methods = [];
+  CashSession? _shift;
+  ProviderSubscription<Location?>? _locationSub;
 
   // Products state
   List<Product> _products = [];
@@ -57,22 +69,10 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   late AnimationController _viewAnimationController;
   ProviderSubscription<RealtimeProductState>? _realtimeSub;
 
-  // Payment methods — cash always enabled; card/transfer/e-wallet require connectivity
-  List<Map<String, dynamic>> get _paymentMethods {
-    final isOffline = ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
-    return [
-      {'value': 'cash', 'label': 'Tunai', 'icon': Icons.payments_outlined, 'enabled': true},
-      {'value': 'card', 'label': 'Kartu', 'icon': Icons.credit_card, 'enabled': !isOffline},
-      {'value': 'transfer', 'label': 'Transfer Bank', 'icon': Icons.account_balance, 'enabled': !isOffline},
-      {'value': 'e-wallet', 'label': 'E-Wallet', 'icon': Icons.wallet, 'enabled': !isOffline},
-    ];
-  }
-
   @override
   void initState() {
     super.initState();
     _setupAnimations();
-    _loadProducts();
   }
 
   @override
@@ -84,40 +84,104 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
         _loadProducts();
       }
     });
+    // Load once the selling location is known, and again when the cashier switches location.
+    _locationSub ??= ref.listenManual<Location?>(cashierLocationProvider, (previous, next) {
+      if (next != null && next.id != _loadedLocationId) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _loadProducts();
+        });
+      }
+    }, fireImmediately: true);
   }
 
   Future<void> _loadProducts({bool forceRefresh = false}) async {
+    final location = ref.read(cashierLocationProvider);
+    if (location == null) return;
     setState(() {
       _isLoadingProducts = true;
       _productsError = null;
     });
 
     try {
-      final user = ref.read(authProvider).user;
-      final branchId = (user != null && !user.isSuperAdmin) ? user.branchId : null;
-      final products = await ProductService.getProducts(
-        branchId: branchId,
-        forceRefresh: forceRefresh,
-      );
+      final catalog = await CatalogService.getProducts(locationId: location.id);
+      if (!mounted) return;
       setState(() {
-        _products = products;
+        _products = [
+          for (final p in catalog)
+            for (final v in p.variants) Product.fromCatalog(p, v, locationId: location.id),
+        ];
+        _loadedLocationId = location.id;
         _isLoadingProducts = false;
       });
+      // Keep the cached goods list fresh for offline selling.
+      ProductService.getProducts(branchId: location.id, forceRefresh: true).ignore();
+      _loadPaymentMethods(location.id).ignore();
+      _loadShift(location.id).ignore();
     } catch (e) {
-      setState(() {
-        _productsError = e.toString();
-        _isLoadingProducts = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal memuat produk: $e'),
-            backgroundColor: AppTheme.destructive,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      // Offline: fall back to the cached goods list (no services / pulsa, no IMEI checks).
+      try {
+        final cached = await ProductService.getProducts(branchId: location.id);
+        if (!mounted) return;
+        setState(() {
+          _products = cached;
+          _loadedLocationId = location.id;
+          _isLoadingProducts = false;
+        });
+        _loadPaymentMethods(location.id).ignore();
+        _toast('Offline — menampilkan daftar produk tersimpan');
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _productsError = e.toString();
+          _isLoadingProducts = false;
+        });
       }
     }
+  }
+
+  String _methodsCacheKey(int locationId) => 'payment_methods:$locationId';
+
+  /// Payment methods are cached so cash can still be taken offline.
+  Future<void> _loadPaymentMethods(int locationId) async {
+    try {
+      final methods = await SalesService.getPaymentMethods(locationId);
+      await CacheManager.put(_methodsCacheKey(locationId), [
+        for (final m in methods) {'id': m.id, 'name': m.name, 'type': m.type, 'requires_reference': m.requiresReference},
+      ]);
+      if (mounted) setState(() => _methods = methods);
+    } catch (_) {
+      final cached = CacheManager.get(_methodsCacheKey(locationId));
+      if (cached != null && mounted) {
+        setState(() => _methods = (cached.data as List)
+            .map((e) => PaymentMethod.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList());
+      }
+    }
+  }
+
+  Future<void> _loadShift(int locationId) async {
+    try {
+      final shift = await SalesService.currentShift(locationId);
+      if (mounted) setState(() => _shift = shift);
+    } catch (_) {
+      // Shifts are optional; selling continues without one.
+    }
+  }
+
+  Future<void> _openShiftSheet() async {
+    final location = ref.read(cashierLocationProvider);
+    if (location == null) return;
+    final (changed, session) = await ShiftSheet.show(context, locationId: location.id, session: _shift);
+    if (changed && mounted) setState(() => _shift = session);
+  }
+
+  void _toast(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: error ? AppTheme.destructive : null,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   void _setupAnimations() {
@@ -138,6 +202,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   @override
   void dispose() {
     _realtimeSub?.close();
+    _locationSub?.close();
     _viewAnimationController.dispose();
     _searchController.dispose();
     _couponController.dispose();
@@ -146,6 +211,27 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
 
   Future<void> _addToCart(Product product) async {
     if (product.isOutOfStock) return;
+
+    // Services / pulsa: price and note typed at the counter, one line each.
+    if (!product.hasStock) {
+      final entry = await showServiceItemDialog(context, product);
+      if (entry == null || !mounted) return;
+      setState(() => _cart.add(CartItem(
+            id: '${product.id}-${const Uuid().v4()}',
+            product: product,
+            quantity: 1,
+            price: entry.$1,
+            note: entry.$2.isEmpty ? null : entry.$2,
+          )));
+      _toast('${product.name} ditambahkan');
+      return;
+    }
+
+    // Phones: the cashier picks (or scans) the exact IMEI units being sold.
+    if (product.isSerialized) {
+      await _pickUnits(product);
+      return;
+    }
 
     // Find existing qty in cart to set as initial value
     final existing = _cart.where((i) => i.id == product.id).firstOrNull;
@@ -221,19 +307,47 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     }
   }
 
-  void _updateCartItemQuantity(String id, int delta) {
+  Future<void> _pickUnits(Product product) async {
+    if (ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline) {
+      _toast('HP / barang ber-IMEI butuh koneksi untuk memeriksa unit', error: true);
+      return;
+    }
+    final location = ref.read(cashierLocationProvider);
+    if (location == null) return;
+    final existing = _cart.where((i) => i.id == product.id).firstOrNull;
+    final units = await UnitPickerSheet.show(
+      context,
+      locationId: location.id,
+      variantId: int.parse(product.id),
+      title: product.name,
+      selected: existing?.unitIds.toSet() ?? const {},
+    );
+    if (units == null || !mounted) return;
     setState(() {
-      final index = _cart.indexWhere((item) => item.id == id);
-      if (index >= 0) {
-        final item = _cart[index];
-        final newQuantity = item.quantity + delta;
-        if (newQuantity <= 0) {
-          _cart.removeAt(index);
-        } else {
-          // Cap at available stock
-          final capped = newQuantity.clamp(1, item.product.stock);
-          _cart[index] = item.copyWith(quantity: capped);
-        }
+      _cart.removeWhere((i) => i.id == product.id);
+      if (units.isNotEmpty) {
+        _cart.add(CartItem(id: product.id, product: product, quantity: units.length, price: product.sellPrice, unitIds: units.toList()));
+      }
+    });
+  }
+
+  void _updateCartItemQuantity(String id, int delta) {
+    final index = _cart.indexWhere((item) => item.id == id);
+    if (index < 0) return;
+    final item = _cart[index];
+    // IMEI items change by picking units, not by count.
+    if (item.product.isSerialized) {
+      _pickUnits(item.product);
+      return;
+    }
+    setState(() {
+      final newQuantity = item.quantity + delta;
+      if (newQuantity <= 0) {
+        _cart.removeAt(index);
+      } else {
+        // Cap at available stock (services and pulsa have none)
+        final capped = item.product.hasStock ? newQuantity.clamp(1, item.product.stock) : newQuantity;
+        _cart[index] = item.copyWith(quantity: capped);
       }
     });
   }
@@ -286,124 +400,98 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     }
   }
 
-  Future<void> _processPayment(String method) async {
+  /// Prices the cart on the server, takes payment in [PaymentSheet] and records the sale.
+  /// Offline (or if the connection drops while saving) the sale goes to the offline queue;
+  /// its id makes the later upload safe to repeat.
+  Future<void> _processPayment() async {
     if (_cart.isEmpty) return;
-
-    // Validate all product IDs are parseable before sending
-    for (final item in _cart) {
-      final pid = int.tryParse(item.product.id);
-      if (pid == null || pid <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('ID produk tidak valid untuk "${item.product.name}"'),
-          backgroundColor: AppTheme.destructive,
-          behavior: SnackBarBehavior.floating,
-        ));
-        return;
-      }
+    final location = ref.read(cashierLocationProvider);
+    if (location == null) {
+      _toast('Anda belum ditugaskan ke cabang untuk berjualan', error: true);
+      return;
     }
+    final offline = ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
+    final lines = _cart.map((i) => i.toSaleLine()).toList();
+    final voucherCode = _appliedCoupon?['code'] as String?;
 
-    // Check connectivity — route offline transactions to the local queue
-    if (ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline) {
-      final user = ref.read(authProvider).user;
-      final items = _cart
-          .map((item) => {
-                'product_id': int.parse(item.product.id),
-                'qty': item.quantity,
-                'price': item.price,
-              })
-          .toList();
-
-      final branchId = user?.isSuperAdmin == true ? _cart.first.product.branchId : user?.branchId;
-
-      final transaction = TransactionModel(
-        uuid: _transactionUuid,
-        items: items,
-        discount: _discount,
-        paymentMethod: method,
-        total: _total,
-        branchId: branchId,
-        createdAt: DateTime.now(),
-      );
-
-      final entry = OfflineTransactionEntry()
-        ..uuid = transaction.uuid
-        ..payload = transaction.toHiveMap()
-        ..createdAt = transaction.createdAt
-        ..retryCount = 0
-        ..status = 'pending';
-
-      await OfflineQueue.enqueue(entry);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Transaksi disimpan — akan dikirim saat online'),
-          behavior: SnackBarBehavior.floating,
-        ));
-        _resetTransaction();
+    double total = _total;
+    var requireCustomer = _cart.any((i) => i.product.isSerialized);
+    if (!offline) {
+      setState(() => _isProcessingPayment = true);
+      try {
+        final quote = await SalesService.quote({
+          'location_id': location.id,
+          'lines': lines,
+          if (voucherCode != null) 'voucher_code': voucherCode,
+        });
+        total = (quote['grand_total'] as num).toDouble();
+        requireCustomer = quote['requires_customer'] == true;
+      } on ApiException catch (e) {
+        _toast(e.message, error: true);
+        return;
+      } finally {
+        if (mounted) setState(() => _isProcessingPayment = false);
       }
+      if (_methods.isEmpty) await _loadPaymentMethods(location.id);
+    }
+    if (_methods.isEmpty) {
+      _toast('Metode pembayaran belum tersedia — periksa koneksi', error: true);
+      return;
+    }
+    if (!mounted) return;
+
+    final result = await PaymentSheet.show(context, total: total, methods: _methods, requireCustomer: requireCustomer, offline: offline);
+    if (result == null || !mounted) return;
+
+    final body = <String, dynamic>{
+      'id': _transactionUuid,
+      'location_id': location.id,
+      if (_shift != null && _shift!.isOpen && _shift!.locationId == location.id) 'cash_session_id': _shift!.id,
+      'occurred_at': DateTime.now().toUtc().toIso8601String(),
+      'lines': lines,
+      if (voucherCode != null) 'voucher_code': voucherCode,
+      'payments': result.payments.map((p) => p.toJson()).toList(),
+      ...?result.customer?.toSaleJson(),
+    };
+
+    if (offline) {
+      await _queueOffline(body);
       return;
     }
 
     setState(() => _isProcessingPayment = true);
-
     try {
-      final token = await AuthService.getToken();
-      final user = ref.read(authProvider).user;
-
-      final dio = Dio(BaseOptions(
-        baseUrl: ApiConfig.apiUrl,
-        headers: {'Authorization': 'Bearer $token', ...ApiConfig.defaultHeaders},
-        connectTimeout: ApiConfig.connectTimeout,
-        receiveTimeout: ApiConfig.receiveTimeout,
-      ));
-
-      final items = _cart
-          .map((item) => {
-                'product_id': int.parse(item.product.id),
-                'qty': item.quantity,
-                'price': item.price,
-              })
-          .toList();
-
-      final body = <String, dynamic>{
-        'items': items,
-        'discount': _discount,
-        'payment_method': method,
-        'payment_amount': _total,
-      };
-
-      // Superadmin has branch_id = 0 in DB — must send the product's branch
-      // Use the first cart item's branch as the transaction branch
-      if (user != null && user.isSuperAdmin) {
-        final firstBranchId = _cart.first.product.branchId;
-        if (firstBranchId != null && firstBranchId > 0) {
-          body['branch_id'] = firstBranchId;
-        }
-      }
-
-      final response = await dio.post('/api/transactions', data: body);
-
-      if (mounted) {
-        setState(() {
-          _lastTransactionId = response.data['transactionId'];
-          _isProcessingPayment = false;
-          _currentView = CashierView.success;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isProcessingPayment = false);
-        String msg = 'Pembayaran gagal';
-        if (e is DioException && e.response?.data != null) {
-          msg = e.response!.data['error'] ?? msg;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(msg),
-          backgroundColor: AppTheme.destructive,
-          behavior: SnackBarBehavior.floating,
-        ));
+      final sale = await SalesService.createSale(body);
+      if (!mounted) return;
+      setState(() {
+        _lastSale = sale;
+        _isProcessingPayment = false;
+        _currentView = CashierView.success;
+      });
+      if (_shift != null) _loadShift(location.id).ignore();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isProcessingPayment = false);
+      if (e.statusCode == null) {
+        // No answer from the server: it may or may not have been saved. The queue retries with the
+        // same id, which the API treats as the same sale.
+        await _queueOffline(body);
+      } else {
+        _toast(e.message, error: true);
       }
     }
+  }
+
+  Future<void> _queueOffline(Map<String, dynamic> body) async {
+    final entry = OfflineTransactionEntry()
+      ..uuid = body['id'] as String
+      ..payload = body
+      ..createdAt = DateTime.now()
+      ..retryCount = 0
+      ..status = 'pending';
+    await OfflineQueue.enqueue(entry);
+    _toast('Transaksi disimpan — akan dikirim saat online');
+    _resetTransaction();
   }
 
   void _resetTransaction() {
@@ -413,6 +501,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       _couponController.clear();
       _currentView = CashierView.products;
       _transactionUuid = const Uuid().v4();
+      _lastSale = null;
     });
   }
 
@@ -431,6 +520,16 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
 
   double get _total => _subtotal - _discount;
 
+  /// Label for the applied voucher card ("10% OFF" / "Rp5.000 OFF").
+  String get _couponLabel {
+    final coupon = _appliedCoupon;
+    if (coupon == null) return '';
+    if (coupon['discountType'] == 'fixed') {
+      return '${CurrencyFormatter.formatToRupiah((coupon['fixedDiscount'] as num?) ?? 0)} OFF';
+    }
+    return '${coupon['discount']}% OFF';
+  }
+
   List<Product> get _filteredProducts {
     final query = _searchController.text.toLowerCase();
     if (query.isEmpty) return _products;
@@ -445,22 +544,29 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
 
-    // Watch connectivity — triggers rebuild when status changes and gates payment methods
-    final connectivityAsync = ref.watch(connectivityProvider);
-    final connectivityStatus = connectivityAsync.valueOrNull ?? ConnectivityMonitor.instance.currentStatus;
+    // Watch connectivity so the offline banner / payment options update.
+    ref.watch(connectivityProvider);
+    final salesLocations = ref.watch(salesLocationsProvider);
+    final location = ref.watch(cashierLocationProvider);
 
-    // If offline and an online-only method is selected, reset to cash
-    if (connectivityStatus == ConnectivityStatus.offline && _selectedPaymentMethod != 'cash') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _selectedPaymentMethod = 'cash');
-      });
+    if (salesLocations.hasValue && salesLocations.value!.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Kasir')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Text('Anda belum ditugaskan ke cabang yang boleh melakukan penjualan.', textAlign: TextAlign.center),
+          ),
+        ),
+      );
     }
 
     if (_currentView == CashierView.success) {
       return PaymentSuccessView(
-        total: _total,
+        total: _lastSale?.grandTotal ?? _total,
         appliedCoupon: _appliedCoupon,
-        transactionId: _lastTransactionId,
+        saleNumber: _lastSale?.number,
+        change: _lastSale?.changeTotal ?? 0,
         onNewTransaction: _resetTransaction,
       );
     }
@@ -480,6 +586,38 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
+          if ((salesLocations.valueOrNull?.length ?? 0) > 1)
+            PopupMenuButton<int>(
+              tooltip: 'Lokasi penjualan',
+              onSelected: (id) {
+                if (_cart.isNotEmpty) {
+                  _toast('Kosongkan keranjang sebelum pindah lokasi', error: true);
+                  return;
+                }
+                ref.read(selectedCashierLocationProvider.notifier).state = id;
+              },
+              itemBuilder: (_) => [
+                for (final l in salesLocations.value!) PopupMenuItem(value: l.id, child: Text(l.label)),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(children: [
+                  const Icon(Icons.storefront_outlined, size: 18),
+                  const SizedBox(width: 4),
+                  Text(location?.code ?? '-', style: const TextStyle(fontWeight: FontWeight.w600)),
+                ]),
+              ),
+            ),
+          IconButton(
+            tooltip: _shift?.isOpen == true ? 'Shift berjalan' : 'Buka shift',
+            onPressed: _openShiftSheet,
+            icon: Badge(
+              isLabelVisible: _shift?.isOpen == true,
+              smallSize: 8,
+              backgroundColor: AppTheme.success,
+              child: const Icon(Icons.point_of_sale_outlined),
+            ),
+          ),
           if (!isTablet && _currentView == CashierView.products && _cart.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 16),
@@ -735,7 +873,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                             if (_appliedCoupon != null)
                               CouponCard(
                                 code: _appliedCoupon!['code'],
-                                discount: '${_appliedCoupon!['discount']}% OFF',
+                                discount: _couponLabel,
                                 description: _appliedCoupon!['description'],
                                 isApplied: true,
                               )
@@ -816,61 +954,11 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
 
                             const SizedBox(height: 16),
 
-                            // Payment Method Dropdown
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: AppTheme.border),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: _selectedPaymentMethod,
-                                  isExpanded: true,
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                  items: _paymentMethods.map((method) {
-                                    final enabled = method['enabled'] as bool;
-                                    return DropdownMenuItem<String>(
-                                      value: method['value'],
-                                      enabled: enabled,
-                                      child: Row(
-                                        children: [
-                                          Icon(method['icon'] as IconData,
-                                              size: 20, color: enabled ? null : AppTheme.mutedForeground),
-                                          const SizedBox(width: 12),
-                                          Text(method['label'] as String,
-                                              style: TextStyle(color: enabled ? null : AppTheme.mutedForeground)),
-                                          if (!enabled) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.muted.withValues(alpha: 0.4),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: const Text('Soon',
-                                                  style: TextStyle(fontSize: 10, color: AppTheme.mutedForeground)),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() => _selectedPaymentMethod = value);
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-
                             // Tombol Proses Pembayaran
                             CustomButton(
-                              text: 'Proses Pembayaran',
+                              text: 'Bayar',
                               icon: Icons.check_circle_outline,
-                              onPressed: _isProcessingPayment ? null : () => _processPayment(_selectedPaymentMethod),
+                              onPressed: _isProcessingPayment ? null : _processPayment,
                               isLoading: _isProcessingPayment,
                               fullWidth: true,
                               size: ButtonSize.large,
@@ -1129,7 +1217,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
               if (_appliedCoupon != null)
                 CouponCard(
                   code: _appliedCoupon!['code'],
-                  discount: '${_appliedCoupon!['discount']}% OFF',
+                  discount: _couponLabel,
                   description: _appliedCoupon!['description'],
                   isApplied: true,
                 )
@@ -1205,70 +1293,12 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
               ),
               const SizedBox(height: 12),
 
-              // ── Payment method ────────────────────────────────────────
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: cs.outlineVariant, width: 0.8),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedPaymentMethod,
-                    isExpanded: true,
-                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: cs.onSurfaceVariant),
-                    items: _paymentMethods.map((method) {
-                      final enabled = method['enabled'] as bool;
-                      return DropdownMenuItem<String>(
-                        value: method['value'],
-                        enabled: enabled,
-                        child: Row(
-                          children: [
-                            Icon(method['icon'] as IconData,
-                                size: 18, color: enabled ? cs.onSurface : cs.onSurfaceVariant.withValues(alpha: 0.4)),
-                            const SizedBox(width: 10),
-                            Text(
-                              method['label'] as String,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: enabled ? null : cs.onSurfaceVariant.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            if (!enabled) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: cs.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'Segera',
-                                  style: TextStyle(fontSize: 9, color: cs.onSurfaceVariant),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _selectedPaymentMethod = value);
-                      }
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-
               // ── Pay button ────────────────────────────────────────────
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _isProcessingPayment ? null : () => _processPayment(_selectedPaymentMethod),
+                  onPressed: _isProcessingPayment ? null : _processPayment,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.gold,
                     foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
@@ -1288,7 +1318,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                             const Icon(Icons.check_circle_outline, size: 18),
                             const SizedBox(width: 8),
                             Text(
-                              'Proses Pembayaran  •  ${CurrencyFormatter.formatToRupiah(_total)}',
+                              'Bayar  •  ${CurrencyFormatter.formatToRupiah(_total)}',
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                             ),
                           ],

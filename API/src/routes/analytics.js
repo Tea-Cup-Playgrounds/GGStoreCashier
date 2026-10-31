@@ -7,19 +7,25 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(requireRole(['superadmin']));
 
+// Revenue is what customers kept (total minus refunds); voided sales are excluded. Quantities
+// are net of returned items. Response keys predate the sales model and are kept for the app.
+const NET_REVENUE = 'COALESCE(SUM(s.grand_total - s.refunded_total), 0)';
+const NET_QTY = 'SUM(sl.qty - sl.returned_qty)';
+const NET_LINE_REVENUE = 'SUM(sl.line_total * (sl.qty - sl.returned_qty) / sl.qty)';
+
 // ── GET /api/analytics/revenue-trend?days=30 ─────────────────────────────────
 // Daily revenue for all branches combined over the last N days
 router.get('/revenue-trend', async (req, res) => {
     try {
         const days = Math.min(parseInt(req.query.days, 10) || 30, 90);
         const [rows] = await pool.execute(
-            `SELECT DATE(created_at) AS date,
-                    COALESCE(SUM(final_amount), 0) AS revenue,
+            `SELECT DATE(s.occurred_at) AS date,
+                    ${NET_REVENUE} AS revenue,
                     COUNT(*) AS transactions
-             FROM transactions
-             WHERE payment_status = 'paid'
-               AND created_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
-             GROUP BY DATE(created_at)
+             FROM sales s
+             WHERE s.status <> 'voided'
+               AND s.occurred_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
+             GROUP BY DATE(s.occurred_at)
              ORDER BY date ASC`,
             []
         );
@@ -37,14 +43,13 @@ router.get('/branch-revenue', async (req, res) => {
         const date = req.query.date || new Date().toISOString().slice(0, 10);
         const [rows] = await pool.execute(
             `SELECT b.id AS branch_id, b.name AS branch_name,
-                    COALESCE(SUM(t.final_amount), 0) AS revenue,
-                    COUNT(t.id) AS transactions
+                    ${NET_REVENUE} AS revenue,
+                    COUNT(s.id) AS transactions
              FROM branches b
-             LEFT JOIN transactions t
-               ON t.branch_id = b.id
-               AND DATE(t.created_at) = ?
-               AND t.payment_status = 'paid'
-             WHERE b.id != 0
+             LEFT JOIN sales s
+               ON s.location_id = b.id
+               AND DATE(s.occurred_at) = ?
+               AND s.status <> 'voided'
              GROUP BY b.id, b.name
              ORDER BY revenue DESC`,
             [date]
@@ -64,15 +69,15 @@ router.get('/category-sales', async (req, res) => {
         const [rows] = await pool.execute(
             `SELECT c.id AS category_id,
                     COALESCE(c.name, 'Uncategorized') AS category_name,
-                    SUM(ti.qty) AS total_qty,
-                    SUM(ti.subtotal) AS total_revenue
-             FROM transaction_items ti
-             JOIN transactions t ON ti.transaction_id = t.id
-             JOIN product_variants v ON ti.product_id = v.id
+                    ${NET_QTY} AS total_qty,
+                    ${NET_LINE_REVENUE} AS total_revenue
+             FROM sale_lines sl
+             JOIN sales s ON sl.sale_id = s.id
+             JOIN product_variants v ON sl.variant_id = v.id
              JOIN products p ON v.product_id = p.id
              LEFT JOIN categories c ON p.category_id = c.id
-             WHERE t.payment_status = 'paid'
-               AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
+             WHERE s.status <> 'voided'
+               AND s.occurred_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
              GROUP BY c.id, c.name
              ORDER BY total_qty DESC
              LIMIT 10`,
@@ -93,16 +98,16 @@ router.get('/top-products', async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit, 10) || 10, 20);
         const [rows] = await pool.execute(
             `SELECT v.id, ${DISPLAY_NAME_SQL} AS name,
-                    SUM(ti.qty) AS total_qty,
-                    SUM(ti.subtotal) AS total_revenue,
+                    ${NET_QTY} AS total_qty,
+                    ${NET_LINE_REVENUE} AS total_revenue,
                     b.name AS branch_name
-             FROM transaction_items ti
-             JOIN transactions t ON ti.transaction_id = t.id
-             JOIN product_variants v ON ti.product_id = v.id
+             FROM sale_lines sl
+             JOIN sales s ON sl.sale_id = s.id
+             JOIN product_variants v ON sl.variant_id = v.id
              JOIN products p ON v.product_id = p.id
-             LEFT JOIN branches b ON t.branch_id = b.id
-             WHERE t.payment_status = 'paid'
-               AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
+             LEFT JOIN branches b ON s.location_id = b.id
+             WHERE s.status <> 'voided'
+               AND s.occurred_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
              GROUP BY v.id, name, b.name
              ORDER BY total_qty DESC
              LIMIT ${limit}`,
@@ -120,21 +125,21 @@ router.get('/top-products', async (req, res) => {
 router.get('/summary', async (req, res) => {
     try {
         const [[today]] = await pool.execute(
-            `SELECT COALESCE(SUM(final_amount),0) AS revenue, COUNT(*) AS transactions
-             FROM transactions WHERE payment_status='paid' AND DATE(created_at)=CURDATE()`
+            `SELECT ${NET_REVENUE} AS revenue, COUNT(*) AS transactions
+             FROM sales s WHERE s.status <> 'voided' AND DATE(s.occurred_at) = CURDATE()`
         );
         const [[month]] = await pool.execute(
-            `SELECT COALESCE(SUM(final_amount),0) AS revenue, COUNT(*) AS transactions
-             FROM transactions WHERE payment_status='paid'
-               AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())`
+            `SELECT ${NET_REVENUE} AS revenue, COUNT(*) AS transactions
+             FROM sales s WHERE s.status <> 'voided'
+               AND YEAR(s.occurred_at) = YEAR(CURDATE()) AND MONTH(s.occurred_at) = MONTH(CURDATE())`
         );
         const [[allTime]] = await pool.execute(
-            `SELECT COALESCE(SUM(final_amount),0) AS revenue, COUNT(*) AS transactions
-             FROM transactions WHERE payment_status='paid'`
+            `SELECT ${NET_REVENUE} AS revenue, COUNT(*) AS transactions
+             FROM sales s WHERE s.status <> 'voided'`
         );
         const [[activeBranches]] = await pool.execute(
-            `SELECT COUNT(DISTINCT branch_id) AS count FROM transactions
-             WHERE payment_status='paid' AND DATE(created_at)=CURDATE()`
+            `SELECT COUNT(DISTINCT s.location_id) AS count FROM sales s
+             WHERE s.status <> 'voided' AND DATE(s.occurred_at) = CURDATE()`
         );
         res.json({
             today: { revenue: parseFloat(today.revenue), transactions: parseInt(today.transactions) },

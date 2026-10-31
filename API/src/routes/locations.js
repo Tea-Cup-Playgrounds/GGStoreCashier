@@ -14,14 +14,20 @@ const COLUMNS = 'id, code, name, address, phone, type, is_active, settings, crea
 const toLocation = (row) => ({ ...row, is_active: !!row.is_active });
 
 // Locations the user is assigned to (owners and global assignments see all).
+// ?scope=destinations lists every location for users who may create transfers, so they can pick
+// a destination they aren't assigned to (id, code, name and type only).
 router.get('/', async (req, res) => {
     try {
         const { type, include_inactive } = req.query;
-        let query = `SELECT ${COLUMNS} FROM locations WHERE deleted_at IS NULL`;
+        const destinations = req.query.scope === 'destinations';
+        if (destinations && !req.access.can('transfers.create')) {
+            return res.status(403).json({ error: 'Akses tidak diizinkan' });
+        }
+        let query = `SELECT ${destinations ? 'id, code, name, type, is_active' : COLUMNS} FROM locations WHERE deleted_at IS NULL`;
         const params = [];
 
         const global = req.access.isOwner || req.access.assignments.some((a) => a.locationId === null);
-        if (!global) {
+        if (!global && !destinations) {
             const ids = req.access.assignments.map((a) => a.locationId);
             if (ids.length === 0) return res.json({ locations: [] });
             query += ` AND id IN (${ids.map(() => '?').join(', ')})`;

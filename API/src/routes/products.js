@@ -8,6 +8,7 @@ const { uploadProduct, deleteFile, validateUploadedImage } = require('../utils/u
 const { listLegacyProducts, getLegacyProduct, emitLegacyProduct } = require('../services/legacy-products');
 const { assignGeneratedSku } = require('../services/catalog');
 const stock = require('../services/stock');
+const posting = require('../services/posting');
 const { logAudit } = require('../services/audit');
 
 const router = express.Router();
@@ -248,9 +249,13 @@ router.put('/:id', requireRole(['admin', 'superadmin']), filterByBranch, uploadP
             if (!locationId) throw new stock.StockError('Pilih cabang untuk mengubah stok');
             if (!req.access.can('stock.adjust', locationId)) throw new stock.StockError('Anda tidak memiliki izin mengubah stok di cabang ini', 403);
             if (current.is_serialized) throw new stock.StockError('Stok produk ber-IMEI diubah melalui pendaftaran unit');
-            await stock.adjustQuantity(conn, { userId: req.user.id }, {
+            const moved = await stock.adjustQuantity(conn, { userId: req.user.id }, {
                 locationId, variantId: current.id, qtyChange: stockDelta, reason: 'adjustment',
                 note: 'Penyesuaian stok dari edit produk',
+            });
+            await posting.postStockValue(conn, { userId: req.user.id }, {
+                sourceType: 'stock_adjustment', sourceId: moved.movementId, locationId,
+                value: stockDelta * moved.unitCost, memo: 'Penyesuaian stok dari edit produk',
             });
         }
 

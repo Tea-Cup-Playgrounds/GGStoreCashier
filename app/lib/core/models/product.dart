@@ -1,3 +1,5 @@
+import 'catalog.dart';
+
 class Product {
   final String id;
   final String name;
@@ -13,6 +15,10 @@ class Product {
   final String? image;
   final String? category;
   final String? description; // 1. Tambahan Baru
+  /// 'goods' | 'service' | 'digital'. Services and digital items (pulsa) have no stock.
+  final String kind;
+  /// Sold per unit with an IMEI / serial picked at checkout.
+  final bool isSerialized;
 
   const Product({
     required this.id,
@@ -29,7 +35,31 @@ class Product {
     this.image,
     this.category,
     this.description, // 2. Tambahan Baru
+    this.kind = 'goods',
+    this.isSerialized = false,
   });
+
+  /// One catalog variant as seen at a location (id = variant id, like the legacy /api/products rows).
+  factory Product.fromCatalog(CatalogProduct p, ProductVariant v, {int? locationId}) {
+    final now = DateTime.now();
+    return Product(
+      id: v.id.toString(),
+      name: p.variantLabel(v),
+      barcode: v.barcode ?? v.sku,
+      categoryId: p.categoryId,
+      costPrice: v.avgCost ?? 0,
+      sellPrice: v.price,
+      stock: v.onHand ?? 0,
+      branchId: locationId,
+      createdAt: now,
+      updatedAt: now,
+      image: p.image,
+      category: p.categoryName,
+      description: p.description,
+      kind: p.kind,
+      isSerialized: p.isSerialized,
+    );
+  }
 
   factory Product.fromJson(Map<String, dynamic> json) {
     double parsePrice(dynamic value) {
@@ -54,6 +84,8 @@ class Product {
       image: json['product_image'] as String?,
       category: json['category_name'] as String?,
       description: json['description'] as String?, // 3. Tambahan Baru
+      kind: json['kind']?.toString() ?? 'goods',
+      isSerialized: json['is_serialized'] == true || json['is_serialized'] == 1,
     );
   }
 
@@ -73,6 +105,8 @@ class Product {
       'image': image,
       'category': category,
       'description': description, // 4. Tambahan Baru
+      'kind': kind,
+      'is_serialized': isSerialized,
     };
   }
 
@@ -107,11 +141,14 @@ class Product {
       image: image ?? this.image,
       category: category ?? this.category,
       description: description ?? this.description, // 6. Tambahan Baru
+      kind: kind,
+      isSerialized: isSerialized,
     );
   }
 
-  bool get isLowStock => stock <= 5;
-  bool get isOutOfStock => stock <= 0;
+  bool get hasStock => kind == 'goods';
+  bool get isLowStock => hasStock && stock <= 5;
+  bool get isOutOfStock => hasStock && stock <= 0;
 
   double get profitMargin => sellPrice - costPrice;
   double get profitPercentage => (profitMargin / costPrice) * 100;

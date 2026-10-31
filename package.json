@@ -18,6 +18,7 @@
     "migrate:status": "knex --knexfile API/knexfile.js migrate:status",
     "migrate:make": "knex --knexfile API/knexfile.js migrate:make",
     "seed": "knex --knexfile API/knexfile.js seed:run",
+    "accounting:backfill": "node API/scripts/backfill-journals.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
