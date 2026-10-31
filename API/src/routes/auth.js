@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const { loadAccess } = require('../services/access');
 
 const router = express.Router();
 
@@ -113,6 +114,11 @@ router.post('/login', async (req, res) => {
             });
         }
 
+        // Checked after the password so a disabled account can't be detected by guessing.
+        if (!user.is_active) {
+            return res.status(401).json({ error: 'Akun dinonaktifkan' });
+        }
+
         // Clear failed attempts on successful login
         clearAttempts(identifier);
         console.log('Login successful for user:', username);
@@ -145,6 +151,7 @@ router.post('/login', async (req, res) => {
                 role: user.role,
                 branchId: user.branch_id
             },
+            access: await loadAccess(pool, user.id),
             token // Include token for Flutter app
         });
 
@@ -172,7 +179,7 @@ router.get('/me', async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
         const [users] = await pool.execute(
-            'SELECT id, name, username, role, branch_id, last_active_at FROM users WHERE id = ?',
+            'SELECT id, name, username, role, branch_id, is_active, last_active_at FROM users WHERE id = ?',
             [decoded.userId]
         );
 
@@ -180,7 +187,12 @@ router.get('/me', async (req, res) => {
             return res.status(401).json({ error: 'Pengguna tidak ditemukan' });
         }
 
-        res.json({ user: users[0] });
+        if (!users[0].is_active) {
+            return res.status(401).json({ error: 'Akun dinonaktifkan' });
+        }
+
+        const { is_active, ...user } = users[0];
+        res.json({ user, access: await loadAccess(pool, user.id) });
 
     } catch (error) {
         console.error('Get user error:', error);

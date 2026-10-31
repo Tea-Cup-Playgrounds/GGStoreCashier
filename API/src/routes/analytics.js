@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { DISPLAY_NAME_SQL } = require('../services/catalog');
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -67,7 +68,8 @@ router.get('/category-sales', async (req, res) => {
                     SUM(ti.subtotal) AS total_revenue
              FROM transaction_items ti
              JOIN transactions t ON ti.transaction_id = t.id
-             JOIN products p ON ti.product_id = p.id
+             JOIN product_variants v ON ti.product_id = v.id
+             JOIN products p ON v.product_id = p.id
              LEFT JOIN categories c ON p.category_id = c.id
              WHERE t.payment_status = 'paid'
                AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
@@ -90,17 +92,18 @@ router.get('/top-products', async (req, res) => {
         const days  = Math.min(parseInt(req.query.days,  10) || 30, 90);
         const limit = Math.min(parseInt(req.query.limit, 10) || 10, 20);
         const [rows] = await pool.execute(
-            `SELECT p.id, p.name,
+            `SELECT v.id, ${DISPLAY_NAME_SQL} AS name,
                     SUM(ti.qty) AS total_qty,
                     SUM(ti.subtotal) AS total_revenue,
                     b.name AS branch_name
              FROM transaction_items ti
              JOIN transactions t ON ti.transaction_id = t.id
-             JOIN products p ON ti.product_id = p.id
-             LEFT JOIN branches b ON p.branch_id = b.id
+             JOIN product_variants v ON ti.product_id = v.id
+             JOIN products p ON v.product_id = p.id
+             LEFT JOIN branches b ON t.branch_id = b.id
              WHERE t.payment_status = 'paid'
                AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL ${days} DAY)
-             GROUP BY p.id, p.name, b.name
+             GROUP BY v.id, name, b.name
              ORDER BY total_qty DESC
              LIMIT ${limit}`,
             []

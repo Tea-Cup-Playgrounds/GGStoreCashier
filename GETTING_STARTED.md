@@ -22,9 +22,9 @@ cd ..
 
 ### 2. Setup Database
 
-- Buat database MySQL
-- Import skema/tabel (gunakan file `gg_kasirinventory_db.sql`)
+- Buat database MySQL kosong
 - Perbarui `.env` dengan kredensial database kamu
+- Jalankan `npm run migrate` untuk membuat semua tabel (lihat bagian migrasi di `README.md`)
 
 ---
 

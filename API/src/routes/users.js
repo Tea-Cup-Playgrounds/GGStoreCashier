@@ -2,6 +2,8 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { syncAssignmentsFromLegacy } = require('../services/access');
+const { assignDefaultLocationCode } = require('../services/locations');
 
 const router = express.Router();
 
@@ -260,6 +262,7 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
                     [sanitizedBranchName]
                 );
                 userBranchId = branchResult.insertId;
+                await assignDefaultLocationCode(pool, userBranchId);
             }
         }
 
@@ -326,14 +329,26 @@ router.post('/', requireRole(['admin', 'superadmin']), async (req, res) => {
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        const [result] = await pool.execute(
-            'INSERT INTO users (name, username, password, role, branch_id) VALUES (?, ?, ?, ?, ?)',
-            [sanitizedName, sanitizedUsername, hashedPassword, sanitizedRole, userBranchId]
-        );
+        const conn = await pool.getConnection();
+        let result;
+        try {
+            await conn.beginTransaction();
+            [result] = await conn.execute(
+                'INSERT INTO users (name, username, password, role, branch_id) VALUES (?, ?, ?, ?, ?)',
+                [sanitizedName, sanitizedUsername, hashedPassword, sanitizedRole, userBranchId || null]
+            );
+            await syncAssignmentsFromLegacy(conn, result.insertId, sanitizedRole, userBranchId || null);
+            await conn.commit();
+        } catch (err) {
+            await conn.rollback();
+            throw err;
+        } finally {
+            conn.release();
+        }
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: 'Pengguna berhasil dibuat',
-            userId: result.insertId 
+            userId: result.insertId
         });
 
     } catch (error) {
@@ -405,6 +420,7 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
                     [sanitizedBranchName]
                 );
                 userBranchId = branchResult.insertId;
+                await assignDefaultLocationCode(pool, userBranchId);
             }
         }
 
@@ -499,7 +515,25 @@ router.put('/:id', requireRole(['admin', 'superadmin']), async (req, res) => {
         params.push(userId);
 
         const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
-        await pool.execute(query, params);
+        const accessChanged = role !== undefined || userBranchId !== undefined || branch_id !== undefined;
+
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            await conn.execute(query, params);
+            // Only a role/branch change rewrites the user's location assignments, so editing a
+            // name or password doesn't drop assignments made through /api/access.
+            if (accessChanged) {
+                const [[updated]] = await conn.execute('SELECT role, branch_id FROM users WHERE id = ?', [userId]);
+                await syncAssignmentsFromLegacy(conn, userId, updated.role, updated.branch_id);
+            }
+            await conn.commit();
+        } catch (err) {
+            await conn.rollback();
+            throw err;
+        } finally {
+            conn.release();
+        }
 
         res.json({ message: 'Pengguna berhasil diperbarui' });
 

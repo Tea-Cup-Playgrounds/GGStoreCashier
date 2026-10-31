@@ -4,7 +4,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/cashier/presentation/pages/cashier_page.dart';
 import '../../features/inventory/presentation/pages/inventory_page.dart';
-import '../../features/inventory/presentation/pages/inventory_detail_page.dart';
+import '../../features/inventory/presentation/pages/product_detail_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import 'package:gg_store_cashier/core/router/transition_factory.dart';
 import 'package:gg_store_cashier/core/router/auth_guard.dart';
@@ -12,7 +12,7 @@ import 'package:gg_store_cashier/features/devices/presentation/pages/printer_dev
 import 'package:gg_store_cashier/features/devices/presentation/pages/scanner_devices_page.dart';
 import 'package:gg_store_cashier/features/devices/presentation/pages/device_manager_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/receipt_editor_page.dart';
-import 'package:gg_store_cashier/features/inventory/presentation/pages/inventory_add_item_page.dart';
+import 'package:gg_store_cashier/features/inventory/presentation/pages/product_form_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/appearance_page.dart';
 import 'package:gg_store_cashier/features/inventory/presentation/pages/category_form_page.dart';
 import 'package:gg_store_cashier/features/cashier/presentation/pages/coupon_page.dart';
@@ -83,16 +83,17 @@ mixin AppRouter {
         path: inventoryDetail,
         name: 'inventoryDetail',
         pageBuilder: (context, state) {
-          final id = state.pathParameters['id']!;
+          // id is a catalog product id (see /api/catalog/products/:id).
+          final id = int.parse(state.pathParameters['id']!);
           return TransitionFactory.getSlideBuilder(
-              context: context, state: state, child: InventoryDetailPage(productId: id));
+              context: context, state: state, child: ProductDetailPage(productId: id));
         },
       ),
       GoRoute(
         path: inventoryAddItem,
         name: 'inventoryAddItem',
         pageBuilder: (context, state) =>
-            TransitionFactory.getSlideBuilder(context: context, state: state, child: const InventoryAddItemPage()),
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const ProductFormPage()),
       ),
       GoRoute(
         path: apprearance,

@@ -16,8 +16,15 @@ router.get('/', async (req, res) => {
         const branchClause = isSuperAdmin ? '' : 'AND t.branch_id = ?';
         const branchParam = isSuperAdmin ? [] : [branch_id];
 
-        const productBranchClause = isSuperAdmin ? '' : 'AND branch_id = ?';
+        const productBranchClause = isSuperAdmin ? '' : 'AND soh.location_id = ?';
         const productBranchParam = isSuperAdmin ? [] : [branch_id];
+
+        // Stock rows (variant x branch) of active catalog items; see the stock_on_hand view.
+        const stockFrom = `
+            FROM stock_on_hand soh
+            JOIN locations l ON l.id = soh.location_id AND l.type = 'branch'
+            JOIN product_variants v ON v.id = soh.variant_id AND v.deleted_at IS NULL AND v.is_active = 1
+            JOIN products p ON p.id = v.product_id AND p.deleted_at IS NULL AND p.is_active = 1`;
 
         // Today's revenue (sum of final_amount for today)
         const [todayRevenue] = await pool.execute(
@@ -43,8 +50,8 @@ router.get('/', async (req, res) => {
         // Low stock products (stock <= 5)
         const [lowStock] = await pool.execute(
             `SELECT COUNT(*) AS count
-             FROM products
-             WHERE stock <= 5 AND stock > 0
+             ${stockFrom}
+             WHERE soh.qty <= 5 AND soh.qty > 0
                ${productBranchClause}`,
             productBranchParam
         );
@@ -52,8 +59,8 @@ router.get('/', async (req, res) => {
         // Out of stock products (stock = 0)
         const [outOfStock] = await pool.execute(
             `SELECT COUNT(*) AS count
-             FROM products
-             WHERE stock = 0
+             ${stockFrom}
+             WHERE soh.qty <= 0
                ${productBranchClause}`,
             productBranchParam
         );

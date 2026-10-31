@@ -38,8 +38,9 @@ Buat file `.env` di root proyek:
 ```env
 # Database
 DB_HOST=localhost
+DB_PORT=3306
 DB_USER=your_user
-DB_PASSWORD=your_password
+DB_PASS=your_password
 DB_NAME=gg_store
 
 # API
@@ -51,7 +52,27 @@ NGROK_API_URL=http://localhost:3000
 NGROK_API_TIMEOUT=30000
 ```
 
-### 4. Jalankan proyek
+### 4. Siapkan database (migrasi)
+
+Buat database kosong sesuai `DB_NAME`, lalu jalankan:
+
+```bash
+npm run migrate
+```
+
+Skema database dikelola dengan migrasi [Knex](https://knexjs.org) di `API/migrations/`. Migrasi pertama (`baseline`) membuat skema awal jika tabel belum ada; pada database lama yang sudah berisi tabel, migrasi ini hanya dicatat sebagai sudah dijalankan tanpa mengubah data.
+
+| Perintah                          | Fungsi                                              |
+| --------------------------------- | --------------------------------------------------- |
+| `npm run migrate`                 | Menjalankan semua migrasi yang belum dijalankan.    |
+| `npm run migrate:status`          | Menampilkan migrasi yang sudah dan belum dijalankan. |
+| `npm run migrate:rollback`        | Membatalkan batch migrasi terakhir.                 |
+| `npm run migrate:make -- <nama>`  | Membuat file migrasi baru.                          |
+| `npm run seed`                    | Menjalankan seed di `API/seeds/`.                   |
+
+Setiap perubahan skema harus dibuat sebagai file migrasi baru — jangan ubah tabel langsung di database atau mengedit migrasi yang sudah dijalankan.
+
+### 5. Jalankan proyek
 
 **Opsi A: Jalankan terpisah**
 
@@ -93,7 +114,16 @@ NGROK_API_TIMEOUT=30000
 | `API/src/routes/vouchers.js`     | JavaScript | Route manajemen voucher diskon.                                       |
 | `API/src/routes/dashboard.js`    | JavaScript | Route statistik dashboard (pendapatan, stok, transaksi terbaru).      |
 | `API/src/routes/analytics.js`    | JavaScript | Route analitik lanjutan khusus superadmin.                            |
-| `API/src/middleware/auth.js`     | JavaScript | Middleware verifikasi JWT dan pengecekan role.                        |
+| `API/src/routes/catalog.js`      | JavaScript | Route katalog: produk, varian, merek, tarif pajak, gambar produk.     |
+| `API/src/routes/stock.js`        | JavaScript | Route stok per lokasi: penyesuaian, harga lokasi, unit IMEI, riwayat. |
+| `API/src/services/stock.js`      | JavaScript | Satu-satunya kode yang mengubah stok; selalu mencatat `stock_movements`. |
+| `API/src/services/legacy-products.js` | JavaScript | Lapisan kompatibilitas `/api/products` lama di atas tabel katalog. |
+| `API/src/routes/locations.js`    | JavaScript | Route lokasi (cabang dan gudang): daftar, tambah, ubah, nonaktifkan.  |
+| `API/src/routes/access.js`       | JavaScript | Route role, daftar izin, dan penugasan role pengguna per lokasi.      |
+| `API/src/middleware/auth.js`     | JavaScript | Middleware JWT, `requireRole` (lama), dan `requirePermission`.        |
+| `API/src/auth/permissions.js`    | JavaScript | Daftar semua kunci izin (permission) yang diperiksa API.              |
+| `API/src/services/access.js`     | JavaScript | Memuat izin pengguna per lokasi; sinkronisasi dengan `users.role`.    |
+| `API/src/services/audit.js`      | JavaScript | Pencatatan audit log perubahan data penting.                          |
 | `API/src/utils/upload.js`        | JavaScript | Konfigurasi Multer untuk upload gambar produk dan kategori.           |
 | `API/src/public/api-docs.js`     | JavaScript | Script frontend untuk halaman dokumentasi API berbasis web.           |
 | `API/src/public/docs-login.js`   | JavaScript | Script frontend untuk halaman login dokumentasi.                      |
@@ -105,6 +135,9 @@ NGROK_API_TIMEOUT=30000
 | `API/uploads/temp/`              | Folder     | Folder sementara untuk file yang sedang diproses.                     |
 | `API/uploads/thumbnails/`        | Folder     | Thumbnail gambar yang sudah dikompresi.                               |
 | `API/scripts/sync-env.js`        | JavaScript | Script untuk menyinkronkan URL ngrok ke file `.env` Flutter.          |
+| `API/knexfile.js`                | JavaScript | Konfigurasi Knex untuk migrasi (membaca kredensial dari `.env`).      |
+| `API/migrations/`                | Folder     | File migrasi skema database, dijalankan berurutan oleh Knex.          |
+| `API/seeds/`                     | Folder     | Data awal (seed) untuk database.                                      |
 
 ### app/
 

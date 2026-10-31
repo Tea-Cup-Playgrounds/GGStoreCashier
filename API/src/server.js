@@ -29,6 +29,10 @@ const transactionRoutes = require("./routes/transactions");
 const dashboardRoutes = require("./routes/dashboard");
 const voucherRoutes = require("./routes/vouchers");
 const analyticsRoutes = require("./routes/analytics");
+const accessRoutes = require("./routes/access");
+const locationRoutes = require("./routes/locations");
+const catalogRoutes = require("./routes/catalog");
+const stockRoutes = require("./routes/stock");
 
 const app = express();
 const server = http.createServer(app);
@@ -175,6 +179,10 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/vouchers", voucherRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/access", accessRoutes);
+app.use("/api/locations", locationRoutes);
+app.use("/api/catalog", catalogRoutes);
+app.use("/api/stock", stockRoutes);
 
 // ── Docs session middleware ───────────────────────────────────────────────────
 const DOCS_SESSION_COOKIE = "docs_session";

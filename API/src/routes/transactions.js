@@ -1,6 +1,9 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole, filterByBranch } = require('../middleware/auth');
+const stock = require('../services/stock');
+const { DISPLAY_NAME_SQL, ACTIVE_VARIANT_SQL } = require('../services/catalog');
+const { emitLegacyProduct } = require('../services/legacy-products');
 
 const router = express.Router();
 
@@ -79,9 +82,10 @@ router.get('/:id', async (req, res) => {
         }
 
         const [items] = await pool.execute(
-            `SELECT ti.*, p.name as product_name, p.barcode
+            `SELECT ti.*, ${DISPLAY_NAME_SQL} as product_name, v.barcode
              FROM transaction_items ti
-             LEFT JOIN products p ON ti.product_id = p.id
+             LEFT JOIN product_variants v ON ti.product_id = v.id
+             LEFT JOIN products p ON v.product_id = p.id
              WHERE ti.transaction_id = ?`,
             [req.params.id]
         );
@@ -102,14 +106,32 @@ router.get('/:id', async (req, res) => {
 // POST /api/transactions
 router.post('/', async (req, res) => {
     // Superadmin must supply a real branch_id in the body
-    const branchId = req.user.role === 'superadmin'
+    const branchId = Number(req.user.role === 'superadmin'
         ? req.body.branch_id
-        : req.user.branch_id;
+        : req.user.branch_id);
 
-    if (!branchId || branchId === 0) {
+    if (!Number.isInteger(branchId) || branchId <= 0) {
         return res.status(400).json({
             error: 'branch_id wajib diisi untuk transaksi ini'
         });
+    }
+
+    const { items, discount = 0, payment_method, payment_amount } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Item transaksi wajib diisi' });
+    }
+
+    // Validate all product_ids and quantities are positive integers
+    for (const item of items) {
+        item.product_id = Number(item.product_id);
+        item.qty = Number(item.qty);
+        if (!Number.isInteger(item.product_id) || item.product_id <= 0) {
+            return res.status(400).json({ error: `ID produk tidak valid: ${item.product_id}` });
+        }
+        if (!Number.isInteger(item.qty) || item.qty <= 0) {
+            return res.status(400).json({ error: `Jumlah tidak valid untuk produk ${item.product_id}` });
+        }
     }
 
     const connection = await pool.getConnection();
@@ -117,38 +139,35 @@ router.post('/', async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const { items, discount = 0, payment_method, payment_amount } = req.body;
-
-        if (!items || items.length === 0) {
-            return res.status(400).json({ error: 'Item transaksi wajib diisi' });
+        if (!req.access.can('sales.create', branchId)) {
+            await connection.rollback();
+            return res.status(403).json({ error: 'Anda tidak memiliki izin berjualan di cabang ini' });
         }
 
-        // Validate all product_ids are positive integers
-        for (const item of items) {
-            if (!item.product_id || item.product_id <= 0) {
-                return res.status(400).json({ error: `ID produk tidak valid: ${item.product_id}` });
-            }
-            if (!item.qty || item.qty <= 0) {
-                return res.status(400).json({ error: `Jumlah tidak valid untuk produk ${item.product_id}` });
-            }
-        }
-
-        // Check stock availability for all items before touching anything
+        // product_id is a variant id (see services/legacy-products.js). Prices come from the
+        // catalog at this branch, not from the client.
         for (const item of items) {
             const [rows] = await connection.execute(
-                'SELECT stock, name FROM products WHERE id = ?',
-                [item.product_id]
+                `SELECT v.id, ${DISPLAY_NAME_SQL} AS name, p.is_serialized, p.kind,
+                        COALESCE(sl.sell_price, v.base_price) AS price
+                 FROM product_variants v
+                 JOIN products p ON p.id = v.product_id
+                 LEFT JOIN stock_levels sl ON sl.variant_id = v.id AND sl.location_id = ?
+                 WHERE v.id = ? AND ${ACTIVE_VARIANT_SQL}`,
+                [branchId, item.product_id]
             );
             if (rows.length === 0) {
                 await connection.rollback();
                 return res.status(404).json({ error: `Produk dengan ID ${item.product_id} tidak ditemukan` });
             }
-            if (rows[0].stock < item.qty) {
+            if (rows[0].is_serialized) {
                 await connection.rollback();
                 return res.status(400).json({
-                    error: `Stok "${rows[0].name}" tidak mencukupi. Tersedia: ${rows[0].stock}, diminta: ${item.qty}`
+                    error: `"${rows[0].name}" memakai IMEI/serial dan belum dapat dijual dari kasir ini`
                 });
             }
+            item.name = rows[0].name;
+            item.price = Number(rows[0].price);
         }
 
         // Calculate totals
@@ -156,18 +175,18 @@ router.post('/', async (req, res) => {
         for (const item of items) {
             total_amount += item.qty * item.price;
         }
-        const final_amount = total_amount - discount;
+        const appliedDiscount = Math.min(Math.max(Number(discount) || 0, 0), total_amount);
+        const final_amount = total_amount - appliedDiscount;
 
         // Insert transaction
         const [transactionResult] = await connection.execute(
             `INSERT INTO transactions (user_id, branch_id, total_amount, discount, final_amount, payment_status)
              VALUES (?, ?, ?, ?, ?, 'paid')`,
-            [req.user.id, branchId, total_amount, discount, final_amount]
+            [req.user.id, branchId, total_amount, appliedDiscount, final_amount]
         );
         const transactionId = transactionResult.insertId;
 
-        // Insert items, deduct stock, record movements
-        const updatedProducts = [];
+        // Insert items and deduct stock (StockService writes the movement)
         for (const item of items) {
             await connection.execute(
                 `INSERT INTO transaction_items (transaction_id, product_id, qty, price, subtotal)
@@ -175,26 +194,16 @@ router.post('/', async (req, res) => {
                 [transactionId, item.product_id, item.qty, item.price, item.qty * item.price]
             );
 
-            await connection.execute(
-                'UPDATE products SET stock = stock - ? WHERE id = ?',
-                [item.qty, item.product_id]
-            );
-
-            const [products] = await connection.execute(
-                `SELECT p.*, c.name as category_name, b.name as branch_name
-                 FROM products p
-                 LEFT JOIN categories c ON p.category_id = c.id
-                 LEFT JOIN branches b ON p.branch_id = b.id
-                 WHERE p.id = ?`,
-                [item.product_id]
-            );
-            if (products.length > 0) updatedProducts.push(products[0]);
-
-            await connection.execute(
-                `INSERT INTO stock_movements (product_id, branch_id, type, qty, note)
-                 VALUES (?, ?, 'out', ?, ?)`,
-                [item.product_id, branchId, item.qty, `Sale - Transaction #${transactionId}`]
-            );
+            try {
+                await stock.adjustQuantity(connection, { userId: req.user.id }, {
+                    locationId: branchId, variantId: Number(item.product_id), qtyChange: -item.qty,
+                    reason: 'sale', refType: 'transaction', refId: transactionId,
+                });
+            } catch (error) {
+                if (!(error instanceof stock.StockError)) throw error;
+                await connection.rollback();
+                return res.status(error.status).json({ error: `"${item.name}": ${error.message}` });
+            }
         }
 
         // Insert payment record
@@ -223,10 +232,9 @@ router.post('/', async (req, res) => {
             io.to(`branch-${branchId}`).emit('transaction-created', transactions[0]);
             io.to('branch-0').emit('transaction-created', transactions[0]);
 
-            updatedProducts.forEach(product => {
-                io.to(`branch-${product.branch_id}`).emit('product-updated', product);
-                io.to('branch-0').emit('product-updated', product);
-            });
+            for (const item of items) {
+                await emitLegacyProduct(req, 'product-updated', item.product_id, [branchId]);
+            }
 
             io.to(`branch-${branchId}`).emit('payment-completed', {
                 transactionId, method: payment_method, amount: payment_amount, branchId

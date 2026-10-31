@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { assignDefaultLocationCode } = require('../services/locations');
 
 const router = express.Router();
 
@@ -54,8 +55,9 @@ router.post('/', requireRole(['superadmin']), async (req, res) => {
 
         const [result] = await pool.execute(
             'INSERT INTO branches (name, address, phone) VALUES (?, ?, ?)',
-            [name, address, phone]
+            [name, address || null, phone || null]
         );
+        await assignDefaultLocationCode(pool, result.insertId);
 
         res.status(201).json({ 
             message: 'Cabang berhasil dibuat',
@@ -126,13 +128,16 @@ router.delete('/:id', requireRole(['superadmin']), async (req, res) => {
 
         // Check if branch has users or products
         const [users] = await pool.execute(
-            'SELECT COUNT(*) as count FROM users WHERE branch_id = ?',
-            [req.params.id]
+            `SELECT COUNT(*) as count FROM users
+             WHERE branch_id = ? OR id IN (SELECT user_id FROM user_locations WHERE location_id = ?)`,
+            [req.params.id, req.params.id]
         );
 
+        // Any stock row or stock history ties the branch to the ledger.
         const [products] = await pool.execute(
-            'SELECT COUNT(*) as count FROM products WHERE branch_id = ?',
-            [req.params.id]
+            `SELECT (SELECT COUNT(*) FROM stock_levels WHERE location_id = ?)
+                  + (SELECT COUNT(*) FROM stock_movements WHERE location_id = ?) as count`,
+            [req.params.id, req.params.id]
         );
 
         if (users[0].count > 0 || products[0].count > 0) {

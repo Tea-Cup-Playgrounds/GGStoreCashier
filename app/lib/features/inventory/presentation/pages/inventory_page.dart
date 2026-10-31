@@ -4,14 +4,18 @@ import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart';
 import 'package:gg_store_cashier/core/helper/screen_type_utils.dart';
 import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
-import 'package:gg_store_cashier/core/provider/auth_provider.dart';
+import 'package:gg_store_cashier/core/provider/access_provider.dart';
 import 'package:gg_store_cashier/core/provider/realtime_provider.dart';
+import 'package:gg_store_cashier/core/services/catalog_service.dart';
 import 'package:gg_store_cashier/core/services/product_service.dart';
-import 'package:gg_store_cashier/core/models/product.dart';
+import 'package:gg_store_cashier/core/models/catalog.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../providers/inventory_location_provider.dart';
 import '../widgets/inventory_header.dart';
+import '../widgets/imei_lookup_sheet.dart';
+import '../widgets/location_selector.dart';
 import 'category_management_page.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 
@@ -27,38 +31,51 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   late TabController _tabController;
   InventoryFilter _currentFilter = InventoryFilter.all;
 
-  List<Product> _products = [];
+  List<CatalogProduct> _products = [];
   bool _isLoadingProducts = true;
   String? _productsError;
+  int? _loadedLocationId;
 
   ProviderSubscription<RealtimeProductState>? _realtimeSub;
+  ProviderSubscription<Location?>? _locationSub;
 
   @override
   void initState() {
     super.initState();
     searchController = TextEditingController();
     _tabController = TabController(length: 2, vsync: this);
-    _loadProducts();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Legacy product events (sales, edits from older screens) still mean stock changed.
     _realtimeSub ??= ref.listenManual(realtimeProductProvider, (previous, next) {
       if (next.lastUpdateTime != previous?.lastUpdateTime) _loadProducts();
     });
+    // Load once the location resolves, and again whenever the user switches location.
+    _locationSub ??= ref.listenManual<Location?>(effectiveInventoryLocationProvider, (previous, next) {
+      if (next != null && next.id != _loadedLocationId) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _loadProducts();
+        });
+      }
+    }, fireImmediately: true);
   }
 
   Future<void> _loadProducts() async {
+    final location = ref.read(effectiveInventoryLocationProvider);
+    if (location == null) return;
     setState(() {
       _isLoadingProducts = true;
       _productsError = null;
     });
     try {
-      final products = await ProductService.getProducts();
+      final products = await CatalogService.getProducts(locationId: location.id);
       if (mounted) {
         setState(() {
           _products = products;
+          _loadedLocationId = location.id;
           _isLoadingProducts = false;
         });
       }
@@ -75,24 +92,29 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   @override
   void dispose() {
     _realtimeSub?.close();
+    _locationSub?.close();
     searchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
-  List<Product> get _filteredProducts {
-    List<Product> result = _products;
+  List<CatalogProduct> get _filteredProducts {
+    List<CatalogProduct> result = _products;
     final q = searchController.text.toLowerCase();
     if (q.isNotEmpty) {
       result = result.where((p) {
         return p.name.toLowerCase().contains(q) ||
-            (p.barcode?.toLowerCase().contains(q) ?? false) ||
-            (p.category?.toLowerCase().contains(q) ?? false);
+            (p.brandName?.toLowerCase().contains(q) ?? false) ||
+            (p.categoryName?.toLowerCase().contains(q) ?? false) ||
+            p.variants.any((v) =>
+                v.sku.toLowerCase().contains(q) ||
+                (v.barcode?.toLowerCase().contains(q) ?? false) ||
+                (v.name?.toLowerCase().contains(q) ?? false));
       }).toList();
     }
     switch (_currentFilter) {
       case InventoryFilter.low:
-        result = result.where((p) => p.isLowStock && !p.isOutOfStock).toList();
+        result = result.where((p) => p.isLowStock).toList();
         break;
       case InventoryFilter.out:
         result = result.where((p) => p.isOutOfStock).toList();
@@ -107,11 +129,13 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = cs.brightness == Brightness.dark;
-    final user = ref.watch(authProvider).user;
-    final isKaryawan = user?.isEmployee ?? false;
+    final access = ref.watch(accessProvider).valueOrNull;
+    final canManageCatalog = access?.can('catalog.manage') ?? false;
     final screenType = getScreenType(context);
     final orientation = getOrientation(context);
     final hPad = Breakpoints.getHorizontalPadding(screenType, orientation);
+
+    final location = ref.watch(effectiveInventoryLocationProvider);
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerLow,
@@ -135,11 +159,19 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const Spacer(),
-                      if (!isKaryawan)
+                      IconButton(
+                        tooltip: 'Cek IMEI / Serial',
+                        icon: const Icon(Icons.qr_code_scanner_rounded),
+                        onPressed: () => ImeiLookupSheet.show(context),
+                      ),
+                      if (canManageCatalog)
                         SizedBox(
                           height: 40,
                           child: ElevatedButton.icon(
-                            onPressed: () => context.push(AppRouter.inventoryAddItem),
+                            onPressed: () async {
+                              await context.push(AppRouter.inventoryAddItem);
+                              _loadProducts();
+                            },
                             icon: const Icon(Icons.add_rounded, size: 18),
                             label: const Text('Tambah Produk'),
                             style: ElevatedButton.styleFrom(
@@ -174,7 +206,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildProductsTab(screenType, hPad),
+                    _buildProductsTab(screenType, hPad, location),
                     const CategoryManagementPage(),
                   ],
                 ),
@@ -186,12 +218,34 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     );
   }
 
-  Widget _buildProductsTab(ScreenType screenType, double hPad) {
+  Widget _buildProductsTab(ScreenType screenType, double hPad, Location? location) {
     final filtered = _filteredProducts;
     final cs = Theme.of(context).colorScheme;
+    final locationsAsync = ref.watch(stockLocationsProvider);
+
+    if (locationsAsync.hasError) {
+      return _ErrorState(message: locationsAsync.error.toString(), onRetry: () => ref.invalidate(accessProvider));
+    }
+    if (!locationsAsync.isLoading && location == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text('Anda belum ditugaskan ke cabang atau gudang mana pun.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+        ),
+      );
+    }
 
     return Column(
       children: [
+        if ((locationsAsync.valueOrNull?.length ?? 0) > 1)
+          Container(
+            color: cs.surface,
+            padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 0),
+            child: const LocationSelector(),
+          ),
+
         // ── Sticky header (search + filters + summary) ──────────────
         InventoryHeader(
           searchController: searchController,
@@ -199,7 +253,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
           currentFilter: _currentFilter,
           onFilterChanged: (f) => setState(() => _currentFilter = f),
           totalItems: _products.length,
-          lowStockItems: _products.where((p) => p.isLowStock && !p.isOutOfStock).length,
+          lowStockItems: _products.where((p) => p.isLowStock).length,
           outOfStockItems: _products.where((p) => p.isOutOfStock).length,
         ),
 
@@ -218,30 +272,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                   ),
                 )
               : _productsError != null
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
-                            const SizedBox(height: 16),
-                            Text('Gagal memuat produk', style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 8),
-                            Text(_productsError!,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                                textAlign: TextAlign.center),
-                            const SizedBox(height: 20),
-                            ElevatedButton.icon(
-                              onPressed: _loadProducts,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Coba Lagi'),
-                              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
+                  ? _ErrorState(message: _productsError!, onRetry: _loadProducts)
                   : filtered.isEmpty
                       ? Center(
                           child: Column(
@@ -265,6 +296,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
                             itemBuilder: (context, index) => _ProductTile(
                               product: filtered[index],
                               isTablet: screenType == ScreenType.tablet,
+                              onTap: () async {
+                                await context.pushNamed('inventoryDetail',
+                                    pathParameters: {'id': filtered[index].id.toString()});
+                                _loadProducts();
+                              },
                             ),
                           ),
                         ),
@@ -274,12 +310,46 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
   }
 }
 
-// _HeaderDelegate removed — header is now a plain Column child, no sliver needed.
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
+            const SizedBox(height: 16),
+            Text('Gagal memuat produk', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(message,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ProductTile extends StatelessWidget {
-  final Product product;
+  final CatalogProduct product;
   final bool isTablet;
-  const _ProductTile({required this.product, this.isTablet = false});
+  final VoidCallback onTap;
+  const _ProductTile({required this.product, required this.onTap, this.isTablet = false});
 
   @override
   Widget build(BuildContext context) {
@@ -291,16 +361,26 @@ class _ProductTile extends StatelessWidget {
         : product.isLowStock
             ? AppTheme.warning
             : AppTheme.success;
-    final stockLabel = product.isOutOfStock
-        ? 'Habis'
-        : product.isLowStock
-            ? 'Stok Tipis'
-            : '${product.stock} stok';
+    final stockLabel = !product.hasStock
+        ? (product.kind == 'service' ? 'Jasa' : 'Digital')
+        : product.isOutOfStock
+            ? 'Habis'
+            : product.isLowStock
+                ? 'Stok Tipis · ${product.onHand}'
+                : '${product.onHand} ${product.isSerialized ? 'unit' : 'stok'}';
+    final range = product.priceRange;
+    final priceText = range.min == range.max
+        ? CurrencyFormatter.formatToRupiah(range.min)
+        : '${CurrencyFormatter.formatToCompactRupiah(range.min)} – ${CurrencyFormatter.formatToCompactRupiah(range.max)}';
+    final subtitle = [
+      if (product.brandName != null) product.brandName!,
+      if (product.variants.length > 1) '${product.variants.length} varian' else if (product.variants.isNotEmpty) product.variants.first.sku,
+    ].join(' · ');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        onTap: () => context.pushNamed('inventoryDetail', pathParameters: {'id': product.id}),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
           padding: const EdgeInsets.all(12),
@@ -336,9 +416,11 @@ class _ProductTile extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis),
-                    if (product.barcode != null) ...[
+                    if (subtitle.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      Text('SKU: ${product.barcode}',
+                      Text(subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                     ],
                     const SizedBox(height: 4),
@@ -357,10 +439,14 @@ class _ProductTile extends StatelessWidget {
                                   .labelSmall
                                   ?.copyWith(color: stockColor, fontWeight: FontWeight.w600)),
                         ),
-                        if (product.category != null) ...[
+                        if (product.isSerialized) ...[
+                          const SizedBox(width: 6),
+                          Icon(Icons.qr_code_2_rounded, size: 14, color: cs.onSurfaceVariant),
+                        ],
+                        if (product.categoryName != null) ...[
                           const SizedBox(width: 6),
                           Flexible(
-                              child: Text(product.category!,
+                              child: Text(product.categoryName!,
                                   style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                                   overflow: TextOverflow.ellipsis)),
                         ],
@@ -373,7 +459,7 @@ class _ProductTile extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(CurrencyFormatter.formatToRupiah(product.sellPrice),
+                  Text(priceText,
                       style: Theme.of(context)
                           .textTheme
                           .titleSmall
