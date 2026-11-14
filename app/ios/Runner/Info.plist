@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Kamera dipakai untuk scan barcode / IMEI dan memotret produk.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Galeri dipakai untuk memilih foto produk.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Bluetooth dipakai untuk mencetak struk ke printer thermal.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Lokasi dipakai untuk mencatat cabang tempat Anda bekerja.</string>
 </dict>
 </plist>

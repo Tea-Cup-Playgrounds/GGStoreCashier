@@ -5,6 +5,37 @@ const { authenticateToken, requirePermission } = require('../middleware/auth');
 const router = express.Router();
 router.use(authenticateToken);
 
+// What a voucher applies to: everything (null), one category ('categories', target_id = category
+// id) or one variant ('product', target_id = variant id). 'category' is accepted for 'categories'.
+// Returns { error } or { targetType, targetId }.
+const readTarget = async (body) => {
+    const raw = body.target_type === undefined || body.target_type === null ? '' : String(body.target_type).trim();
+    if (raw === '') return { targetType: null, targetId: null };
+    const targetType = raw === 'category' ? 'categories' : raw;
+    if (!['categories', 'product'].includes(targetType)) {
+        return { error: 'Target voucher harus kosong (semua barang), categories, atau product' };
+    }
+    const targetId = Number(body.target_id);
+    if (!Number.isInteger(targetId) || targetId <= 0) {
+        return { error: targetType === 'categories' ? 'Pilih kategori voucher' : 'Pilih varian produk voucher' };
+    }
+    const [rows] = targetType === 'categories'
+        ? await pool.execute('SELECT id FROM categories WHERE id = ?', [targetId])
+        : await pool.execute('SELECT id FROM product_variants WHERE id = ? AND deleted_at IS NULL', [targetId]);
+    if (rows.length === 0) return { error: targetType === 'categories' ? 'Kategori tidak ditemukan' : 'Varian produk tidak ditemukan' };
+    return { targetType, targetId };
+};
+
+// Shared checks for create and update. Returns an error message or null.
+const checkDiscount = ({ code, discount_type, discount_value }) => {
+    if (!code || !discount_type || discount_value == null) return 'Kode, tipe diskon, dan nilai diskon wajib diisi';
+    if (!['percent', 'fixed'].includes(discount_type)) return 'Tipe diskon harus percent atau fixed';
+    const value = Number(discount_value);
+    if (!Number.isFinite(value) || value <= 0) return 'Nilai diskon harus lebih dari 0';
+    if (discount_type === 'percent' && value > 100) return 'Diskon persen harus antara 1 dan 100';
+    return null;
+};
+
 // ── GET /api/vouchers — list all (vouchers.manage) ─────────────────────────
 router.get('/', requirePermission('vouchers.manage'), async (req, res) => {
     try {
@@ -50,23 +81,15 @@ router.post('/', requirePermission('vouchers.manage'), async (req, res) => {
     try {
         const {
             code, description,
-            target_type, target_id,
             discount_type, discount_value,
             valid_from, valid_to,
             is_active = 1,
         } = req.body;
 
-        if (!code || !discount_type || discount_value == null) {
-            return res.status(400).json({
-                error: 'Kode, tipe diskon, dan nilai diskon wajib diisi'
-            });
-        }
-        if (!['percent', 'fixed'].includes(discount_type)) {
-            return res.status(400).json({ error: 'Tipe diskon harus percent atau fixed' });
-        }
-        if (discount_type === 'percent' && (discount_value <= 0 || discount_value > 100)) {
-            return res.status(400).json({ error: 'Diskon persen harus antara 1 dan 100' });
-        }
+        const invalid = checkDiscount(req.body);
+        if (invalid) return res.status(400).json({ error: invalid });
+        const target = await readTarget(req.body);
+        if (target.error) return res.status(400).json({ error: target.error });
 
         const [result] = await pool.execute(
             `INSERT INTO vouchers
@@ -75,8 +98,8 @@ router.post('/', requirePermission('vouchers.manage'), async (req, res) => {
             [
                 code.trim().toUpperCase(),
                 description || null,
-                target_type || null,
-                target_id || null,
+                target.targetType,
+                target.targetId,
                 discount_type,
                 discount_value,
                 valid_from || null,
@@ -100,16 +123,14 @@ router.put('/:id', requirePermission('vouchers.manage'), async (req, res) => {
     try {
         const {
             code, description,
-            target_type, target_id,
             discount_type, discount_value,
             valid_from, valid_to, is_active,
         } = req.body;
 
-        if (!code || !discount_type || discount_value == null) {
-            return res.status(400).json({
-                error: 'Kode, tipe diskon, dan nilai diskon wajib diisi'
-            });
-        }
+        const invalid = checkDiscount(req.body);
+        if (invalid) return res.status(400).json({ error: invalid });
+        const target = await readTarget(req.body);
+        if (target.error) return res.status(400).json({ error: target.error });
 
         const [result] = await pool.execute(
             `UPDATE vouchers SET
@@ -120,8 +141,8 @@ router.put('/:id', requirePermission('vouchers.manage'), async (req, res) => {
             [
                 code.trim().toUpperCase(),
                 description || null,
-                target_type || null,
-                target_id || null,
+                target.targetType,
+                target.targetId,
                 discount_type,
                 discount_value,
                 valid_from || null,

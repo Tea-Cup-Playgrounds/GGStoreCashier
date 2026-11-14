@@ -4,8 +4,9 @@ const { authenticateToken, requirePermission } = require('../middleware/auth');
 const { logAudit } = require('../services/audit');
 const stock = require('../services/stock');
 const { ON_HAND_SQL, AVG_COST_SQL, DISPLAY_NAME_SQL, canSeeCost } = require('../services/catalog');
-const { withTransaction } = require('../utils/transaction');
+const { AppError, withTransaction } = require('../utils/transaction');
 const posting = require('../services/posting');
+const { documentDate } = require('../services/documentDate');
 const { ctxOf, requireLocation } = require('../utils/request');
 
 const router = express.Router();
@@ -59,18 +60,29 @@ router.get('/', requirePermission('stock.view'), requireLocation, async (req, re
 // Body: { location_id, variant_id, qty_change, unit_cost?, note }
 // Manual correction or opening stock for non-serialized items. Incoming stock with unit_cost
 // updates the average cost.
+// Body: { location_id, variant_id, qty_change, unit_cost?, note, date?, opening? }
+//   opening: stock the business had before using the system (qty > 0, unit_cost required); its
+//            value goes to Ekuitas Saldo Awal instead of Selisih Persediaan.
+//   date:    YYYY-MM-DD the adjustment takes effect (default today; not future, not a closed period).
 router.post('/adjust', requirePermission('stock.adjust'), requireLocation, async (req, res) => {
     const { variant_id, qty_change, unit_cost, note } = req.body;
+    const opening = req.body.opening === true;
     if (!note || !String(note).trim()) return res.status(400).json({ error: 'Alasan penyesuaian (note) wajib diisi' });
+    if (opening && !(Number(qty_change) > 0)) return res.status(400).json({ error: 'Stok awal harus berupa penambahan (jumlah > 0)' });
+    if (opening && (unit_cost === undefined || unit_cost === null || unit_cost === '' || !(Number(unit_cost) >= 0))) {
+        return res.status(400).json({ error: 'Harga pokok wajib diisi untuk stok awal' });
+    }
 
     const result = await withTransaction(res, 'Gagal menyesuaikan stok', async (conn) => {
-        const r = await stock.adjustQuantity(conn, ctxOf(req), {
+        const doc = await documentDate(conn, req.body.date, { label: 'Tanggal penyesuaian' });
+        const ctx = { ...ctxOf(req), occurredAt: doc.at };
+        const r = await stock.adjustQuantity(conn, ctx, {
             locationId: req.locationId, variantId: Number(variant_id), qtyChange: Number(qty_change),
-            unitCost: unit_cost, reason: 'adjustment', note: String(note).trim(),
+            unitCost: unit_cost, reason: opening ? 'opening' : 'adjustment', note: String(note).trim(),
         });
-        await posting.postStockValue(conn, ctxOf(req), {
-            sourceType: 'stock_adjustment', sourceId: r.movementId, locationId: req.locationId,
-            value: Number(qty_change) * r.unitCost, memo: `Penyesuaian stok: ${String(note).trim()}`,
+        await posting.postStockValue(conn, ctx, {
+            sourceType: 'stock_adjustment', sourceId: r.movementId, locationId: req.locationId, opening,
+            value: Number(qty_change) * r.unitCost, memo: `${opening ? 'Stok awal' : 'Penyesuaian stok'}: ${String(note).trim()}`,
         });
         await logAudit(conn, req, {
             action: 'adjust', entity: 'stock', entityId: variant_id, locationId: req.locationId,
@@ -171,21 +183,28 @@ router.get('/units', requirePermission('stock.view'), async (req, res) => {
     }
 });
 
-// Body: { location_id, variant_id, units: [{ imei1, imei2, serial_number, unit_cost, condition_grade, sell_price, notes }], note }
+// Body: { location_id, variant_id, units: [{ imei1, imei2, serial_number, unit_cost, condition_grade, sell_price, notes }], note, date?, opening? }
 // Registers units as stock (opening stock / correction; supplier receipts come with purchasing).
-// IMEI/serial may be left empty only when receiving at a warehouse.
+// IMEI/serial may be left empty only when receiving at a warehouse. opening and date: see /adjust.
 router.post('/units', requirePermission('units.register'), requireLocation, async (req, res) => {
     const { variant_id, units, note } = req.body;
+    const opening = req.body.opening === true;
     const result = await withTransaction(res, 'Gagal mendaftarkan unit', async (conn) => {
+        if (opening && (!Array.isArray(units) || units.some((u) => u.unit_cost === undefined || u.unit_cost === null || u.unit_cost === ''))) {
+            throw new AppError('Harga pokok setiap unit wajib diisi untuk stok awal');
+        }
+        const doc = await documentDate(conn, req.body.date, { label: 'Tanggal pendaftaran' });
+        const ctx = { ...ctxOf(req), occurredAt: doc.at };
         const [[location]] = await conn.execute('SELECT type FROM locations WHERE id = ?', [req.locationId]);
-        const created = await stock.receiveUnits(conn, ctxOf(req), {
+        const created = await stock.receiveUnits(conn, ctx, {
             locationId: req.locationId, variantId: Number(variant_id), units,
-            reason: 'adjustment', sourceType: 'adjustment', note: note || 'Pendaftaran unit',
+            reason: opening ? 'opening' : 'adjustment', sourceType: opening ? 'opening' : 'adjustment',
+            note: note || (opening ? 'Stok awal' : 'Pendaftaran unit'),
             requireIdentifiers: !location || location.type !== 'warehouse',
         });
-        await posting.postStockValue(conn, ctxOf(req), {
-            sourceType: 'stock_adjustment', sourceId: created[0].id, locationId: req.locationId,
-            value: created.reduce((s, u) => s + u.unit_cost, 0), memo: `Pendaftaran ${created.length} unit`,
+        await posting.postStockValue(conn, ctx, {
+            sourceType: 'stock_adjustment', sourceId: created[0].id, locationId: req.locationId, opening,
+            value: created.reduce((s, u) => s + u.unit_cost, 0), memo: `${opening ? 'Stok awal' : 'Pendaftaran'} ${created.length} unit`,
         });
         await logAudit(conn, req, {
             action: 'register_units', entity: 'stock', entityId: variant_id, locationId: req.locationId,
@@ -214,10 +233,12 @@ router.post('/units/:id/write-off', requirePermission('stock.adjust', { location
     if (!note || !String(note).trim()) return res.status(400).json({ error: 'Alasan (note) wajib diisi' });
 
     const result = await withTransaction(res, 'Gagal mengeluarkan unit', async (conn) => {
-        const unit = await stock.removeUnit(conn, ctxOf(req), {
+        const doc = await documentDate(conn, req.body.date, { label: 'Tanggal' });
+        const ctx = { ...ctxOf(req), occurredAt: doc.at };
+        const unit = await stock.removeUnit(conn, ctx, {
             unitId: req.params.id, status, reason: 'write_off', note: String(note).trim(),
         });
-        await posting.postStockValue(conn, ctxOf(req), {
+        await posting.postStockValue(conn, ctx, {
             sourceType: 'stock_adjustment', sourceId: req.params.id, locationId: unit.location_id,
             value: -Number(unit.unit_cost), memo: `Unit ${status === 'defective' ? 'rusak' : 'dihapus'}: ${String(note).trim()}`,
         });

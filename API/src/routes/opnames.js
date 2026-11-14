@@ -9,6 +9,8 @@ const { AppError, withTransaction } = require('../utils/transaction');
 const { ctxOf, requireLocation } = require('../utils/request');
 const { uuidv7 } = require('../utils/uuid');
 const posting = require('../services/posting');
+const { documentDate } = require('../services/documentDate');
+const { dateOnly } = require('../services/journal');
 
 // Stock counts (opname). Starting one snapshots the system quantity of every stocked variant at
 // the location (and the in-stock units of serialized ones). Staff enter counted quantities and
@@ -39,7 +41,8 @@ const lockCounting = async (conn, id) => {
 
 const loadOpname = async (db, id) => {
     const [[opname]] = await db.execute(
-        `SELECT o.*, l.code AS location_code, l.name AS location_name, c.name AS category_name,
+        `SELECT o.*, DATE_FORMAT(o.adjustment_date, '%Y-%m-%d') AS adjustment_date,
+                l.code AS location_code, l.name AS location_name, c.name AS category_name,
                 cu.name AS created_by_name, au.name AS approved_by_name
          FROM stock_opnames o
          JOIN locations l ON l.id = o.location_id
@@ -261,11 +264,16 @@ router.post('/:id/unscan', resolveOpname, requirePermission('stock.opname', { lo
 
 // Applies the count: quantity variances become 'opname' movements; expected units that were
 // never scanned (and are still in stock here) are written off. Uncounted quantity items are left alone.
+// Body: { date? } the day the differences are booked (default today; not before the count started,
+// e.g. counted on 31 Oct and approved on 1 Nov still lands in October).
 router.post('/:id/approve', resolveOpname, requirePermission('stock.opname', { location: opnameLocation }), async (req, res) => {
     const result = await withTransaction(res, 'Gagal menyetujui stok opname', async (conn) => {
         const opname = await lockCounting(conn, req.opname.id);
         const full = await loadOpname(conn, opname.id);
-        const ctx = ctxOf(req);
+        const doc = await documentDate(conn, req.body.date, {
+            label: 'Tanggal penyesuaian', notBefore: dateOnly(opname.created_at), notBeforeLabel: 'tanggal mulai opname',
+        });
+        const ctx = { ...ctxOf(req), occurredAt: doc.at };
         const common = { refType: 'opname', refId: opname.id, note: opname.number };
         const summary = { adjusted: 0, unitsWrittenOff: 0, qtyChange: 0 };
 
@@ -289,7 +297,7 @@ router.post('/:id/approve', resolveOpname, requirePermission('stock.opname', { l
             }
         }
 
-        await conn.execute("UPDATE stock_opnames SET status = 'approved', approved_by = ?, approved_at = NOW(3) WHERE id = ?", [req.user.id, opname.id]);
+        await conn.execute("UPDATE stock_opnames SET status = 'approved', approved_by = ?, approved_at = NOW(3), adjustment_date = ? WHERE id = ?", [req.user.id, doc.date, opname.id]);
         await posting.postStockValue(conn, ctx, {
             sourceType: 'opname', sourceId: opname.id, locationId: opname.location_id,
             value: await posting.movementValue(conn, 'opname', opname.id), memo: `Stok opname ${opname.number}`,

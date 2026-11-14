@@ -22,13 +22,15 @@ class OfflineTransactionEntryAdapter
       ..payload = (fields[1] as Map).cast<dynamic, dynamic>()
       ..createdAt = fields[2] as DateTime
       ..retryCount = fields[3] as int
-      ..status = fields[4] as String;
+      ..status = fields[4] as String
+      ..lastError = fields[5] as String?
+      ..lastAttemptAt = fields[6] as DateTime?;
   }
 
   @override
   void write(BinaryWriter writer, OfflineTransactionEntry obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.uuid)
       ..writeByte(1)
@@ -38,7 +40,11 @@ class OfflineTransactionEntryAdapter
       ..writeByte(3)
       ..write(obj.retryCount)
       ..writeByte(4)
-      ..write(obj.status);
+      ..write(obj.status)
+      ..writeByte(5)
+      ..write(obj.lastError)
+      ..writeByte(6)
+      ..write(obj.lastAttemptAt);
   }
 
   @override

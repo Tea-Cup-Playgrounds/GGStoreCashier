@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_search_bar.dart';

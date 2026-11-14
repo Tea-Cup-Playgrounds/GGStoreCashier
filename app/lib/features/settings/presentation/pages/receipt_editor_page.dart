@@ -1,6 +1,9 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
+import 'package:gg_store_cashier/features/devices/domain/receipt_config.dart';
+import 'package:gg_store_cashier/features/devices/domain/receipt_layout.dart';
+import 'package:gg_store_cashier/features/devices/presentation/widgets/receipt_preview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ── Paper Size ────────────────────────────────────────────────────────────────
@@ -94,13 +97,14 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage> with SingleTicker
 
   PaperSize _selectedSize = _paperSizes.first;
 
+  // Branch, address and phone left empty print the selling branch's own data from the sale.
   final _storeNameCtrl = TextEditingController(text: 'GG Store');
-  final _branchCtrl = TextEditingController(text: 'Downtown Branch');
-  final _addressCtrl = TextEditingController(text: 'Jl. Contoh No. 1, Jakarta');
-  final _phoneCtrl = TextEditingController(text: '+62 812-3456-7890');
-  final _footerCtrl = TextEditingController(text: 'Thank you for your purchase!');
+  final _branchCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _footerCtrl = TextEditingController(text: 'Terima kasih atas kunjungan Anda');
   final _taxLabelCtrl = TextEditingController(text: 'PPN');
-  final _discountLabelCtrl = TextEditingController(text: 'Discount');
+  final _discountLabelCtrl = TextEditingController(text: 'Diskon');
   final _voucherLabelCtrl = TextEditingController(text: 'Voucher');
 
   double _taxRate = 11.0;
@@ -184,29 +188,31 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage> with SingleTicker
     } catch (_) {}
   }
 
+  /// The settings as edited, in the shape [ReceiptConfig.fromJson] reads (and the printer uses).
+  Map<String, dynamic> _configJson() => {
+        'storeName': _storeNameCtrl.text,
+        'branch': _branchCtrl.text,
+        'address': _addressCtrl.text,
+        'phone': _phoneCtrl.text,
+        'footer': _footerCtrl.text,
+        'taxLabel': _taxLabelCtrl.text,
+        'discountLabel': _discountLabelCtrl.text,
+        'voucherLabel': _voucherLabelCtrl.text,
+        'taxRate': _taxRate,
+        'taxEnabled': _taxEnabled,
+        'discountEnabled': _discountEnabled,
+        'voucherEnabled': _voucherEnabled,
+        'showCashierName': _showCashierName,
+        'showTransactionId': _showTransactionId,
+        'showDateTime': _showDateTime,
+        'paperSizeIndex': _paperSizes.indexOf(_selectedSize),
+        'paperWidth': _selectedSize.width.name,
+        'sections': _sections.map((s) => {'type': s.type.name, 'visible': s.visible}).toList(),
+      };
+
   Future<void> _saveConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _prefsKey,
-        jsonEncode({
-          'storeName': _storeNameCtrl.text,
-          'branch': _branchCtrl.text,
-          'address': _addressCtrl.text,
-          'phone': _phoneCtrl.text,
-          'footer': _footerCtrl.text,
-          'taxLabel': _taxLabelCtrl.text,
-          'discountLabel': _discountLabelCtrl.text,
-          'voucherLabel': _voucherLabelCtrl.text,
-          'taxRate': _taxRate,
-          'taxEnabled': _taxEnabled,
-          'discountEnabled': _discountEnabled,
-          'voucherEnabled': _voucherEnabled,
-          'showCashierName': _showCashierName,
-          'showTransactionId': _showTransactionId,
-          'showDateTime': _showDateTime,
-          'paperSizeIndex': _paperSizes.indexOf(_selectedSize),
-          'sections': _sections.map((s) => {'type': s.type.name, 'visible': s.visible}).toList(),
-        }));
+    await prefs.setString(_prefsKey, jsonEncode(_configJson()));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Receipt settings saved')),
@@ -214,7 +220,6 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage> with SingleTicker
     }
   }
 
-  bool _sectionVisible(SectionType t) => _sections.any((s) => s.type == t && s.visible);
 
   @override
   Widget build(BuildContext context) {
@@ -277,34 +282,13 @@ class _ReceiptEditorPageState extends State<ReceiptEditorPage> with SingleTicker
             sections: _sections,
             onReorder: (oldIdx, newIdx) {
               setState(() {
-                if (newIdx > oldIdx) newIdx--;
                 final item = _sections.removeAt(oldIdx);
                 _sections.insert(newIdx, item);
               });
             },
             onToggle: (idx, val) => setState(() => _sections[idx].visible = val),
           ),
-          _PreviewTab(
-            paperSize: _selectedSize,
-            storeName: _storeNameCtrl.text,
-            branch: _branchCtrl.text,
-            address: _sectionVisible(SectionType.contact) ? _addressCtrl.text : null,
-            phone: _sectionVisible(SectionType.contact) ? _phoneCtrl.text : null,
-            footer: _footerCtrl.text,
-            taxLabel: _taxLabelCtrl.text,
-            discountLabel: _discountLabelCtrl.text,
-            voucherLabel: _voucherLabelCtrl.text,
-            taxRate: _taxRate,
-            taxEnabled: _taxEnabled,
-            discountEnabled: _discountEnabled,
-            voucherEnabled: _voucherEnabled,
-            showLogo: _sectionVisible(SectionType.logo),
-            showBarcode: _sectionVisible(SectionType.barcode),
-            showCashierName: _showCashierName,
-            showTransactionId: _showTransactionId,
-            showDateTime: _showDateTime,
-            sections: _sections,
-          ),
+          _LivePreview(config: ReceiptConfig.fromJson(_configJson())),
         ],
       ),
     );
@@ -380,15 +364,15 @@ class _ContentTab extends StatelessWidget {
           const SizedBox(height: 8),
           _RField(label: 'Store Name', ctrl: storeNameCtrl),
           const SizedBox(height: 8),
-          _RField(label: 'Branch / Subheader', ctrl: branchCtrl),
+          _RField(label: 'Branch / Subheader (empty: branch name)', ctrl: branchCtrl),
           const SizedBox(height: 24),
 
           // Contact
           const _SecTitle('Contact Info'),
           const SizedBox(height: 8),
-          _RField(label: 'Address', ctrl: addressCtrl, maxLines: 2),
+          _RField(label: 'Address (empty: branch address)', ctrl: addressCtrl, maxLines: 2),
           const SizedBox(height: 8),
-          _RField(label: 'Phone', ctrl: phoneCtrl),
+          _RField(label: 'Phone (empty: branch phone)', ctrl: phoneCtrl),
           const SizedBox(height: 24),
 
           // Tax
@@ -500,11 +484,11 @@ class _LayoutTab extends StatelessWidget {
           child: ReorderableListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             itemCount: sections.length,
-            onReorder: onReorder,
-            proxyDecorator: (child, index, animation) => Material(
-              color: Colors.transparent,
-              child: child,
-            ),
+            onReorderItem: onReorder,
+              proxyDecorator: (child, index, animation) => Material(
+                color: Colors.transparent,
+                child: child,
+              ),
             itemBuilder: (context, i) {
               final s = sections[i];
               return Container(
@@ -554,233 +538,25 @@ class _LayoutTab extends StatelessWidget {
 
 // ── Preview Tab ───────────────────────────────────────────────────────────────
 
-class _PreviewTab extends StatelessWidget {
-  final PaperSize paperSize;
-  final String storeName, branch, footer, taxLabel, discountLabel, voucherLabel;
-  final String? address, phone;
-  final double taxRate;
-  final bool taxEnabled, discountEnabled, voucherEnabled;
-  final bool showLogo, showBarcode, showCashierName, showTransactionId, showDateTime;
-  final List<ReceiptSection> sections;
-
-  const _PreviewTab({
-    required this.paperSize,
-    required this.storeName,
-    required this.branch,
-    this.address,
-    this.phone,
-    required this.footer,
-    required this.taxLabel,
-    required this.discountLabel,
-    required this.voucherLabel,
-    required this.taxRate,
-    required this.taxEnabled,
-    required this.discountEnabled,
-    required this.voucherEnabled,
-    required this.showLogo,
-    required this.showBarcode,
-    required this.showCashierName,
-    required this.showTransactionId,
-    required this.showDateTime,
-    required this.sections,
-  });
-
-  bool _vis(SectionType t) => sections.any((s) => s.type == t && s.visible);
+/// The receipt exactly as the printer will print it (same layout code), with sample sale data.
+class _LivePreview extends StatelessWidget {
+  final ReceiptConfig config;
+  const _LivePreview({required this.config});
 
   @override
   Widget build(BuildContext context) {
-    final isNarrow = paperSize.width == PaperWidth.mm58;
-    final previewWidth = isNarrow ? 220.0 : 280.0;
-    const subtotal = 35000.0;
-    const discount = 5000.0;
-    const voucher = 2000.0;
-    final taxAmt = taxEnabled ? subtotal * (taxRate / 100) : 0.0;
-    final discAmt = discountEnabled ? discount : 0.0;
-    final vouchAmt = voucherEnabled ? voucher : 0.0;
-    final total = subtotal + taxAmt - discAmt - vouchAmt;
-
+    final rows = ReceiptLayout.build(ReceiptLayout.sample(), config);
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Center(
-        child: Container(
-          width: previewWidth,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(4),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4)),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Tape top
-              Container(height: 6, color: const Color(0xFFEEEEEE)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                child: DefaultTextStyle(
-                  style: const TextStyle(color: Colors.black, fontSize: 9, height: 1.5),
-                  child: Column(
-                    children: [
-                      // Logo
-                      if (_vis(SectionType.logo)) ...[
-                        Image.asset('assets/images/GG_Logo.png', height: 48, fit: BoxFit.contain),
-                        const SizedBox(height: 6),
-                      ],
-                      // Header
-                      if (_vis(SectionType.header)) ...[
-                        Text(storeName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black),
-                            textAlign: TextAlign.center),
-                        Text(branch,
-                            style: const TextStyle(fontSize: 10, color: Colors.black54), textAlign: TextAlign.center),
-                      ],
-                      // Contact
-                      if (_vis(SectionType.contact)) ...[
-                        const SizedBox(height: 4),
-                        if (address != null)
-                          Text(address!,
-                              textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.black54)),
-                        if (phone != null)
-                          Text(phone!,
-                              textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.black54)),
-                      ],
-                      // Transaction meta
-                      if (showDateTime || showTransactionId || showCashierName) ...[
-                        const _PDivider(),
-                        if (showDateTime) const _PRow(left: 'Date', right: '08/04/2026 14:32'),
-                        if (showTransactionId) const _PRow(left: 'TRX ID', right: '#TRX-00123'),
-                        if (showCashierName) const _PRow(left: 'Cashier', right: 'Budi Santoso'),
-                      ],
-                      // Items
-                      if (_vis(SectionType.items)) ...[
-                        const _PDivider(),
-                        _PRow(left: 'Kopi Susu x2', right: _fmt(20000)),
-                        _PRow(left: 'Croissant x1', right: _fmt(15000)),
-                        _PRow(left: 'Air Mineral x1', right: _fmt(5000)),
-                      ],
-                      // Totals
-                      if (_vis(SectionType.totals)) ...[
-                        const _PDivider(),
-                        _PRow(left: 'Subtotal', right: _fmt(subtotal)),
-                        if (taxEnabled) _PRow(left: '$taxLabel (${taxRate.toStringAsFixed(0)}%)', right: _fmt(taxAmt)),
-                        if (discountEnabled) _PRow(left: discountLabel, right: '-${_fmt(discAmt)}'),
-                        if (voucherEnabled) _PRow(left: voucherLabel, right: '-${_fmt(vouchAmt)}'),
-                        const _PDivider(),
-                        _PRow(left: 'TOTAL', right: _fmt(total), bold: true),
-                      ],
-                      // Payment
-                      if (_vis(SectionType.payment)) ...[
-                        const SizedBox(height: 4),
-                        const _PRow(left: 'Payment', right: 'Cash'),
-                        _PRow(left: 'Paid', right: _fmt(total + 5000)),
-                        _PRow(left: 'Change', right: _fmt(5000)),
-                      ],
-                      // Barcode
-                      if (_vis(SectionType.barcode)) ...[
-                        const _PDivider(),
-                        const SizedBox(height: 4),
-                        Container(
-                          height: 36,
-                          width: double.infinity,
-                          color: const Color(0xFFF0F0F0),
-                          child: const Center(
-                            child: Text('▌▌▌▌ ▌ ▌▌▌ ▌▌▌▌ ▌ ▌▌',
-                                style: TextStyle(fontSize: 9, color: Colors.black38, letterSpacing: 1)),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text('TRX-00123',
-                            textAlign: TextAlign.center, style: TextStyle(fontSize: 8, color: Colors.black38)),
-                        const SizedBox(height: 4),
-                      ],
-                      // Footer
-                      if (_vis(SectionType.footer)) ...[
-                        const _PDivider(),
-                        Text(footer,
-                            textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, color: Colors.black54)),
-                      ],
-                      const SizedBox(height: 4),
-                      Text(paperSize.label, style: const TextStyle(fontSize: 7, color: Colors.black26)),
-                    ],
-                  ),
-                ),
-              ),
-              // Tape bottom (torn edge)
-              ClipPath(
-                clipper: _TornEdgeClipper(),
-                child: Container(height: 14, color: const Color(0xFFEEEEEE)),
-              ),
-            ],
-          ),
+      child: Column(children: [
+        ReceiptPreview(rows: rows, charsPerLine: config.charsPerLine),
+        const SizedBox(height: 12),
+        Text(
+          'Kertas ${config.wide ? '80' : '58'} mm · ${config.charsPerLine} karakter per baris. Logo tidak dicetak.',
+          style: Theme.of(context).textTheme.bodySmall,
+          textAlign: TextAlign.center,
         ),
-      ),
-    );
-  }
-
-  String _fmt(double v) {
-    final s = v.toStringAsFixed(0);
-    final buf = StringBuffer();
-    for (int i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) buf.write('.');
-      buf.write(s[i]);
-    }
-    return 'Rp $buf';
-  }
-}
-
-class _TornEdgeClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.moveTo(0, 0);
-    double x = 0;
-    const step = 8.0;
-    bool up = true;
-    while (x < size.width) {
-      x += step;
-      path.lineTo(x.clamp(0, size.width), up ? size.height * 0.4 : 0);
-      up = !up;
-    }
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(_) => false;
-}
-
-class _PDivider extends StatelessWidget {
-  const _PDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 5),
-      child: Divider(height: 1, color: Colors.black12),
-    );
-  }
-}
-
-class _PRow extends StatelessWidget {
-  final String left, right;
-  final bool bold;
-  const _PRow({required this.left, required this.right, this.bold = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(
-      fontSize: 9,
-      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-      color: Colors.black87,
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [Text(left, style: style), Text(right, style: style)],
-      ),
+      ]),
     );
   }
 }

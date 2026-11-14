@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -16,6 +17,12 @@ import '../../../../core/services/voucher_service.dart';
 import '../../../../core/services/connectivity_monitor.dart';
 import '../../../../core/services/offline_queue.dart';
 import '../../../../core/provider/realtime_provider.dart';
+import '../../../../core/provider/auth_provider.dart';
+import '../../../../core/services/offline_sale_number.dart';
+import '../../../../core/helper/scan_code.dart';
+import '../../../../shared/widgets/barcode_scanner_page.dart';
+import '../../../../shared/widgets/scan_key_listener.dart';
+import '../../../devices/domain/receipt.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
@@ -51,6 +58,9 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   bool _isApplyingCoupon = false;
   bool _isProcessingPayment = false;
   SaleResult? _lastSale;
+
+  /// Receipt of the sale just finished (printed / shown on the success screen).
+  ReceiptData? _receipt;
   // Sale id generated here, so a retried checkout (or the offline queue) never creates two sales.
   String _transactionUuid = const Uuid().v4();
 
@@ -321,6 +331,102 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     });
   }
 
+  /// A code from a scanner: the camera, a USB / Bluetooth scanner, or typed in the search box and
+  /// Enter. A product barcode or SKU adds one of it; a phone's IMEI or serial number adds that unit.
+  Future<void> _onScanned(String raw) async {
+    final code = ScanCode.normalize(raw);
+    if (code.isEmpty || _currentView == CashierView.success) return;
+    final product = ScanCode.findProduct(_products, code);
+    if (product != null) {
+      _clearSearch();
+      await _addScanned(product);
+      return;
+    }
+    if (ScanCode.looksLikeUnitCode(code) && await _addUnitByCode(code)) {
+      _clearSearch();
+      return;
+    }
+    _toast('Kode "$code" tidak ditemukan', error: true);
+  }
+
+  void _clearSearch() {
+    if (_searchController.text.isEmpty) return;
+    _searchController.clear();
+    setState(() {});
+  }
+
+  /// One scan = one piece: no quantity dialog, so a stack of items can be scanned quickly.
+  Future<void> _addScanned(Product product) async {
+    if (product.isOutOfStock) {
+      _toast('Stok "${product.name}" habis', error: true);
+      return;
+    }
+    // Services ask for a price, phones for the unit: same as tapping the product.
+    if (!product.hasStock || product.isSerialized) {
+      await _addToCart(product);
+      return;
+    }
+    final index = _cart.indexWhere((i) => i.id == product.id);
+    final inCart = index >= 0 ? _cart[index].quantity : 0;
+    if (inCart >= product.stock) {
+      _toast('Stok "${product.name}" sudah habis ditambahkan', error: true);
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (index >= 0) {
+        _cart[index] = _cart[index].copyWith(quantity: inCart + 1);
+      } else {
+        _cart.add(CartItem.fromProduct(product, quantity: 1));
+      }
+    });
+    _toast('${inCart + 1} × ${product.name}');
+  }
+
+  /// Looks [code] up among the IMEI / serial units in stock here and puts that unit in the cart.
+  /// Returns false when no unit matches.
+  Future<bool> _addUnitByCode(String code) async {
+    final location = ref.read(cashierLocationProvider);
+    if (location == null) return false;
+    if (ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline) {
+      _toast('Mencari IMEI / serial butuh koneksi', error: true);
+      return true;
+    }
+    try {
+      final units = await CatalogService.getUnits(locationId: location.id, search: code, status: 'in_stock');
+      final wanted = code.toUpperCase();
+      final exact = units.where((u) => [u.imei1, u.imei2, u.serialNumber].any((v) => v != null && v.toUpperCase() == wanted)).toList();
+      final unit = exact.length == 1 ? exact.first : (exact.isEmpty && units.length == 1 ? units.first : null);
+      if (unit == null || !mounted) return false;
+      final product = _products.where((p) => p.id == '${unit.variantId}').firstOrNull;
+      if (product == null) return false;
+      if (_cart.any((i) => i.unitIds.contains(unit.id))) {
+        _toast('Unit ini sudah ada di keranjang');
+        return true;
+      }
+      HapticFeedback.selectionClick();
+      setState(() {
+        final index = _cart.indexWhere((i) => i.id == product.id);
+        if (index >= 0) {
+          final ids = [..._cart[index].unitIds, unit.id];
+          _cart[index] = _cart[index].copyWith(unitIds: ids, quantity: ids.length);
+        } else {
+          _cart.add(CartItem(id: product.id, product: product, quantity: 1, price: product.sellPrice, unitIds: [unit.id]));
+        }
+      });
+      _toast('${product.name} · ${unit.imei1 ?? unit.serialNumber ?? code} ditambahkan');
+      return true;
+    } on ApiException catch (e) {
+      _toast(e.message, error: true);
+      return true;
+    }
+  }
+
+  Future<void> _scanWithCamera() async {
+    final code = await scanWithCamera(context, title: 'Scan barang / IMEI');
+    if (code != null && mounted) await _onScanned(code);
+  }
+
   void _updateCartItemQuantity(String id, int delta) {
     final index = _cart.indexWhere((item) => item.id == id);
     if (index < 0) return;
@@ -364,6 +470,8 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
             'discount': voucher.discountType == 'percent' ? voucher.discountValue : null,
             'fixedDiscount': voucher.discountType == 'fixed' ? voucher.discountValue : null,
             'discountType': voucher.discountType,
+            'targetType': voucher.targetType,
+            'targetId': voucher.targetId,
             'description': voucher.description ?? voucher.discountLabel,
           };
           _currentView = CashierView.cart;
@@ -406,10 +514,11 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
 
     double total = _total;
     var requireCustomer = _cart.any((i) => i.product.isSerialized);
+    Map<String, dynamic>? quote;
     if (!offline) {
       setState(() => _isProcessingPayment = true);
       try {
-        final quote = await SalesService.quote({
+        quote = await SalesService.quote({
           'location_id': location.id,
           'lines': lines,
           if (voucherCode != null) 'voucher_code': voucherCode,
@@ -444,8 +553,31 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       ...?result.customer?.toSaleJson(),
     };
 
+    // A sale sent later already happened: it carries who sold it and what was charged, and the
+    // server records it as it was instead of refusing it (differences are flagged for review).
+    final user = ref.read(authProvider).user;
+    final queued = <String, dynamic>{
+      ...body,
+      'offline': true,
+      if (user != null) 'cashier_id': user.id,
+      if (user != null) 'cashier_name': user.name,
+      'charged_total': total,
+    };
+
     if (offline) {
-      await _queueOffline(body);
+      // No quote offline: this device priced the cart, so the prices and discount it charged go along.
+      // It also numbers the sale, so the printed receipt carries the number the sale will keep.
+      final number = await OfflineSaleNumber.next(location.code);
+      await _queueOffline(
+        {
+          ...queued,
+          'number': number,
+          'priced_on_device': true,
+          'lines': _cart.map((i) => i.toSaleLine(withPrice: true)).toList(),
+          if (_discount > 0) 'discount': _discount,
+        },
+        receipt: _localReceipt(number: number, total: total, payments: result.payments, customer: result.customer, location: location),
+      );
       return;
     }
 
@@ -455,6 +587,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       if (!mounted) return;
       setState(() {
         _lastSale = sale;
+        _receipt = ReceiptData.fromSale(sale.json);
         _isProcessingPayment = false;
         _currentView = CashierView.success;
       });
@@ -464,15 +597,74 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       setState(() => _isProcessingPayment = false);
       if (e.statusCode == null) {
         // No answer from the server: it may or may not have been saved. The queue retries with the
-        // same id, which the API treats as the same sale.
-        await _queueOffline(body);
+        // same id, which the API treats as the same sale. Its number comes from the server, so the
+        // receipt shows a reference instead.
+        await _queueOffline(
+          queued,
+          message: 'Server tidak menjawab — transaksi disimpan dan dikirim otomatis',
+          receipt: _localReceipt(total: total, payments: result.payments, customer: result.customer, location: location, quote: quote),
+        );
       } else {
         _toast(e.message, error: true);
       }
     }
   }
 
-  Future<void> _queueOffline(Map<String, dynamic> body) async {
+  /// Receipt for a sale the server doesn't have yet: from the quote when there is one (server
+  /// prices, IMEIs in the line names), else from the cart as priced on this device.
+  ReceiptData _localReceipt({
+    String? number,
+    required double total,
+    required List<PaymentEntry> payments,
+    CustomerChoice? customer,
+    required Location location,
+    Map<String, dynamic>? quote,
+  }) {
+    final paid = payments.fold<double>(0, (sum, p) => sum + p.amount);
+    final quoteLines = (quote?['lines'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    return ReceiptData(
+      number: number,
+      reference: number == null ? _transactionUuid.substring(0, 8).toUpperCase() : null,
+      date: DateTime.now(),
+      cashier: ref.read(authProvider).user?.name,
+      customer: customer?.name,
+      locationName: location.name,
+      items: quoteLines != null
+          ? [
+              for (final l in quoteLines)
+                ReceiptItem(
+                  name: l['description']?.toString() ?? '',
+                  qty: (l['qty'] as num).toDouble(),
+                  unitPrice: (l['unit_price'] as num).toDouble(),
+                  discount: (l['discount'] as num?)?.toDouble() ?? 0,
+                  total: (l['line_total'] as num).toDouble(),
+                ),
+            ]
+          : [
+              for (final i in _cart)
+                ReceiptItem(
+                  name: i.note != null && i.note!.isNotEmpty ? '${i.product.name} - ${i.note}' : i.product.name,
+                  qty: i.quantity.toDouble(),
+                  unitPrice: i.price,
+                  total: i.subtotal,
+                ),
+            ],
+      subtotal: (quote?['subtotal'] as num?)?.toDouble() ?? _subtotal,
+      discount: (quote?['discount_total'] as num?)?.toDouble() ?? _discount,
+      tax: (quote?['tax_total'] as num?)?.toDouble(),
+      total: total,
+      payments: [for (final p in payments) ReceiptPayment(name: p.method.name, amount: p.amount, reference: p.reference)],
+      change: paid > total ? paid - total : 0,
+      voucherCode: _appliedCoupon?['code'] as String?,
+      offline: true,
+    );
+  }
+
+  Future<void> _queueOffline(
+    Map<String, dynamic> body, {
+    String message = 'Transaksi disimpan — akan dikirim saat online',
+    required ReceiptData receipt,
+  }) async {
     final entry = OfflineTransactionEntry()
       ..uuid = body['id'] as String
       ..payload = body
@@ -480,8 +672,14 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       ..retryCount = 0
       ..status = 'pending';
     await OfflineQueue.enqueue(entry);
-    _toast('Transaksi disimpan — akan dikirim saat online');
-    _resetTransaction();
+    _toast(message);
+    if (!mounted) return;
+    // The customer still gets a receipt and the change shown; "Transaksi Baru" clears the cart.
+    setState(() {
+      _lastSale = null;
+      _receipt = receipt;
+      _currentView = CashierView.success;
+    });
   }
 
   void _resetTransaction() {
@@ -492,20 +690,31 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       _currentView = CashierView.products;
       _transactionUuid = const Uuid().v4();
       _lastSale = null;
+      _receipt = null;
     });
   }
 
   double get _subtotal => _cart.fold(0, (sum, item) => sum + item.subtotal);
 
+  /// The voucher's discount, worked out like the server does: only on the product / category the
+  /// voucher is for, a percentage rounded to the cent, a fixed amount never more than those items.
+  /// Offline this is the discount the customer gets and the server keeps.
   double get _discount {
-    if (_appliedCoupon == null) return 0;
-    if (_appliedCoupon!['discountType'] == 'fixed') {
-      final fixed = (_appliedCoupon!['fixedDiscount'] as num?)?.toDouble() ?? 0;
-      return fixed > _subtotal ? _subtotal : fixed;
+    final coupon = _appliedCoupon;
+    if (coupon == null) return 0;
+    final targetType = coupon['targetType'] as String?;
+    final targetId = (coupon['targetId'] as num?)?.toInt();
+    final eligible = _cart.where((item) {
+      if (targetType == null || targetId == null) return true;
+      if (targetType == 'product') return int.tryParse(item.product.id) == targetId;
+      return item.product.categoryId == targetId;
+    }).fold<double>(0, (sum, item) => sum + item.subtotal);
+    if (coupon['discountType'] == 'fixed') {
+      final fixed = (coupon['fixedDiscount'] as num?)?.toDouble() ?? 0;
+      return fixed > eligible ? eligible : fixed;
     }
-    // percent
-    final pct = (_appliedCoupon!['discount'] as num?)?.toDouble() ?? 0;
-    return _subtotal * (pct / 100);
+    final pct = ((coupon['discount'] as num?) ?? 0).clamp(0, 100).toDouble();
+    return (eligible * pct).roundToDouble() / 100;
   }
 
   double get _total => _subtotal - _discount;
@@ -521,12 +730,9 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
   }
 
   List<Product> get _filteredProducts {
-    final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return _products;
-
-    return _products.where((product) {
-      return product.name.toLowerCase().contains(query) || (product.category?.toLowerCase().contains(query) ?? false);
-    }).toList();
+    final query = _searchController.text;
+    if (query.trim().isEmpty) return _products;
+    return _products.where((product) => ScanCode.matchesSearch(product, query)).toList();
   }
 
   @override
@@ -538,6 +744,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     ref.watch(connectivityProvider);
     final salesLocations = ref.watch(salesLocationsProvider);
     final location = ref.watch(cashierLocationProvider);
+    final unsynced = ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
 
     if (salesLocations.hasValue && salesLocations.value!.isEmpty) {
       return Scaffold(
@@ -553,10 +760,12 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
 
     if (_currentView == CashierView.success) {
       return PaymentSuccessView(
-        total: _lastSale?.grandTotal ?? _total,
+        total: _receipt?.total ?? _lastSale?.grandTotal ?? _total,
         appliedCoupon: _appliedCoupon,
-        saleNumber: _lastSale?.number,
-        change: _lastSale?.changeTotal ?? 0,
+        saleNumber: _receipt?.number ?? _lastSale?.number,
+        change: _receipt?.change ?? _lastSale?.changeTotal ?? 0,
+        receipt: _receipt,
+        savedOffline: _lastSale == null && _receipt != null,
         onNewTransaction: _resetTransaction,
       );
     }
@@ -596,6 +805,16 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                   const SizedBox(width: 4),
                   Text(location?.code ?? '-', style: const TextStyle(fontWeight: FontWeight.w600)),
                 ]),
+              ),
+            ),
+          if (unsynced > 0)
+            IconButton(
+              tooltip: 'Transaksi belum terkirim',
+              onPressed: () => context.push(AppRouter.syncQueue),
+              icon: Badge(
+                label: Text('$unsynced'),
+                backgroundColor: AppTheme.warning,
+                child: const Icon(Icons.cloud_upload_outlined),
               ),
             ),
           IconButton(
@@ -651,7 +870,11 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
             ),
         ],
       ),
-      body: isTablet ? _buildTabletLayout(orientation) : _buildPhoneLayout(),
+      // A USB / Bluetooth scanner works here even when the search box doesn't have focus.
+      body: ScanKeyListener(
+        onScan: _onScanned,
+        child: isTablet ? _buildTabletLayout(orientation) : _buildPhoneLayout(),
+      ),
     );
   }
 
@@ -675,11 +898,19 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
                     padding: const EdgeInsets.all(16),
                     child: TextField(
                       controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: 'Cari produk...',
-                        prefixIcon: Icon(Icons.search),
+                      decoration: InputDecoration(
+                        hintText: 'Cari / scan barcode, SKU, IMEI...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: IconButton(
+                          tooltip: 'Scan dengan kamera',
+                          icon: const Icon(Icons.qr_code_scanner),
+                          onPressed: _scanWithCamera,
+                        ),
                       ),
                       onChanged: (value) => setState(() {}),
+                      onSubmitted: _onScanned,
+                      // Keep focus after Enter, so a scanner can scan the next item straight away.
+                      onEditingComplete: () {},
                     ),
                   ),
                   // Products Grid
@@ -997,17 +1228,23 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Cari produk...',
+          hintText: 'Cari / scan barcode, SKU, IMEI...',
           prefixIcon: const Icon(Icons.search, size: 20),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_searchController.text.isNotEmpty)
+                IconButton(
                   icon: const Icon(Icons.close, size: 18),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {});
-                  },
-                )
-              : null,
+                  onPressed: _clearSearch,
+                ),
+              IconButton(
+                tooltip: 'Scan dengan kamera',
+                icon: const Icon(Icons.qr_code_scanner, size: 20),
+                onPressed: _scanWithCamera,
+              ),
+            ],
+          ),
           filled: true,
           fillColor: cs.surfaceContainerHighest,
           border: OutlineInputBorder(
@@ -1017,6 +1254,9 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         ),
         onChanged: (value) => setState(() {}),
+        onSubmitted: _onScanned,
+        // Keep focus after Enter, so a scanner can scan the next item straight away.
+        onEditingComplete: () {},
       ),
     );
   }

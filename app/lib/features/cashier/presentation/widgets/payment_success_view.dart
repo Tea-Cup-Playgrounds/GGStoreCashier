@@ -1,15 +1,25 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../core/helper/currency_formatter.dart';
+import '../../../devices/data/receipt_printer.dart';
+import '../../../devices/domain/receipt.dart';
+import '../../../devices/presentation/widgets/sale_receipt_sheet.dart';
 
 class PaymentSuccessView extends StatefulWidget {
   final double total;
   final Map<String, dynamic>? appliedCoupon;
   final String? saleNumber;
   final double change;
+
+  /// The sale's receipt, for printing / showing. Printed right away when automatic printing is on.
+  final ReceiptData? receipt;
+
+  /// The sale is stored on this device and goes to the server later.
+  final bool savedOffline;
   final VoidCallback onNewTransaction;
 
   const PaymentSuccessView({
@@ -18,6 +28,8 @@ class PaymentSuccessView extends StatefulWidget {
     this.appliedCoupon,
     this.saleNumber,
     this.change = 0,
+    this.receipt,
+    this.savedOffline = false,
     required this.onNewTransaction,
   });
 
@@ -33,11 +45,97 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
   late Animation<double> _fadeAnimation;
   final AudioPlayer _audioPlayer = AudioPlayer();
 
+  PrinterSettings? _printer;
+  bool _printing = false;
+  int _printedCount = 0;
+  String? _printError;
+
   @override
   void initState() {
     super.initState();
     _setupAnimations();
     _startAnimations();
+    _initPrinter();
+  }
+
+  Future<void> _initPrinter() async {
+    final printer = await PrinterSettings.load();
+    if (!mounted) return;
+    setState(() => _printer = printer);
+    if (printer.autoPrint && printer.isConfigured && widget.receipt != null) _print();
+  }
+
+  /// The first print of a sale also opens the cash drawer (when that is switched on); later
+  /// prints are marked as copies.
+  Future<void> _print() async {
+    final receipt = widget.receipt;
+    if (receipt == null || _printing) return;
+    setState(() {
+      _printing = true;
+      _printError = null;
+    });
+    try {
+      final first = _printedCount == 0;
+      await ReceiptPrinter.printReceipt(first ? receipt : receipt.asCopy(), openDrawer: first);
+      if (mounted) setState(() => _printedCount++);
+    } catch (e) {
+      if (mounted) setState(() => _printError = e is PrinterException ? e.message : 'Gagal mencetak: $e');
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  Future<void> _setUpPrinter() async {
+    await context.push(AppRouter.printerDevices);
+    final printer = await PrinterSettings.load();
+    if (mounted) setState(() => _printer = printer);
+  }
+
+  Widget _buildPrintRow(BuildContext context) {
+    final receipt = widget.receipt;
+    if (receipt == null) return const SizedBox.shrink();
+    final configured = _printer?.isConfigured ?? false;
+    final status = _printing
+        ? 'Mencetak struk...'
+        : _printError ?? (_printedCount > 0 ? 'Struk tercetak${_printedCount > 1 ? ' ($_printedCount×)' : ''}' : null);
+    return Column(
+      children: [
+        if (status != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              status,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _printError != null ? AppTheme.destructive : AppTheme.mutedForeground, fontSize: 13),
+            ),
+          ),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => SaleReceiptSheet.showReceipt(context, receipt),
+                icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                label: const Text('Lihat struk'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: configured
+                  ? FilledButton.icon(
+                      onPressed: _printing ? null : _print,
+                      icon: const Icon(Icons.print_outlined, size: 18),
+                      label: Text(_printedCount == 0 ? 'Cetak struk' : 'Cetak lagi'),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: _setUpPrinter,
+                      icon: const Icon(Icons.print_disabled_outlined, size: 18),
+                      label: const Text('Atur printer'),
+                    ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   void _setupAnimations() {
@@ -97,7 +195,13 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
-        child: Padding(
+        // Scrolls on short screens; on tall ones the spacers keep it centred as before.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -156,9 +260,11 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Transaksi berhasil diselesaikan',
+                        widget.savedOffline
+                            ? 'Tersimpan di perangkat ini — dikirim ke server otomatis'
+                            : 'Transaksi berhasil diselesaikan',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: AppTheme.mutedForeground,
+                              color: widget.savedOffline ? AppTheme.warning : AppTheme.mutedForeground,
                             ),
                         textAlign: TextAlign.center,
                       ),
@@ -240,15 +346,20 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
                 ),
               ),
 
+              const SizedBox(height: 24),
               const Spacer(),
 
-              // New Transaction Button
+              // Receipt + New Transaction buttons
               SlideTransition(
                 position: _slideAnimation,
                 child: FadeTransition(
                   opacity: _fadeAnimation,
                   child: Column(
                     children: [
+                      if (widget.receipt != null) ...[
+                        _buildPrintRow(context),
+                        const SizedBox(height: 12),
+                      ],
                       CustomButton(
                         text: 'Transaksi Baru',
                         onPressed: widget.onNewTransaction,
@@ -271,6 +382,10 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
 
               const SizedBox(height: 100), // Space for bottom navigation
             ],
+          ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

@@ -17,10 +17,13 @@ class ApiConfig {
   };
 
   // Connection settings
+  /// API_TIMEOUT is in milliseconds (the API writes 30000 into app/.env). Values under 1000 are
+  /// read as seconds, as older .env files had them. Kept between 3 and 30 seconds, so a dead
+  /// connection fails quickly enough for checkout to fall back to the offline queue.
   static Duration get connectTimeout {
-    final timeoutStr = dotenv.env['API_TIMEOUT'] ?? '10';
-    final seconds = int.tryParse(timeoutStr) ?? 10;
-    return Duration(seconds: seconds);
+    final raw = int.tryParse(dotenv.env['API_TIMEOUT'] ?? '') ?? 10000;
+    final ms = raw < 1000 ? raw * 1000 : raw;
+    return Duration(milliseconds: ms.clamp(3000, 30000));
   }
   static const Duration receiveTimeout = Duration(seconds: 30);
   static const Duration sendTimeout = Duration(seconds: 30);

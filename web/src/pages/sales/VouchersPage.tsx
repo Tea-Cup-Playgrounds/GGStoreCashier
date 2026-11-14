@@ -13,7 +13,7 @@ export function VouchersPage() {
   const vouchers = useQuery({ queryKey: ['vouchers'], queryFn: () => api<{ vouchers: Voucher[] }>('/vouchers').then((r) => r.vouchers) });
   const categories = useCategories();
   const target = (v: Voucher) =>
-    v.target_type === 'category' ? `Kategori: ${categories.data?.find((c) => c.id === v.target_id)?.name ?? v.target_id}` : v.target_type === 'product' ? `Varian #${v.target_id}` : 'Semua barang';
+    v.target_type === 'categories' ? `Kategori: ${categories.data?.find((c) => c.id === v.target_id)?.name ?? v.target_id}` : v.target_type === 'product' ? `Varian #${v.target_id}` : 'Semua barang';
 
   return (
     <>
@@ -115,11 +115,11 @@ function VoucherDialog({ voucher, onClose, onSaved }: { voucher: Voucher | null;
         <Field label="Berlaku untuk">
           <Select value={targetType} onChange={(e) => { setTargetType(e.target.value); setTargetId(''); setTargetLabel(''); }}>
             <option value="">Semua barang</option>
-            <option value="category">Satu kategori</option>
+            <option value="categories">Satu kategori</option>
             <option value="product">Satu produk (varian)</option>
           </Select>
         </Field>
-        {targetType === 'category' && (
+        {targetType === 'categories' && (
           <Field label="Kategori">
             <Select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
               <option value="">Pilih…</option>

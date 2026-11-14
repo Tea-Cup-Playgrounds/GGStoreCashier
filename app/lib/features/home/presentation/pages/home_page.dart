@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -14,6 +14,7 @@ import '../../../../core/helper/currency_formatter.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/quick_action_card.dart';
 import '../widgets/transaction_item.dart';
+import '../../../devices/presentation/widgets/sale_receipt_sheet.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 import '../../../../shared/widgets/live_clock.dart';
 import '../../../../core/services/location_service.dart';
@@ -517,7 +518,9 @@ class _HomePageState extends ConsumerState<HomePage>
                           child: FadeTransition(
                             opacity: _fadeAnimations[4],
                             child: TransactionItem(
-                              id: tx.id.toString(),
+                              id: tx.id,
+                              number: tx.number,
+                              onTap: tx.id.isEmpty ? null : () => SaleReceiptSheet.showSale(context, tx.id),
                               time: tx.relativeTime,
                               items: tx.itemCount,
                               total: tx.finalAmount,

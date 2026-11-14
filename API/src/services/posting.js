@@ -5,8 +5,14 @@ const { postEntry, reverseSource, fromCents, toCents } = require('./journal');
 //
 //   sale            Dr payment accounts (cash net of change)   Cr sales_* revenue (excl. PPN), ppn_output
 //                   Dr cogs                                     Cr inventory            (goods at unit cost)
+//                   Dr cogs                                     Cr pulsa_deposit        (pulsa / digital at cost_price)
 //   sale_return     the reverse of the returned part, refunded through one payment method;
-//                   defective goods go to inventory_adjustment instead of back to inventory
+//                   defective goods go to inventory_adjustment instead of back to inventory;
+//                   returned pulsa goes back to the deposit (the provider refunds a failed top-up)
+//   pulsa_deposit   Dr pulsa_deposit                            Cr cash | bank          (deposit top-up)
+//   expense         Dr expense account                          Cr cash | bank
+//   opening_balance balance-sheet accounts                      vs opening_balance (Ekuitas Saldo Awal)
+//   transfer        Dr inventory (destination)                  Cr inventory (source)   (on arrival)
 //   goods_receipt   Dr inventory, ppn_input                     Cr accounts_payable
 //   supplier_payment Dr accounts_payable                        Cr cash | bank
 //   stock value     Dr/Cr inventory  vs  inventory_adjustment  (adjustments, opname, write-offs)
@@ -43,7 +49,9 @@ const postSale = async (conn, ctx, saleId) => {
         revenueByKey[key] = (revenueByKey[key] || 0) + toCents(l.line_total) - toCents(l.tax_amount);
     }
     const taxCents = sumCents(lines, (l) => l.tax_amount);
-    const costCents = lines.filter((l) => l.line_type === 'goods').reduce((s, l) => s + Math.round(toCents(l.unit_cost) * l.qty), 0);
+    const costOf = (type) => lines.filter((l) => l.line_type === type).reduce((s, l) => s + Math.round(toCents(l.unit_cost) * l.qty), 0);
+    const costCents = costOf('goods');
+    const digitalCostCents = costOf('digital');
 
     return postEntry(conn, ctx, {
         date: sale.occurred_at,
@@ -55,8 +63,9 @@ const postSale = async (conn, ctx, saleId) => {
             ...debitLines,
             ...Object.entries(revenueByKey).map(([key, cents]) => ({ account: key, credit: fromCents(cents) })),
             { account: 'ppn_output', credit: fromCents(taxCents) },
-            { account: 'cogs', debit: fromCents(costCents) },
+            { account: 'cogs', debit: fromCents(costCents + digitalCostCents) },
             { account: 'inventory', credit: fromCents(costCents) },
+            { account: 'pulsa_deposit', credit: fromCents(digitalCostCents), memo: 'Pemakaian deposit pulsa' },
         ],
     });
 };
@@ -85,6 +94,7 @@ const postSaleReturn = async (conn, ctx, returnId) => {
     const goods = lines.filter((l) => l.line_type === 'goods');
     const restockCents = goods.filter((l) => l.restock).reduce((s, l) => s + Math.round(toCents(l.unit_cost) * l.qty), 0);
     const defectiveCents = goods.filter((l) => !l.restock).reduce((s, l) => s + Math.round(toCents(l.unit_cost) * l.qty), 0);
+    const digitalCents = lines.filter((l) => l.line_type === 'digital').reduce((s, l) => s + Math.round(toCents(l.unit_cost) * l.qty), 0);
 
     return postEntry(conn, ctx, {
         date: ret.created_at,
@@ -98,7 +108,8 @@ const postSaleReturn = async (conn, ctx, returnId) => {
             { account: ret.refund_account, credit: ret.refund_total, memo: 'Pengembalian dana' },
             { account: 'inventory', debit: fromCents(restockCents) },
             { account: 'inventory_adjustment', debit: fromCents(defectiveCents), memo: 'Barang retur rusak' },
-            { account: 'cogs', credit: fromCents(restockCents + defectiveCents) },
+            { account: 'pulsa_deposit', debit: fromCents(digitalCents), memo: 'Deposit pulsa kembali' },
+            { account: 'cogs', credit: fromCents(restockCents + defectiveCents + digitalCents) },
         ],
     });
 };
@@ -106,7 +117,7 @@ const postSaleReturn = async (conn, ctx, returnId) => {
 const postGoodsReceipt = async (conn, ctx, receiptId) => {
     const [[r]] = await conn.execute('SELECT * FROM goods_receipts WHERE id = ?', [receiptId]);
     return postEntry(conn, ctx, {
-        date: r.posted_at || r.created_at,
+        date: r.received_date || r.posted_at || r.created_at,
         locationId: r.location_id,
         sourceType: 'goods_receipt',
         sourceId: r.id,
@@ -139,18 +150,44 @@ const postSupplierPayment = async (conn, ctx, paymentId) => {
 };
 
 // A change in stock value not caused by buying or selling. value > 0 adds inventory.
-const postStockValue = async (conn, ctx, { sourceType, sourceId, locationId, value, memo }) => {
+// The other side is Selisih Persediaan, or for opening stock (opening: true) Ekuitas Saldo Awal:
+// stock the business already had is equity brought in, not a gain of this period.
+const postStockValue = async (conn, ctx, { sourceType, sourceId, locationId, value, memo, opening = false }) => {
     const cents = toCents(value);
     if (cents === 0) return null;
     const amount = fromCents(Math.abs(cents));
+    const counter = opening ? 'opening_balance' : 'inventory_adjustment';
     return postEntry(conn, ctx, {
         locationId,
         sourceType,
         sourceId,
         memo,
         lines: cents > 0
-            ? [{ account: 'inventory', debit: amount }, { account: 'inventory_adjustment', credit: amount }]
-            : [{ account: 'inventory_adjustment', debit: amount }, { account: 'inventory', credit: amount }],
+            ? [{ account: 'inventory', debit: amount }, { account: counter, credit: amount }]
+            : [{ account: counter, debit: amount }, { account: 'inventory', credit: amount }],
+    });
+};
+
+// Goods that arrived at another location: their value moves from the source's inventory to the
+// destination's, so each location's books hold its own stock. Each side is balanced through the
+// inter-location account (the destination owes the source), so every location's books balance
+// on their own; company-wide that account nets to zero.
+// Until they arrive the goods stay in the source's books; lost goods are written off there (resolve).
+const postTransferReceived = async (conn, ctx, { transferId, number, fromLocationId, toLocationId, value }) => {
+    const cents = toCents(value);
+    if (cents <= 0) return null;
+    const amount = fromCents(cents);
+    return postEntry(conn, ctx, {
+        locationId: toLocationId,
+        sourceType: 'transfer',
+        sourceId: transferId,
+        memo: `Transfer ${number} diterima`,
+        lines: [
+            { account: 'inventory', debit: amount, locationId: toLocationId, memo: 'Barang masuk' },
+            { account: 'inter_location', credit: amount, locationId: toLocationId, memo: 'Hutang ke lokasi pengirim' },
+            { account: 'inter_location', debit: amount, locationId: fromLocationId, memo: 'Piutang dari lokasi penerima' },
+            { account: 'inventory', credit: amount, locationId: fromLocationId, memo: 'Barang keluar' },
+        ],
     });
 };
 
@@ -187,6 +224,7 @@ module.exports = {
     postGoodsReceipt,
     postSupplierPayment,
     postStockValue,
+    postTransferReceived,
     movementValue,
     postCashSessionClose,
 };

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
 import 'package:gg_store_cashier/core/helper/rupiah_input_formatter.dart';
 import 'package:gg_store_cashier/core/models/sales.dart';

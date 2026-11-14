@@ -34,6 +34,7 @@ const PERMISSIONS = {
     'accounting.view': { group: 'accounting', description: 'Melihat akun dan jurnal' },
     'accounting.post_manual': { group: 'accounting', description: 'Membuat jurnal manual' },
     'accounting.close_period': { group: 'accounting', description: 'Menutup periode akuntansi' },
+    'expenses.manage': { group: 'accounting', description: 'Mencatat biaya operasional dan top up deposit pulsa' },
 
     'reports.view_location': { group: 'reports', description: 'Melihat laporan lokasi sendiri' },
     'reports.view_all': { group: 'reports', description: 'Melihat laporan semua lokasi' },

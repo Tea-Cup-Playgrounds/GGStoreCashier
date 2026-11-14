@@ -7,7 +7,7 @@ import type { Transfer, Unit } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { LocationSelect, useDestinations, useLocationChoice } from '../../lib/locations';
 import { unitLabel, unitStatusBadge, VariantPicker } from '../../lib/catalog';
-import { formatDateTime } from '../../lib/format';
+import { formatDateTime, toDateInput, today } from '../../lib/format';
 import { Badge, Button, Card, Checkbox, ConfirmButton, DataTable, Field, Input, Modal, PageHeader, QueryState, Select, Spinner, Textarea, useToast } from '../../components/ui';
 import { TRANSFER_STATUS } from './TransfersPage';
 
@@ -42,6 +42,7 @@ function TransferEditor({ transfer }: { transfer: Transfer | null }) {
   const fromId = transfer?.from_location_id ?? choice.locationId;
   const [toId, setToId] = useState(String(transfer?.to_location_id ?? ''));
   const [note, setNote] = useState(transfer?.note ?? '');
+  const [sendDate, setSendDate] = useState(today());
   const [items, setItems] = useState<ItemRow[]>(
     () =>
       transfer?.items.map((i) => ({ variantId: i.variant_id, name: i.name, sku: i.sku, isSerialized: i.is_serialized, qty: String(i.qty_sent), unitIds: i.units.map((u) => u.unit_id) })) ?? [],
@@ -100,10 +101,17 @@ function TransferEditor({ transfer }: { transfer: Transfer | null }) {
                 variant="primary"
                 confirmVariant="primary"
                 title="Kirim transfer?"
-                message="Stok keluar dari lokasi asal dan berstatus dalam pengiriman sampai diterima. Simpan perubahan draf terlebih dahulu."
+                message={
+                  <>
+                    <p className="mb-3">Stok keluar dari lokasi asal dan berstatus dalam pengiriman sampai diterima. Simpan perubahan draf terlebih dahulu.</p>
+                    <Field label="Tanggal kirim">
+                      <Input type="date" value={sendDate} max={today()} onChange={(e) => setSendDate(e.target.value)} />
+                    </Field>
+                  </>
+                }
                 confirmLabel="Kirim"
                 onConfirm={async () => {
-                  await api(`/transfers/${transfer.id}/send`, { method: 'POST' });
+                  await api(`/transfers/${transfer.id}/send`, { method: 'POST', body: { date: sendDate } });
                   qc.invalidateQueries({ queryKey: ['transfers'] });
                   qc.invalidateQueries({ queryKey: ['transfer', transfer.id] });
                   toast.success('Transfer dikirim');
@@ -264,11 +272,12 @@ function ReceiveDialog({ transfer, onClose }: { transfer: Transfer; onClose: () 
   const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(transfer.items.filter((i) => !i.is_serialized).map((i) => [i.id, String(i.qty_sent)])));
   const [missing, setMissing] = useState<string[]>([]);
   const [note, setNote] = useState('');
+  const [date, setDate] = useState(today());
   const receive = useMutation({
     mutationFn: () =>
       api<{ message: string }>(`/transfers/${transfer.id}/receive`, {
         method: 'POST',
-        body: { items: Object.entries(qty).map(([item_id, q]) => ({ item_id, qty_received: Number(q) })), missing_unit_ids: missing, note: note.trim() || undefined },
+        body: { items: Object.entries(qty).map(([item_id, q]) => ({ item_id, qty_received: Number(q) })), missing_unit_ids: missing, note: note.trim() || undefined, date },
       }),
     onSuccess: (res) => {
       toast.success(res.message);
@@ -319,7 +328,12 @@ function ReceiveDialog({ transfer, onClose }: { transfer: Transfer; onClose: () 
             )}
           </div>
         ))}
-        <Field label="Catatan"><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Tanggal barang sampai">
+            <Input type="date" value={date} min={toDateInput(transfer.sent_at)} max={today()} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Catatan"><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        </div>
       </div>
     </Modal>
   );
@@ -330,8 +344,9 @@ function ResolveDialog({ transfer, onClose }: { transfer: Transfer; onClose: () 
   const toast = useToast();
   const [action, setAction] = useState<'return' | 'write_off'>('return');
   const [note, setNote] = useState('');
+  const [date, setDate] = useState(today());
   const resolve = useMutation({
-    mutationFn: () => api<{ message: string }>(`/transfers/${transfer.id}/resolve`, { method: 'POST', body: { action, note: note.trim() } }),
+    mutationFn: () => api<{ message: string }>(`/transfers/${transfer.id}/resolve`, { method: 'POST', body: { action, note: note.trim(), date } }),
     onSuccess: (res) => {
       toast.success(res.message);
       qc.invalidateQueries({ queryKey: ['transfer', transfer.id] });
@@ -359,6 +374,9 @@ function ResolveDialog({ transfer, onClose }: { transfer: Transfer; onClose: () 
             <option value="return">Kembalikan ke stok lokasi asal</option>
             <option value="write_off">Catat sebagai hilang (kerugian persediaan)</option>
           </Select>
+        </Field>
+        <Field label="Tanggal">
+          <Input type="date" value={date} min={toDateInput(transfer.sent_at)} max={today()} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <Field label="Alasan"><Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
       </div>

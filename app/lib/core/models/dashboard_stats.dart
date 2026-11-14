@@ -46,7 +46,11 @@ class DashboardStats {
 }
 
 class RecentTransaction {
-  final int id;
+  /// Sale id (a UUID).
+  final String id;
+
+  /// Sale number, e.g. INV-BR01-261114-0001.
+  final String? number;
   final double finalAmount;
   final String paymentStatus;
   final String? paymentMethod;
@@ -57,6 +61,7 @@ class RecentTransaction {
 
   const RecentTransaction({
     required this.id,
+    this.number,
     required this.finalAmount,
     required this.paymentStatus,
     this.paymentMethod,
@@ -68,7 +73,8 @@ class RecentTransaction {
 
   factory RecentTransaction.fromJson(Map<String, dynamic> json) {
     return RecentTransaction(
-      id: DashboardStats._toInt(json['id']),
+      id: json['id']?.toString() ?? '',
+      number: json['number']?.toString(),
       finalAmount: DashboardStats._toDouble(json['final_amount']),
       paymentStatus: json['payment_status']?.toString() ?? 'paid',
       paymentMethod: json['payment_method']?.toString(),

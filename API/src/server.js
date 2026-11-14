@@ -36,6 +36,8 @@ const customerRoutes = require("./routes/customers");
 const cashSessionRoutes = require("./routes/cash_sessions");
 const salesRoutes = require("./routes/sales");
 const accountingRoutes = require("./routes/accounting");
+const expenseRoutes = require("./routes/expenses");
+const pulsaDepositRoutes = require("./routes/pulsa_deposit");
 
 const app = express();
 const server = http.createServer(app);
@@ -211,6 +213,8 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/cash-sessions", cashSessionRoutes);
 app.use("/api/sales", salesRoutes);
 app.use("/api/accounting", accountingRoutes);
+app.use("/api/expenses", expenseRoutes);
+app.use("/api/pulsa-deposit", pulsaDepositRoutes);
 
 // ── Docs session middleware ───────────────────────────────────────────────────
 const DOCS_SESSION_COOKIE = "docs_session";
@@ -373,12 +377,20 @@ server.listen(PORT, async () => {
     });
   }, 10000);
 
-  // Start ngrok if auth token is provided
+  // Start ngrok if auth token is provided. A fixed domain (NGROK_DOMAIN, or NGROK_API_URL when it
+  // holds one, e.g. "name.ngrok-free.dev") keeps the public URL the same across restarts, so the
+  // app doesn't need a new build every time.
+  const ngrokDomain = (process.env.NGROK_DOMAIN || process.env.NGROK_API_URL || "")
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "");
+  const useDomain = ngrokDomain.includes(".") && !/^(localhost|127\.|10\.)/.test(ngrokDomain);
   if (process.env.NGROK_AUTHTOKEN) {
     try {
       const listener = await ngrok.forward({
         addr: PORT,
         authtoken: process.env.NGROK_AUTHTOKEN,
+        ...(useDomain ? { domain: ngrokDomain } : {}),
       });
       ngrokUrl = listener.url();
       console.log(`\nngrok public URL : ${ngrokUrl}`);

@@ -121,6 +121,9 @@ export function ProductDetailPage() {
                     { header: 'Barcode', cell: (v) => v.barcode ?? '—' },
                     { header: 'Harga dasar', align: 'right', cell: (v) => formatRp(v.base_price) },
                     { header: 'Harga min.', align: 'right', cell: (v) => (v.min_price == null ? '—' : formatRp(v.min_price)) },
+                    ...(p.kind === 'digital'
+                      ? [{ header: 'Harga modal', align: 'right' as const, cell: (v: Variant) => (v.cost_price == null ? '—' : formatRp(v.cost_price)) }]
+                      : []),
                     { header: '', cell: (v) => !v.is_active && <Badge tone="red">Nonaktif</Badge> },
                   ]}
                 />
@@ -144,7 +147,7 @@ export function ProductDetailPage() {
           </div>
 
           {editing && <EditProductDialog product={p} onClose={() => setEditing(false)} onSaved={refresh} />}
-          {variant && <VariantDialog productId={p.id} variant={variant === 'new' ? null : variant} onClose={() => setVariant(null)} onSaved={refresh} />}
+          {variant && <VariantDialog productId={p.id} kind={p.kind} variant={variant === 'new' ? null : variant} onClose={() => setVariant(null)} onSaved={refresh} />}
         </>
       )}
     </QueryState>
@@ -252,13 +255,14 @@ function EditProductDialog({ product, onClose, onSaved }: { product: Product; on
   );
 }
 
-function VariantDialog({ productId, variant, onClose, onSaved }: { productId: number; variant: Variant | null; onClose: () => void; onSaved: () => void }) {
+function VariantDialog({ productId, kind, variant, onClose, onSaved }: { productId: number; kind: ProductKind; variant: Variant | null; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const [name, setName] = useState(variant?.name ?? '');
   const [sku, setSku] = useState(variant?.sku ?? '');
   const [barcode, setBarcode] = useState(variant?.barcode ?? '');
   const [basePrice, setBasePrice] = useState(variant ? String(Number(variant.base_price)) : '');
   const [minPrice, setMinPrice] = useState(variant?.min_price != null ? String(Number(variant.min_price)) : '');
+  const [costPrice, setCostPrice] = useState(variant?.cost_price != null ? String(Number(variant.cost_price)) : '');
   const [active, setActive] = useState(variant?.is_active ?? true);
 
   const save = useMutation({
@@ -270,6 +274,7 @@ function VariantDialog({ productId, variant, onClose, onSaved }: { productId: nu
         base_price: Number(basePrice),
         min_price: minPrice === '' ? null : Number(minPrice),
         is_active: active,
+        ...(kind === 'digital' ? { cost_price: costPrice === '' ? null : Number(costPrice) } : {}),
       };
       return variant
         ? api(`/catalog/variants/${variant.id}`, { method: 'PUT', body })
@@ -328,6 +333,11 @@ function VariantDialog({ productId, variant, onClose, onSaved }: { productId: nu
         <Field label="Harga minimum" hint="Kasir tidak bisa menjual di bawah ini tanpa izin">
           <Input type="number" min={0} value={minPrice} onChange={(e) => setMinPrice(e.target.value)} />
         </Field>
+        {kind === 'digital' && (
+          <Field label="Harga modal" hint="Biaya dari deposit pulsa per item, mis. pulsa 10rb = 10.150. Dicatat sebagai HPP saat terjual.">
+            <Input type="number" min={0} value={costPrice} onChange={(e) => setCostPrice(e.target.value)} />
+          </Field>
+        )}
         <Checkbox label="Aktif" checked={active} onChange={(e) => setActive(e.target.checked)} />
       </div>
     </Modal>

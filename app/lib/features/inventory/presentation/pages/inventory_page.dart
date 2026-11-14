@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:gg_store_cashier/features/inventory/domain/inventory_filter.dart';

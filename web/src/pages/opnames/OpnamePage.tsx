@@ -6,8 +6,8 @@ import { api, errorMessage } from '../../api/client';
 import type { Opname } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { unitLabel } from '../../lib/catalog';
-import { formatDateTime } from '../../lib/format';
-import { Badge, Button, Card, ConfirmButton, DataTable, Input, PageHeader, QueryState, useToast } from '../../components/ui';
+import { formatDate, formatDateTime, toDateInput, today } from '../../lib/format';
+import { Badge, Button, Card, ConfirmButton, DataTable, Field, Input, PageHeader, QueryState, useToast } from '../../components/ui';
 import { OPNAME_STATUS } from './OpnamesPage';
 
 interface ScanResult {
@@ -24,6 +24,7 @@ export function OpnamePage() {
   const [counts, setCounts] = useState<Record<number, string>>({});
   const [identifier, setIdentifier] = useState('');
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);
+  const [approveDate, setApproveDate] = useState(today());
   const o = opname.data;
   const counting = o?.status === 'counting' && access.can('stock.opname', o.location_id);
   const refresh = () => qc.invalidateQueries({ queryKey: ['opname', id] });
@@ -71,7 +72,7 @@ export function OpnamePage() {
           </Link>
           <PageHeader
             title={o.number}
-            description={`${o.location_name}${o.category_name ? ` · ${o.category_name}` : ''} · dimulai ${formatDateTime(o.created_at)} oleh ${o.created_by_name ?? '—'}`}
+            description={`${o.location_name}${o.category_name ? ` · ${o.category_name}` : ''} · dimulai ${formatDateTime(o.created_at)} oleh ${o.created_by_name ?? '—'}${o.adjustment_date ? ` · selisih dibukukan ${formatDate(o.adjustment_date)}` : ''}`}
             actions={
               <>
                 <Badge tone={OPNAME_STATUS[o.status][1]}>{OPNAME_STATUS[o.status][0]}</Badge>
@@ -95,10 +96,17 @@ export function OpnamePage() {
                       confirmVariant="primary"
                       disabled={dirty}
                       title="Setujui stok opname?"
-                      message="Selisih hitungan diterapkan ke stok dan unit yang tidak dipindai dihapus dari stok. Barang yang belum dihitung tidak diubah."
+                      message={
+                        <>
+                          <p className="mb-3">Selisih hitungan diterapkan ke stok dan unit yang tidak dipindai dihapus dari stok. Barang yang belum dihitung tidak diubah.</p>
+                          <Field label="Tanggal penyesuaian" hint="Selisih dibukukan pada tanggal ini, mis. dihitung 31 Okt, disetujui 1 Nov">
+                            <Input type="date" value={approveDate} min={toDateInput(o.created_at)} max={today()} onChange={(e) => setApproveDate(e.target.value)} />
+                          </Field>
+                        </>
+                      }
                       confirmLabel="Setujui"
                       onConfirm={async () => {
-                        await api(`/opnames/${o.id}/approve`, { method: 'POST' });
+                        await api(`/opnames/${o.id}/approve`, { method: 'POST', body: { date: approveDate } });
                         toast.success('Stok opname disetujui, stok disesuaikan');
                         refresh();
                         qc.invalidateQueries({ queryKey: ['opnames'] });

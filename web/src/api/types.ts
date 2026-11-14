@@ -63,6 +63,8 @@ export interface Variant {
   attributes: Record<string, string> | null;
   base_price: Money;
   min_price: Money | null;
+  /** Cost of a pulsa / digital item (only for people who may see costs). */
+  cost_price?: Money | null;
   is_active: boolean;
   // With location_id:
   on_hand?: number;
@@ -211,6 +213,8 @@ export interface ReceiptSummary {
   invoice_no: string | null;
   invoice_date: string | null;
   due_date: string | null;
+  /** The day the goods arrived; stock movements, journal and number use it. */
+  received_date: string | null;
   status: 'draft' | 'posted';
   subtotal: Money;
   tax_total: Money;
@@ -332,6 +336,8 @@ export interface OpnameSummary {
   note: string | null;
   created_at: string;
   approved_at: string | null;
+  /** The day the count differences were booked. */
+  adjustment_date?: string | null;
   item_count: number;
 }
 
@@ -376,6 +382,40 @@ export interface SaleSummary {
   occurred_at: string;
   line_count: number;
   payment_methods: string | null;
+  /** Uploaded from a device that was offline (GET /sales only). */
+  is_offline?: boolean;
+  /** Differences the server noted on an offline sale (GET /sales only). */
+  sync_issue_count?: number;
+  /** Someone marked those differences as checked (GET /sales only). */
+  sync_reviewed?: boolean;
+}
+
+/** One difference noted on an offline sale; the other fields depend on `code`. */
+export interface SyncIssue {
+  code: string;
+  variant_id?: number;
+  name?: string;
+  qty_after?: number;
+  charged?: number;
+  catalog?: number;
+  expected?: number;
+  recorded?: number;
+  min?: number;
+  amount?: number;
+  voucher_code?: string;
+  cash_session_id?: string;
+  cashier_id?: number | string;
+  hours?: number;
+  reported?: string;
+}
+
+export interface SyncFlags {
+  offline: true;
+  priced_on_device: boolean;
+  uploaded_by?: number;
+  uploaded_by_name?: string;
+  issues: SyncIssue[];
+  reviewed?: { by: number; by_name: string; at: string; note: string | null };
 }
 
 export interface SaleLine {
@@ -409,6 +449,8 @@ export interface Sale extends SaleSummary {
   change_total: Money;
   note: string | null;
   void_reason?: string | null;
+  received_at: string;
+  sync_flags: SyncFlags | null;
   lines: SaleLine[];
   payments: Array<{ id: string; payment_method_id: number; method_name: string; method_type: string; amount: Money; reference: string | null }>;
   returns: Array<{ id: string; number: string; refund_total: Money; reason: string; created_at: string; refund_method: string; created_by_name: string | null }>;
@@ -465,7 +507,8 @@ export interface Voucher {
   id: number;
   code: string;
   description: string | null;
-  target_type: 'product' | 'category' | null;
+  /** 'categories' = one category (target_id), 'product' = one variant (target_id), null = everything. */
+  target_type: 'product' | 'categories' | null;
   target_id: number | null;
   discount_type: 'percent' | 'fixed';
   discount_value: Money;
@@ -518,4 +561,82 @@ export interface Balance {
   debit: number;
   credit: number;
   balance: number;
+}
+
+// ── accounting reports, expenses, pulsa deposit ──
+
+export interface BalanceSheetRow {
+  id: number | null;
+  code: string | null;
+  name: string;
+  balance: number;
+  /** Worked out from income and expense accounts (this year's / earlier years' profit). */
+  computed?: boolean;
+}
+
+export interface BalanceSheet {
+  to: string;
+  assets: BalanceSheetRow[];
+  liabilities: BalanceSheetRow[];
+  equity: BalanceSheetRow[];
+  totals: { assets: number; liabilities: number; equity: number; liabilities_and_equity: number; difference: number };
+}
+
+export interface LedgerEntry {
+  entry_id: string;
+  number: string;
+  date: string;
+  source_type: string;
+  source_id: string | null;
+  memo: string | null;
+  line_memo: string | null;
+  location_code: string | null;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface Ledger {
+  account: { id: number; code: string; name: string; type: AccountType };
+  from: string;
+  to: string;
+  opening: number;
+  closing: number;
+  entries: LedgerEntry[];
+  truncated: boolean;
+}
+
+export interface ExpenseCategory {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface Expense {
+  id: string;
+  number: string;
+  location_id: number | null;
+  location_code: string | null;
+  expense_date: string;
+  account_id: number;
+  account_code: string;
+  account_name: string;
+  amount: number;
+  paid_from: 'cash' | 'bank';
+  payee: string | null;
+  note: string | null;
+  status: 'posted' | 'void';
+  created_by_name: string | null;
+}
+
+export interface ExpenseList {
+  expenses: Expense[];
+  total: number;
+  by_category: Array<{ category: string; amount: number }>;
+}
+
+export interface PulsaDeposit {
+  balance: number;
+  top_ups: Array<{ entry_id: string; number: string; date: string; memo: string | null; status: 'posted' | 'void'; location_code: string | null; amount: number }>;
+  usage: Array<{ month: string; used: number; sales: number }>;
 }

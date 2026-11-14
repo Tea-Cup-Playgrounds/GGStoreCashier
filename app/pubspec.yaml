@@ -65,6 +65,11 @@ dependencies:
   http_parser: ^4.1.2
   image_cropper: ^12.1.1
   audioplayers: ^6.6.0
+  # Camera barcode / QR / IMEI scanning (cashier, unit picker).
+  mobile_scanner: 7.4.2
+  # Classic-Bluetooth receipt printers. Pinned: 1.2.2+ needs Flutter >= 3.44, the project uses 3.38.5 (.fvmrc).
+  print_bluetooth_thermal: 1.2.1
+  material_ui: ^0.0.1
 
 dev_dependencies:
   flutter_test:

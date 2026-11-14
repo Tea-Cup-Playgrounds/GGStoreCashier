@@ -2,7 +2,8 @@ const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
 const { logAudit } = require('../services/audit');
-const { postEntry, reverseSource, dateOnly } = require('../services/journal');
+const { postEntry, reverseSource, resolveAccount, dateOnly, toCents, fromCents } = require('../services/journal');
+const { documentDate } = require('../services/documentDate');
 const { AppError, withTransaction } = require('../utils/transaction');
 const { ctxOf, parseDate, parseMoney } = require('../utils/request');
 const { uuidv7 } = require('../utils/uuid');
@@ -185,15 +186,74 @@ router.post('/journals', requirePermission('accounting.post_manual', { location:
     if (result) res.status(201).json({ message: `Jurnal ${result.number} disimpan`, journal: result });
 });
 
-// Manual journals only; automatic ones are voided through their documents (sale void, return...).
+// ── opening balances ─────────────────────────────────────────────────────────
+
+// Balance-sheet amounts the business had when it started using the system: cash, bank,
+// receivables, supplier debt, loans, capital. The difference goes to Ekuitas Saldo Awal (mapping
+// opening_balance). Stock is not entered here but as opening stock (POST /api/stock/adjust or
+// /api/stock/units with opening: true), so quantities and their value stay together.
+// Body: { date, location_id?, memo?, lines: [{ account_code | account_id, debit?, credit? }] }
+router.post('/opening-balances', requirePermission('accounting.post_manual', { location: (req) => req.body.location_id }), async (req, res) => {
+    if (!req.locationId && req.access.locationsFor('accounting.post_manual') !== null) {
+        return res.status(403).json({ error: 'Saldo awal tanpa lokasi hanya untuk pengguna dengan akses semua lokasi' });
+    }
+    if (!Array.isArray(req.body.lines) || req.body.lines.length === 0) return res.status(400).json({ error: 'Isi minimal satu saldo akun' });
+
+    const result = await withTransaction(res, 'Gagal menyimpan saldo awal', async (conn) => {
+        const doc = await documentDate(conn, req.body.date, { label: 'Tanggal saldo awal' });
+        const inventoryId = await resolveAccount(conn, 'inventory', req.locationId);
+        const openingId = await resolveAccount(conn, 'opening_balance', req.locationId);
+        const interLocationId = await resolveAccount(conn, 'inter_location', req.locationId);
+        const lines = [];
+        let netCents = 0;
+        for (const l of req.body.lines) {
+            const [[account]] = l.account_code
+                ? await conn.execute('SELECT id, code, type, is_postable, is_active FROM accounts WHERE code = ?', [String(l.account_code)])
+                : await conn.execute('SELECT id, code, type, is_postable, is_active FROM accounts WHERE id = ?', [Number(l.account_id)]);
+            if (!account) throw new AppError(`Akun ${l.account_code || l.account_id} tidak ditemukan`);
+            if (!['asset', 'liability', 'equity'].includes(account.type)) throw new AppError(`Akun ${account.code} bukan akun neraca (aset, kewajiban, ekuitas)`);
+            if (account.id === inventoryId) {
+                throw new AppError('Persediaan diisi lewat stok awal (Stok → Sesuaikan, pilih "Stok awal") agar jumlah barang dan nilainya sama');
+            }
+            if (account.id === openingId) throw new AppError(`Akun ${account.code} dihitung otomatis dari selisih saldo`);
+            if (account.id === interLocationId) throw new AppError(`Akun ${account.code} hanya diisi oleh transfer antar lokasi`);
+            const debit = l.debit ? parseMoney(l.debit) : 0;
+            const credit = l.credit ? parseMoney(l.credit) : 0;
+            if (Number.isNaN(debit) || Number.isNaN(credit) || (debit > 0 && credit > 0)) throw new AppError('Setiap baris berisi debit atau kredit saja');
+            if (debit === 0 && credit === 0) continue;
+            netCents += toCents(debit) - toCents(credit);
+            lines.push({ account: account.id, debit, credit, memo: l.memo });
+        }
+        if (lines.length === 0) throw new AppError('Isi minimal satu saldo akun');
+        if (netCents !== 0) {
+            lines.push({
+                account: openingId, debit: netCents < 0 ? fromCents(-netCents) : 0, credit: netCents > 0 ? fromCents(netCents) : 0,
+                memo: 'Selisih ke Ekuitas Saldo Awal',
+            });
+        }
+        const id = uuidv7();
+        const entryId = await postEntry(conn, ctxOf(req), {
+            date: doc.date, locationId: req.locationId || null, sourceType: 'opening_balance', sourceId: id,
+            memo: String(req.body.memo || '').trim() || 'Saldo awal', lines, strict: true,
+        });
+        await logAudit(conn, req, { action: 'create', entity: 'opening_balance', entityId: entryId, locationId: req.locationId || null, after: req.body });
+        return loadJournal(conn, entryId);
+    });
+    if (result) res.status(201).json({ message: `Saldo awal ${result.number} disimpan`, journal: result });
+});
+
+// Manual journals and opening balances only; automatic ones are voided through their documents
+// (sale void, return, expense void...).
 router.post('/journals/:id/void', requirePermission('accounting.post_manual'), async (req, res) => {
     const result = await withTransaction(res, 'Gagal membatalkan jurnal', async (conn) => {
         const [[entry]] = await conn.execute('SELECT * FROM journal_entries WHERE id = ?', [req.params.id]);
         if (!entry) throw new AppError('Jurnal tidak ditemukan', 404);
-        if (entry.source_type !== 'manual' || entry.reverses_entry_id) throw new AppError('Hanya jurnal manual yang dapat dibatalkan di sini');
+        if (!['manual', 'opening_balance', 'pulsa_deposit'].includes(entry.source_type) || entry.reverses_entry_id) {
+            throw new AppError('Hanya jurnal manual, saldo awal, dan top up deposit yang dapat dibatalkan di sini');
+        }
         if (entry.status !== 'posted') throw new AppError('Jurnal ini sudah dibatalkan');
         if (entry.location_id && !req.access.can('accounting.post_manual', entry.location_id)) throw new AppError('Akses tidak diizinkan', 403);
-        await reverseSource(conn, ctxOf(req), { sourceType: 'manual', sourceId: entry.source_id, memo: `Pembatalan ${entry.number}: ${req.body.reason || ''}`.trim() });
+        await reverseSource(conn, ctxOf(req), { sourceType: entry.source_type, sourceId: entry.source_id, memo: `Pembatalan ${entry.number}: ${req.body.reason || ''}`.trim() });
         await logAudit(conn, req, { action: 'void', entity: 'journal', entityId: entry.id, locationId: entry.location_id, after: { reason: req.body.reason || null } });
         return true;
     });
@@ -251,6 +311,91 @@ router.get('/profit-loss', requirePermission('accounting.view'), handle('Gagal m
             net_profit: Math.round((sum(income) - sum(expense)) * 100) / 100,
         },
     });
+}));
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+// Profit in balance rows: income adds, expense (HPP included) subtracts.
+const profitOf = (rows) => round2(rows.reduce((s, r) => s + (r.type === 'income' ? r.balance : r.type === 'expense' ? -r.balance : 0), 0));
+
+// GET /api/accounting/balance-sheet?to=&location_id=   (Neraca / laporan posisi keuangan)
+// Assets = liabilities + equity at the end of `to` (default today). Profit is not closed into an
+// account at year end: this year's profit (from 1 January) and earlier years' profit are worked
+// out from the income and expense accounts and shown under equity.
+router.get('/balance-sheet', requirePermission('accounting.view'), handle('Gagal menyusun neraca', async (req, res) => {
+    const to = req.query.to ? parseDate(req.query.to) : dateOnly();
+    if (!to) return res.status(400).json({ error: 'Format tanggal harus YYYY-MM-DD' });
+    const year = to.slice(0, 4);
+    const rows = await balances(req, { to });
+    const thisYear = await balances(req, { from: `${year}-01-01`, to, types: ['income', 'expense'] });
+    const currentProfit = profitOf(thisYear);
+    const priorProfit = round2(profitOf(rows) - currentProfit);
+
+    const section = (type) => rows.filter((r) => r.type === type && Math.round(r.balance * 100) !== 0)
+        .map(({ id, code, name, balance }) => ({ id, code, name, balance }));
+    const assets = section('asset');
+    const liabilities = section('liability');
+    const equity = [
+        ...section('equity'),
+        { id: null, code: null, name: 'Laba ditahan (tahun-tahun sebelumnya)', balance: priorProfit, computed: true },
+        { id: null, code: null, name: `Laba tahun berjalan ${year}`, balance: currentProfit, computed: true },
+    ];
+    const sum = (list) => round2(list.reduce((s, r) => s + r.balance, 0));
+    const totals = { assets: sum(assets), liabilities: sum(liabilities), equity: sum(equity) };
+    totals.liabilities_and_equity = round2(totals.liabilities + totals.equity);
+    totals.difference = round2(totals.assets - totals.liabilities_and_equity);
+    res.json({ to, assets, liabilities, equity, totals });
+}));
+
+// GET /api/accounting/ledger?account_id=&from=&to=&location_id=   (Buku Besar)
+// One account: its balance before `from`, every entry line in the range with the running balance,
+// and the closing balance. Ranges with more than 5000 lines are cut off (truncated: true).
+const LEDGER_LIMIT = 5000;
+router.get('/ledger', requirePermission('accounting.view'), handle('Gagal menyusun buku besar', async (req, res) => {
+    const [[account]] = await pool.execute('SELECT id, code, name, type FROM accounts WHERE id = ?', [Number(req.query.account_id)]);
+    if (!account) return res.status(400).json({ error: 'Pilih akun' });
+    const today = dateOnly();
+    const from = req.query.from ? parseDate(req.query.from) : `${today.slice(0, 7)}-01`;
+    const to = req.query.to ? parseDate(req.query.to) : today;
+    if (!from || !to) return res.status(400).json({ error: 'Format tanggal harus YYYY-MM-DD' });
+    const sign = DEBIT_NORMAL.has(account.type) ? 1 : -1;
+    const net = (debit, credit) => sign * (Number(debit) - Number(credit));
+
+    const totalBetween = async (condition, values) => {
+        const params = [account.id];
+        let where = "jl.account_id = ? AND e.status IN ('posted', 'void')";
+        where += scopeClause(req, 'jl.location_id', params);
+        const [[row]] = await pool.execute(
+            `SELECT COALESCE(SUM(jl.debit), 0) AS debit, COALESCE(SUM(jl.credit), 0) AS credit
+             FROM journal_lines jl JOIN journal_entries e ON e.id = jl.entry_id WHERE ${where} AND ${condition}`,
+            [...params, ...values]
+        );
+        return round2(net(row.debit, row.credit));
+    };
+    const opening = await totalBetween('e.entry_date < ?', [from]);
+    const closing = await totalBetween('e.entry_date <= ?', [to]);
+
+    const params = [account.id];
+    let where = "jl.account_id = ? AND e.status IN ('posted', 'void')";
+    where += scopeClause(req, 'jl.location_id', params);
+    const [lines] = await pool.execute(
+        `SELECT e.id AS entry_id, e.number, DATE_FORMAT(e.entry_date, '%Y-%m-%d') AS date, e.source_type, e.source_id, e.memo,
+                jl.memo AS line_memo, jl.debit, jl.credit, l.code AS location_code
+         FROM journal_lines jl
+         JOIN journal_entries e ON e.id = jl.entry_id
+         LEFT JOIN locations l ON l.id = jl.location_id
+         WHERE ${where} AND e.entry_date BETWEEN ? AND ?
+         ORDER BY e.entry_date, e.created_at, e.number
+         LIMIT ${LEDGER_LIMIT + 1}`,
+        [...params, from, to]
+    );
+    const truncated = lines.length > LEDGER_LIMIT;
+    let balance = opening;
+    const entries = lines.slice(0, LEDGER_LIMIT).map((l) => {
+        balance = round2(balance + net(l.debit, l.credit));
+        return { ...l, debit: Number(l.debit), credit: Number(l.credit), balance };
+    });
+    res.json({ account, from, to, opening, closing, entries, truncated });
 }));
 
 // ── periods ──────────────────────────────────────────────────────────────────

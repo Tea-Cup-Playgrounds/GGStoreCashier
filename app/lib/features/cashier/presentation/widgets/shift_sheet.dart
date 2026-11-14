@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
 import 'package:gg_store_cashier/core/helper/rupiah_input_formatter.dart';
 import 'package:gg_store_cashier/core/models/sales.dart';
+import 'package:gg_store_cashier/core/services/offline_queue.dart';
 import 'package:gg_store_cashier/core/services/sales_service.dart';
+import 'package:gg_store_cashier/core/services/sync_service.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
@@ -85,6 +87,17 @@ class _ShiftSheetState extends State<ShiftSheet> {
     }
     setState(() => _busy = true);
     try {
+      // Sales of this shift still on the device aren't in the server's expected cash yet: the
+      // count would be off. Try to send them first, and don't close while any are left.
+      if (OfflineQueue.unsyncedForShift(_session!.id) > 0) {
+        await SyncService.syncAll();
+        final left = OfflineQueue.unsyncedForShift(_session!.id);
+        if (left > 0) {
+          SnackBarService.error('Masih ada $left transaksi shift ini yang belum terkirim. '
+              'Kirim dulu lewat menu Sinkronisasi sebelum menutup shift.');
+          return;
+        }
+      }
       final (closed, message) = await SalesService.closeShift(_session!.id, countedCash: counted, note: _note.text.trim());
       if ((closed.difference ?? 0) == 0) {
         SnackBarService.success(message);

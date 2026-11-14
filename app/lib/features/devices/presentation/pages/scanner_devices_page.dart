@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
-import 'dart:developer' as dev;
-import 'package:gg_store_cashier/features/devices/presentation/widgets/devices.dart';
-import 'package:gg_store_cashier/features/devices/presentation/widgets/custom_title.dart';
-import 'package:gg_store_cashier/shared/widgets/refresh_button.dart';
+import 'package:material_ui/material_ui.dart';
 
+import '../../../../core/helper/imei_validator.dart';
+import '../../../../shared/widgets/barcode_scanner_page.dart';
+import '../../../../shared/widgets/scan_key_listener.dart';
+
+/// Pengaturan → Scanner Barcode: how barcode scanning works at the cashier, and a place to try a
+/// scanner (USB / Bluetooth scanners act as a keyboard, so there is nothing to pair in the app).
 class ScannerDevicesPage extends StatefulWidget {
   const ScannerDevicesPage({super.key});
 
@@ -11,127 +13,125 @@ class ScannerDevicesPage extends StatefulWidget {
   State<ScannerDevicesPage> createState() => _ScannerDevicesPageState();
 }
 
-class _ScannerDevicesPageState extends State<ScannerDevicesPage> with SingleTickerProviderStateMixin {
-  late final AnimationController _refreshController;
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    );
-  }
+class _ScannerDevicesPageState extends State<ScannerDevicesPage> {
+  final _field = TextEditingController();
+  final _focus = FocusNode();
+  String? _last;
+  String? _source;
 
   @override
   void dispose() {
-    _refreshController.stop();
-    _refreshController.reset();
-    _refreshController.dispose();
+    _field.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
-  void _refreshDevices() async {
-    _refreshController.repeat();
+  void _show(String code, String source) {
+    final value = code.trim();
+    if (value.isEmpty) return;
+    setState(() {
+      _last = value;
+      _source = source;
+    });
+    _field.clear();
+  }
 
-    // TODO: scan bluetooth
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    _refreshController.stop();
-    _refreshController.reset();
+  String _describe(String code) {
+    final digits = ImeiValidator.normalize(code);
+    if (RegExp(r'^\d{15}$').hasMatch(digits)) {
+      return ImeiValidator.isValid(digits) ? 'IMEI yang valid' : '15 digit, tapi check digit IMEI tidak cocok';
+    }
+    if (RegExp(r'^\d{13}$').hasMatch(digits)) return 'Barcode EAN-13 (barcode produk)';
+    if (RegExp(r'^\d{8}$').hasMatch(digits)) return 'Barcode EAN-8';
+    return '${code.length} karakter';
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        // Judul dan Subtitle Kustom
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: AppBar(title: const Text('Scanner Barcode')),
+      body: ScanKeyListener(
+        onScan: (code) => _show(code, 'scanner'),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              'Scanner',
-              style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+            const _Tip(
+              icon: Icons.qr_code_scanner,
+              title: 'Kamera HP',
+              text: 'Tekan ikon scan di kolom pencarian Kasir. Bisa membaca barcode produk, QR, dan IMEI di dus HP.',
             ),
+            const _Tip(
+              icon: Icons.usb,
+              title: 'Scanner USB atau Bluetooth',
+              text: 'Scanner bekerja seperti keyboard. USB: colok lewat kabel OTG. Bluetooth: pasangkan di pengaturan '
+                  'Bluetooth HP (mode HID / keyboard). Pastikan scanner mengirim Enter setelah kode (pengaturan bawaan '
+                  'hampir semua scanner). Lalu scan saja di halaman Kasir.',
+            ),
+            const _Tip(
+              icon: Icons.add_shopping_cart,
+              title: 'Yang terjadi saat scan di Kasir',
+              text: 'Barcode / SKU produk menambah 1 barang ke keranjang. IMEI atau nomor seri menambah unit HP itu '
+                  '(butuh koneksi). Jasa dan pulsa tetap minta harga diisi.',
+            ),
+            const SizedBox(height: 16),
+            Text('Coba scanner', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text('Scan sesuatu: hasilnya muncul di bawah.', style: muted),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _field,
+              focusNode: _focus,
+              decoration: InputDecoration(
+                hintText: 'Scan atau ketik kode lalu Enter',
+                prefixIcon: const Icon(Icons.keyboard_outlined),
+                suffixIcon: IconButton(
+                  tooltip: 'Scan dengan kamera',
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  onPressed: () async {
+                    final code = await scanWithCamera(context, title: 'Coba scan');
+                    if (code != null) _show(code, 'kamera');
+                  },
+                ),
+              ),
+              onSubmitted: (code) {
+                _show(code, 'kolom ini');
+                _focus.requestFocus();
+              },
+            ),
+            const SizedBox(height: 16),
+            if (_last != null)
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.check_circle, color: Colors.green),
+                  title: SelectableText(_last!, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w600)),
+                  subtitle: Text('${_describe(_last!)} · dari $_source'),
+                ),
+              ),
           ],
         ),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const CustomTitle(title: "Perangkat yang disandingkan"),
-          const SizedBox(
-            height: 20.0,
-          ),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 1,
-            separatorBuilder: (_, __) => const SizedBox(height: 20),
-            itemBuilder: (context, index) {
-              return Column(children: [
-                Devices(
-                  title: 'Scanner SMKJFKFo',
-                  type: 'Scanner',
-                  isConnected: true,
-                  isPaired: true,
-                  icon: Icons.qr_code_2_outlined,
-                  extraInfo: '14',
-                  onPressed: () {
-                    dev.log("Disconnect Scanner");
-                  },
-                ),
-                const SizedBox(height: 20),
-                Devices(
-                  title: 'Scanner SMKJFKFo',
-                  type: 'Scanner',
-                  isConnected: false,
-                  isPaired: true,
-                  icon: Icons.qr_code_2_outlined,
-                  onPressed: () {
-                    dev.log("Disconnect Scanner");
-                  },
-                ),
-              ]);
-            },
-          ),
-          Row(children: [
-            const CustomTitle(title: "Perangkat yang tersedia"),
-            const Spacer(),
-            RefreshButton(
-              onRefresh: _refreshDevices,
-              refreshController: _refreshController,
-            ),
-          ]),
-          const SizedBox(
-            height: 20.0,
-          ),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 1,
-            separatorBuilder: (_, __) => const SizedBox(height: 20),
-            itemBuilder: (context, index) {
-              return Devices(
-                isPaired: false,
-                title: 'Scanner SMKJFKFo',
-                type: 'Scanner',
-                icon: Icons.qr_code_2_outlined,
-                onPressed: () {
-                  dev.log("Disconnect Scanner");
-                },
-              );
-            },
-          ),
-        ]),
+    );
+  }
+}
+
+class _Tip extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+
+  const _Tip({required this.icon, required this.title, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Padding(padding: const EdgeInsets.only(top: 4), child: Text(text)),
       ),
     );
   }

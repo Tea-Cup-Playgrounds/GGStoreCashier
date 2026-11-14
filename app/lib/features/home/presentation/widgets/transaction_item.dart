@@ -1,25 +1,41 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/helper/currency_formatter.dart';
 
 class TransactionItem extends StatelessWidget {
   final String id;
+
+  /// Sale number shown next to the time.
+  final String? number;
   final String time;
   final int items;
   final double total;
   final String paymentMethod;
 
+  /// Opens the sale's receipt.
+  final VoidCallback? onTap;
+
   const TransactionItem({
     super.key,
     required this.id,
+    this.number,
     required this.time,
     required this.items,
     required this.total,
     required this.paymentMethod,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: _buildCard(context),
+    );
+  }
+
+  Widget _buildCard(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -68,11 +84,14 @@ class TransactionItem extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      time,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.mutedForeground,
-                          ),
+                    Flexible(
+                      child: Text(
+                        number != null ? '$number · $time' : time,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.mutedForeground,
+                            ),
+                      ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(

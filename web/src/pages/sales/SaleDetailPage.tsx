@@ -6,7 +6,8 @@ import { api, errorMessage } from '../../api/client';
 import type { PaymentMethod, Sale } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { unitLabel } from '../../lib/catalog';
-import { formatDate, formatDateTime, formatRp, toNumber } from '../../lib/format';
+import { formatDate, formatDateTime, formatRp, toDateInput, toNumber, today } from '../../lib/format';
+import { describeSyncIssue } from '../../lib/syncIssues';
 import { Badge, Button, Card, Checkbox, DataTable, Field, Input, Modal, PageHeader, QueryState, Select, Textarea, useToast } from '../../components/ui';
 import { SALE_STATUS } from './SalesPage';
 
@@ -46,6 +47,7 @@ export function SaleDetailPage() {
             }
           />
           {s.status === 'voided' && s.void_reason && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Dibatalkan: {s.void_reason}</p>}
+          {s.sync_flags && <OfflinePanel sale={s} canReview={!!canVoid} />}
           <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
             <Card title="Barang">
               <DataTable
@@ -124,6 +126,74 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+// An offline sale is stored as it happened; what didn't match the rules is listed here so a
+// manager can act on it (recount stock, explain a shift's cash difference) and mark it checked.
+function OfflinePanel({ sale, canReview }: { sale: Sale; canReview: boolean }) {
+  const flags = sale.sync_flags!;
+  const [reviewing, setReviewing] = useState(false);
+  const open = flags.issues.length > 0 && !flags.reviewed;
+  return (
+    <div className={`mb-5 rounded-lg border px-4 py-3 text-sm ${open ? 'border-amber-200 bg-amber-50' : 'border-stone-200 bg-stone-50'}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <b>Penjualan offline</b> · diterima server {formatDateTime(sale.received_at)}
+          {flags.uploaded_by_name && <> · dikirim oleh {flags.uploaded_by_name}</>}
+          {flags.priced_on_device && <> · harga dari perangkat</>}
+        </div>
+        {open && canReview && <Button size="sm" onClick={() => setReviewing(true)}>Tandai sudah dicek</Button>}
+      </div>
+      {flags.issues.length === 0 ? (
+        <p className="mt-1 text-stone-600">Tidak ada selisih: tercatat sama seperti transaksi online.</p>
+      ) : (
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {flags.issues.map((issue, i) => <li key={i}>{describeSyncIssue(issue)}</li>)}
+        </ul>
+      )}
+      {flags.reviewed && (
+        <p className="mt-2 text-stone-600">
+          Dicek oleh {flags.reviewed.by_name}, {formatDateTime(flags.reviewed.at)}
+          {flags.reviewed.note && <>: “{flags.reviewed.note}”</>}
+        </p>
+      )}
+      {reviewing && <ReviewDialog sale={sale} onClose={() => setReviewing(false)} />}
+    </div>
+  );
+}
+
+function ReviewDialog({ sale, onClose }: { sale: Sale; onClose: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [note, setNote] = useState('');
+  const review = useMutation({
+    mutationFn: () => api(`/sales/${sale.id}/sync-review`, { method: 'POST', body: { note: note.trim() } }),
+    onSuccess: () => {
+      toast.success('Ditandai sudah dicek');
+      qc.invalidateQueries({ queryKey: ['sale', sale.id] });
+      qc.invalidateQueries({ queryKey: ['sales'] });
+      onClose();
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Tandai ${sale.number} sudah dicek?`}
+      footer={
+        <>
+          <Button onClick={onClose}>Kembali</Button>
+          <Button variant="primary" loading={review.isPending} onClick={() => review.mutate()}>Tandai sudah dicek</Button>
+        </>
+      }
+    >
+      <p className="mb-3 text-sm text-stone-600">
+        Penjualan tetap seperti tercatat. Koreksi stok lewat stok opname, atau batalkan / retur penjualan ini bila memang salah.
+      </p>
+      <Field label="Catatan (opsional)"><Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} autoFocus /></Field>
+    </Modal>
+  );
+}
+
 function VoidDialog({ sale, onClose }: { sale: Sale; onClose: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -165,6 +235,7 @@ function ReturnDialog({ sale, onClose }: { sale: Sale; onClose: () => void }) {
   const [defective, setDefective] = useState<Record<string, boolean>>({});
   const [methodId, setMethodId] = useState('');
   const [reason, setReason] = useState('');
+  const [date, setDate] = useState(today());
 
   const chosen = open.filter((l) => Number(qty[l.id]) > 0);
   const refund = chosen.reduce((s, l) => s + (toNumber(l.line_total) * Number(qty[l.id])) / l.qty, 0);
@@ -176,6 +247,7 @@ function ReturnDialog({ sale, onClose }: { sale: Sale; onClose: () => void }) {
           lines: chosen.map((l) => ({ sale_line_id: l.id, qty: Number(qty[l.id]), restock: !defective[l.id] })),
           refund_method_id: Number(methodId),
           reason: reason.trim(),
+          date,
         },
       }),
     onSuccess: () => {
@@ -218,7 +290,10 @@ function ReturnDialog({ sale, onClose }: { sale: Sale; onClose: () => void }) {
           );
         })}
       </div>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <Field label="Tanggal retur">
+          <Input type="date" value={date} min={toDateInput(sale.occurred_at)} max={today()} onChange={(e) => setDate(e.target.value)} />
+        </Field>
         <Field label="Dikembalikan via">
           <Select value={methodId} onChange={(e) => setMethodId(e.target.value)}>
             <option value="">Pilih metode…</option>

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:gg_store_cashier/core/helper/currency_formatter.dart';
 import 'package:gg_store_cashier/core/models/catalog.dart';

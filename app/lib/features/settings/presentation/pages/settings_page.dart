@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:gg_store_cashier/core/provider/auth_provider.dart';
 import 'package:gg_store_cashier/core/provider/access_provider.dart';
 import 'package:gg_store_cashier/core/models/branch.dart';
 import 'package:gg_store_cashier/core/services/branch_service.dart';
+import 'package:gg_store_cashier/core/services/offline_queue.dart';
+import 'package:gg_store_cashier/features/devices/data/receipt_printer.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 
@@ -20,6 +22,8 @@ class SettingsPage extends ConsumerWidget {
     // Owners pick which branch to edit; others edit their own location when allowed.
     final canEditBranches = access.isOwner || access.locationsFor('locations.manage') == null;
     final canEditOwnBranch = ownLocation != null && access.can('locations.manage', ownLocation);
+    final unsynced = ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
+    final printer = ref.watch(printerSettingsProvider).valueOrNull;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -63,24 +67,40 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: 8),
             _SettingsGroup(tiles: [
               _SettingsTile(
-                title: 'Barcode Scanner',
-                subtitle: 'Zebra DS9308 - Terhubung',
-                icon: Icons.qr_code_scanner,
-                statusColor: AppTheme.success,
-                onTap: () => context.push(AppRouter.scannerDevices),
+                title: 'Printer Struk',
+                subtitle: printer == null
+                    ? 'Memuat...'
+                    : printer.isConfigured
+                        ? '${printer.label}${printer.autoPrint ? ' · cetak otomatis' : ''}'
+                        : 'Belum diatur',
+                icon: Icons.print_outlined,
+                statusColor: printer?.isConfigured == true ? AppTheme.success : AppTheme.mutedForeground,
+                onTap: () => context.push(AppRouter.printerDevices),
               ),
               _SettingsTile(
-                title: 'Receipt Printer',
-                subtitle: 'Epson TM-T88VI - Tidak terhubung',
-                icon: Icons.print_outlined,
-                statusColor: AppTheme.mutedForeground,
-                onTap: () => context.push(AppRouter.printerDevices),
+                title: 'Tampilan Struk',
+                subtitle: 'Nama toko, alamat, catatan kaki, ukuran kertas',
+                icon: Icons.receipt_long_outlined,
+                onTap: () => context.push(AppRouter.receiptEditor),
+              ),
+              _SettingsTile(
+                title: 'Scanner Barcode',
+                subtitle: 'Kamera HP atau scanner USB / Bluetooth',
+                icon: Icons.qr_code_scanner,
+                onTap: () => context.push(AppRouter.scannerDevices),
               ),
             ]),
             const SizedBox(height: 28),
             const _SectionLabel('Preferences'),
             const SizedBox(height: 8),
             _SettingsGroup(tiles: [
+              _SettingsTile(
+                title: 'Sinkronisasi',
+                subtitle: unsynced == 0 ? 'Semua transaksi sudah terkirim' : '$unsynced transaksi belum terkirim',
+                icon: Icons.cloud_upload_outlined,
+                statusColor: unsynced == 0 ? null : AppTheme.warning,
+                onTap: () => context.push(AppRouter.syncQueue),
+              ),
               _SettingsTile(
                 title: 'Notifications',
                 subtitle: 'Push & notifikasi peringatan',
@@ -510,9 +530,14 @@ class _SignOutDialogState extends State<_SignOutDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final unsynced = OfflineQueue.unsyncedCount;
     return AlertDialog(
       title: const Text('Sign Out'),
-      content: const Text('Apakah Anda yakin ingin keluar dari akun ini?'),
+      content: Text(unsynced == 0
+          ? 'Apakah Anda yakin ingin keluar dari akun ini?'
+          : 'Masih ada $unsynced transaksi yang belum terkirim. Transaksi tetap tersimpan di perangkat ini '
+              'dan dikirim otomatis setelah ada yang login lagi (tercatat atas nama kasir yang menjualnya).\n\n'
+              'Tetap keluar?'),
       actions: [
         TextButton(
           onPressed: _confirming ? null : () => Navigator.of(context).pop(false),

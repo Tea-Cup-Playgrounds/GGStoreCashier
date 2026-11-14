@@ -93,6 +93,29 @@ npm run db:docs
 
 Perintah ini menulis ulang `Database.md` dari skema database yang sedang dipakai.
 
+#### Data demo satu tahun (khusus development)
+
+Untuk mencoba laporan akuntansi dengan data yang terasa nyata, isi database dev dengan satu tahun operasional toko:
+
+```bash
+npm run seed:demo-year -- --reset
+```
+
+`--reset` **menghapus database `DB_NAME`**, lalu membuatnya ulang, menjalankan migrasi dan seed akun dev. Tanpa `--reset`, skrip menolak database yang sudah berisi produk, penjualan atau jurnal. Skrip juga menolak berjalan jika `NODE_ENV=production`.
+
+Semua data dibuat lewat kode API yang sama dengan pemakaian nyata (router dipasang di dalam proses, tanpa server terpisah) dengan jam simulasi: `Date` di JavaScript dan `NOW()` di MySQL mengikuti hari yang sedang disimulasikan. Karena itu nomor dokumen, mutasi stok, jurnal, shift dan `created_at` memakai tanggal kejadiannya, dan periode yang sudah ditutup tetap ditolak.
+
+Isinya, mulai 1 November 2025 sampai hari ini (hari ini berhenti di jam sekarang, shift-nya masih terbuka):
+
+- Saldo awal (bank, kas cabang, deposit pulsa, hutang supplier, modal) dan stok awal dengan IMEI di gudang dan cabang.
+- Sekitar 26.000 penjualan dan 3.000 pelanggan di BR01–BR03: HP (wajib pelanggan, IMEI), aksesoris, pulsa/token, jasa servis. Ramai di akhir pekan, tanggal gajian, Desember dan menjelang Lebaran; toko tutup saat Idul Fitri. Ada voucher promo, diskon dari kepala cabang, retur, pembatalan, dan selisih kas kecil saat tutup shift.
+- Gudang membeli HP setiap Senin dan aksesoris tanggal 1 dan 16, lalu mengirim ke cabang setiap Selasa dan Jumat. Tagihan supplier dibayar saat jatuh tempo.
+- Akuntan menyetor kas cabang ke bank, mencairkan QRIS/EDC (dipotong MDR), membayar sewa, gaji (termasuk THR), listrik/air/internet dan iklan, menyetor PPN tanggal 20, dan menutup bulan sebelumnya setiap tanggal 8. Pemilik mengambil prive setiap bulan.
+- Kepala cabang top up deposit pulsa, membeli perlengkapan toko dari kas, menghapus barang rusak, dan menjalankan stok opname akhir kuartal.
+- Beberapa kejadian khusus: perubahan harga, dua HP baru diluncurkan, BR03 offline satu siang (penjualan offline dengan selisih harga yang perlu dicek), dan satu transfer yang datang kurang.
+
+Opsi: `--from=YYYY-MM-DD`, `--to=YYYY-MM-DD`, `--scale=1` (banyaknya pembeli), `--seed=2025` (seed yang sama menghasilkan data yang sama). Satu tahun penuh butuh sekitar 8–10 menit. Hentikan server API dulu selama `--reset` berjalan (koneksinya ke database lama akan putus). Semua akun dev memakai kata sandi `SEED_PASSWORD` (default `Password#123`).
+
 ### 5. Jalankan proyek
 
 **Opsi A: Jalankan terpisah**
@@ -166,6 +189,7 @@ Menu dan halaman mengikuti izin pengguna (sama dengan aplikasi kasir); API tetap
 | `API/src/services/posting.js`    | JavaScript | Aturan jurnal otomatis untuk penjualan, retur, pembelian, stok, dan shift. |
 | `API/scripts/backfill-journals.js` | JavaScript | `npm run accounting:backfill` — membuat jurnal untuk dokumen lama.   |
 | `API/scripts/schema-doc.js`      | JavaScript | `npm run db:docs` — menulis ulang `Database.md` dari skema database.  |
+| `API/scripts/demo-year.js`       | JavaScript | `npm run seed:demo-year -- --reset` — data demo satu tahun lewat kode API dengan jam simulasi (khusus dev). |
 | `API/src/routes/purchasing.js`   | JavaScript | Supplier, penerimaan barang (draf → posting ke stok), pembayaran supplier. |
 | `API/src/routes/transfers.js`    | JavaScript | Transfer stok antar lokasi: draf → kirim → terima / selesaikan selisih. |
 | `API/src/routes/opnames.js`      | JavaScript | Stok opname: snapshot, hitung jumlah, scan IMEI, setujui penyesuaian. |
@@ -253,11 +277,53 @@ saat server berjalan — login dengan akun owner. Ringkasan:
 | `/api/sales`               | Penjualan (idempoten per UUID klien), `/quote`, batal, retur, metode pembayaran.          |
 | `/api/customers`, `/api/cash-sessions` | Pelanggan dan shift kasir.                                                  |
 | `/api/vouchers`            | Voucher (`vouchers.manage`); `/validate/:code` untuk kasir.                               |
-| `/api/accounting`          | Akun, jurnal, neraca saldo, laba rugi, periode, pemetaan akun.                            |
+| `/api/accounting`          | Akun, jurnal, saldo awal, neraca, neraca saldo, laba rugi, buku besar, periode, pemetaan akun. |
+| `/api/expenses`, `/api/pulsa-deposit` | Biaya operasional; deposit pulsa (top up, saldo, pemakaian) (`expenses.manage`). |
 | `/api/dashboard`, `/api/analytics` | Ringkasan untuk lokasi pengguna; analitik semua lokasi (`reports.view_all`).    |
 
 Endpoint lama `/api/products`, `/api/branches`, `/api/transactions`, `/api/admins` dan `/api/super` sudah dihapus;
 gunakan `/api/catalog`, `/api/locations` dan `/api/sales`.
+
+### 📒 Akuntansi
+
+- **Tanggal dokumen.** Penerimaan barang (tanggal barang diterima), retur, penyesuaian stok, stok opname (tanggal
+  penyesuaian), transfer (kirim / terima), pembayaran supplier, dan biaya bisa diberi tanggal sebelumnya. Mutasi stok,
+  jurnal, dan nomor dokumen (`GR-BR01-261031-…`) memakai tanggal itu. Tanggal di masa depan dan di periode yang sudah
+  ditutup ditolak.
+- **Saldo awal.** Akuntansi → Saldo Awal: saldo kas, bank, piutang, hutang, modal saat mulai memakai sistem; selisihnya
+  otomatis ke 3-3000 Ekuitas Saldo Awal. Persediaan dimasukkan sebagai *stok awal* (Stok → Sesuaikan, atau daftar unit
+  IMEI, centang "Stok awal") sehingga nilainya juga ke Ekuitas Saldo Awal, bukan ke Selisih Persediaan.
+- **Biaya.** Akuntansi → Biaya: sewa, gaji, listrik, dll. Kategori = akun beban. Izin `expenses.manage` (manajer cabang
+  dan akuntan); biaya tanpa lokasi (kantor pusat) hanya untuk pengguna dengan akses semua lokasi.
+- **Deposit pulsa.** Isi *harga modal* pada varian produk digital (Produk → varian). Setiap penjualan pulsa mencatat
+  HPP dari deposit (1-1600); top up di Akuntansi → Deposit Pulsa.
+- **Transfer antar lokasi** memindahkan nilai persediaan dari lokasi pengirim ke penerima saat barang diterima, lewat
+  akun 1-1700 Rekening Antar Lokasi, sehingga neraca setiap lokasi tetap seimbang (di tingkat perusahaan akun ini nol).
+- **Laporan.** Neraca (laba tahun berjalan dan laba ditahan dihitung otomatis, tanpa jurnal penutup), Buku Besar per
+  akun dengan saldo berjalan, Neraca Saldo, Laba Rugi; semua bisa per lokasi dan diekspor ke CSV.
+
+Uji integrasi akuntansi (membuat ulang database uji, namanya harus diawali `gg_test`):
+
+```bash
+TEST_DB_NAME=gg_test_accounting npm run test:integration
+```
+
+### 📴 Penjualan offline
+
+Saat tidak ada koneksi, aplikasi kasir hanya menerima tunai dan menyimpan penjualan di perangkat (Hive). Penjualan
+yang responsnya hilang (server tidak menjawab) juga disimpan. Aplikasi mengirimnya otomatis saat dibuka, setiap menit
+selama ada yang menunggu, dan saat koneksi kembali.
+
+Penjualan offline sudah terjadi (uang diterima, barang dibawa pelanggan), jadi API **tidak menolaknya** karena hal
+yang berubah sesudahnya. Penjualan dicatat apa adanya dan setiap selisih ditulis ke `sales.sync_flags.issues`:
+stok jadi minus, harga atau voucher berubah, shift sudah ditutup, pembayaran kurang dari harga sekarang (selisihnya
+dicatat sebagai diskon), dan sebagainya. Manajer melihatnya di web (Penjualan → filter *Offline, perlu dicek*) dan
+menandainya sudah dicek. Yang tetap ditolak: barang tidak dikenal, unit IMEI yang sudah terjual, data rusak.
+
+Di aplikasi, menu **Sinkronisasi** (Pengaturan, atau ikon awan di Kasir) menampilkan transaksi yang belum terkirim
+beserta alasan bila ditolak server, dengan tombol *Coba lagi*, *Salin data*, dan *Hapus* (hanya untuk yang berizin
+`sales.void`). Shift tidak bisa ditutup selama transaksinya belum terkirim. Sesi login yang habis (401) atau server
+yang bermasalah (5xx) tidak dihitung sebagai penolakan; transaksi menunggu sampai bisa dikirim.
 
 ### ⚡ Socket.IO Events
 

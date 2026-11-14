@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gg_store_cashier/core/services/connectivity_monitor.dart';
 import 'package:gg_store_cashier/core/services/notification_service.dart';
@@ -19,6 +19,7 @@ class ScaffoldWithBottomNavbar extends ConsumerStatefulWidget {
 
 class _ScaffoldWithBottomNavbarState extends ConsumerState<ScaffoldWithBottomNavbar> {
   ProviderSubscription<AsyncValue<ConnectivityStatus>>? _connectivitySub;
+  bool _syncStarted = false;
 
   @override
   void didChangeDependencies() {
@@ -26,6 +27,13 @@ class _ScaffoldWithBottomNavbarState extends ConsumerState<ScaffoldWithBottomNav
     // Start connectivity monitoring now that the user is logged in.
     // This ensures the HTTP probe never runs on the login page.
     ConnectivityMonitor.instance.start();
+    // Send what was saved while offline: now (also after the app was closed offline and opened
+    // again online, or after logging in again), every minute while anything waits, and below
+    // whenever the connection comes back.
+    if (!_syncStarted) {
+      _syncStarted = true;
+      SyncService.start();
+    }
     _connectivitySub ??= ref.listenManual(connectivityProvider, (previous, next) {
       final prev = previous?.valueOrNull;
       final curr = next.valueOrNull;

@@ -69,4 +69,24 @@ class PendingOperationsQueue {
 
   static int get pendingCount =>
       _box.values.where((e) => e.status == 'pending').length;
+
+  /// Every queued change (waiting and failed), oldest first.
+  static List<PendingOperation> getAll() {
+    final list = _box.values.toList();
+    list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return list;
+  }
+
+  /// Puts a failed change back in line to be sent again.
+  static Future<void> retry(String id) async {
+    final op = _box.get(id);
+    if (op != null) {
+      op
+        ..status = 'pending'
+        ..retryCount = 0;
+      await op.save();
+    }
+  }
+
+  static Box<PendingOperation> get box => _box;
 }

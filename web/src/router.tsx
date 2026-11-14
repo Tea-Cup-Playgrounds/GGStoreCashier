@@ -30,6 +30,10 @@ import { PaymentMethodsPage } from './pages/sales/PaymentMethodsPage';
 import { JournalsPage } from './pages/accounting/JournalsPage';
 import { ProfitLossPage, TrialBalancePage } from './pages/accounting/ReportsPages';
 import { AccountsPage, MappingsPage, PeriodsPage } from './pages/accounting/AccountsPages';
+import { BalanceSheetPage, LedgerPage } from './pages/accounting/StatementsPages';
+import { ExpensesPage } from './pages/accounting/ExpensesPage';
+import { PulsaDepositPage } from './pages/accounting/PulsaDepositPage';
+import { OpeningBalancesPage } from './pages/accounting/OpeningBalancesPage';
 
 const page = (menuPath: string, element: ReactNode) => <Guard to={menuPath}>{element}</Guard>;
 
@@ -78,6 +82,11 @@ export const router = createBrowserRouter([
           { path: 'analytics', element: page('/analytics', <AnalyticsPage />) },
           { path: 'settings/payment-methods', element: page('/settings/payment-methods', <PaymentMethodsPage />) },
           { path: 'accounting/journals', element: page('/accounting/journals', <JournalsPage />) },
+          { path: 'accounting/expenses', element: page('/accounting/expenses', <ExpensesPage />) },
+          { path: 'accounting/pulsa-deposit', element: page('/accounting/pulsa-deposit', <PulsaDepositPage />) },
+          { path: 'accounting/opening-balances', element: page('/accounting/opening-balances', <OpeningBalancesPage />) },
+          { path: 'accounting/balance-sheet', element: page('/accounting/balance-sheet', <BalanceSheetPage />) },
+          { path: 'accounting/ledger', element: page('/accounting/ledger', <LedgerPage />) },
           { path: 'accounting/trial-balance', element: page('/accounting/trial-balance', <TrialBalancePage />) },
           { path: 'accounting/profit-loss', element: page('/accounting/profit-loss', <ProfitLossPage />) },
           { path: 'accounting/accounts', element: page('/accounting/accounts', <AccountsPage />) },

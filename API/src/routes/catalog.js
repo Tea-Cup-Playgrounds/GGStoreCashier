@@ -119,7 +119,9 @@ router.put('/tax-rates/:id', requirePermission('settings.manage'), async (req, r
 
 // Loads variants for the given products. With locationId, adds on-hand stock, the effective
 // sell price there and (for permitted users) the average cost.
-const loadVariants = async (db, productIds, { locationId, includeInactive, showCost }) => {
+// cost_price (cost of a pulsa / digital item) is only returned to people who may see costs or
+// manage the catalog (showCostPrice).
+const loadVariants = async (db, productIds, { locationId, includeInactive, showCost, showCostPrice = showCost }) => {
     if (productIds.length === 0) return [];
     const marks = productIds.map(() => '?').join(', ');
     const locationColumns = locationId
@@ -127,7 +129,7 @@ const loadVariants = async (db, productIds, { locationId, includeInactive, showC
            sl.sell_price AS location_price, sl.reorder_level${showCost ? `, ${AVG_COST_SQL} AS avg_cost` : ''}`
         : '';
     const [rows] = await db.execute(
-        `SELECT v.id, v.product_id, v.sku, v.barcode, v.name, v.attributes, v.base_price, v.min_price,
+        `SELECT v.id, v.product_id, v.sku, v.barcode, v.name, v.attributes, v.base_price, v.min_price, v.cost_price,
                 v.is_active, v.created_at, v.updated_at ${locationColumns}
          FROM product_variants v
          JOIN products p ON p.id = v.product_id
@@ -137,8 +139,15 @@ const loadVariants = async (db, productIds, { locationId, includeInactive, showC
          ORDER BY v.product_id, v.id`,
         locationId ? [locationId, ...productIds] : productIds
     );
-    return rows.map((r) => ({ ...r, is_active: !!r.is_active, ...(locationId ? { on_hand: Number(r.on_hand) } : {}) }));
+    return rows.map(({ cost_price: costPrice, ...r }) => ({
+        ...r,
+        is_active: !!r.is_active,
+        ...(showCostPrice ? { cost_price: costPrice } : {}),
+        ...(locationId ? { on_hand: Number(r.on_hand) } : {}),
+    }));
 };
+
+const mayEditCost = (access) => access.can('catalog.manage') || canSeeCost(access);
 
 const PRODUCT_COLUMNS = `
     p.id, p.name, p.description, p.category_id, c.name AS category_name, p.brand_id, b.name AS brand_name,
@@ -213,7 +222,7 @@ router.get('/products/:id', requirePermission('catalog.view'), async (req, res) 
         );
         if (!row) return res.status(404).json({ error: 'Produk tidak ditemukan' });
 
-        const variants = await loadVariants(pool, [row.id], { includeInactive: true });
+        const variants = await loadVariants(pool, [row.id], { includeInactive: true, showCostPrice: mayEditCost(req.access) });
         const product = shapeProduct(row, variants);
 
         const visible = req.access.locationsFor('stock.view');
@@ -314,6 +323,12 @@ const readVariantFields = (body, { partial }) => {
         if (price === null || Number.isNaN(price)) return { error: 'Harga jual varian wajib diisi dan tidak boleh negatif' };
         fields.base_price = price;
     }
+    // Cost of a pulsa / digital item (e.g. pulsa 10rb costs 10.150); booked from the pulsa deposit.
+    if (body.cost_price !== undefined) {
+        const cost = body.cost_price === null || body.cost_price === '' ? null : parseMoney(body.cost_price);
+        if (Number.isNaN(cost)) return { error: 'Harga modal tidak valid' };
+        fields.cost_price = cost;
+    }
     if (body.min_price !== undefined) {
         const price = parseMoney(body.min_price);
         if (Number.isNaN(price)) return { error: 'Harga minimum tidak valid' };
@@ -381,7 +396,7 @@ router.post('/products', requirePermission('catalog.manage'), async (req, res) =
         const [[product]] = await pool.execute(`SELECT ${PRODUCT_COLUMNS} FROM products p LEFT JOIN categories c ON c.id = p.category_id LEFT JOIN brands b ON b.id = p.brand_id WHERE p.id = ?`, [result.insertId]);
         res.status(201).json({
             message: 'Produk berhasil dibuat',
-            product: shapeProduct(product, await loadVariants(pool, [result.insertId], { includeInactive: true })),
+            product: shapeProduct(product, await loadVariants(pool, [result.insertId], { includeInactive: true, showCostPrice: mayEditCost(req.access) })),
         });
     } catch (error) {
         await conn.rollback();
@@ -491,7 +506,7 @@ router.post('/products/:id/variants', requirePermission('catalog.manage'), async
         await logAudit(conn, req, { action: 'create', entity: 'variant', entityId: variantId, after: { product_id: product.id, ...fields } });
         await conn.commit();
 
-        const [variant] = (await loadVariants(pool, [product.id], { includeInactive: true })).filter((v) => v.id === variantId);
+        const [variant] = (await loadVariants(pool, [product.id], { includeInactive: true, showCostPrice: mayEditCost(req.access) })).filter((v) => v.id === variantId);
         res.status(201).json({ message: 'Varian berhasil dibuat', variant });
     } catch (error) {
         await conn.rollback();

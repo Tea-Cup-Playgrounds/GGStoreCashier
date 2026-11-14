@@ -1,12 +1,5 @@
 const pool = require('../db');
-
-// An error whose message is meant for the user (Indonesian) and maps to an HTTP status.
-class AppError extends Error {
-    constructor(message, status = 400) {
-        super(message);
-        this.status = status;
-    }
-}
+const { AppError } = require('./errors');
 
 // Runs fn(conn) in a transaction and returns its result. On failure it rolls back, sends the
 // response itself (AppError -> its status and message, anything else -> 500) and returns undefined,

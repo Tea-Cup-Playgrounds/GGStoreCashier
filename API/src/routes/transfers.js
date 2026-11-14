@@ -9,6 +9,8 @@ const { AppError, withTransaction } = require('../utils/transaction');
 const { ctxOf } = require('../utils/request');
 const { uuidv7 } = require('../utils/uuid');
 const posting = require('../services/posting');
+const { documentDate } = require('../services/documentDate');
+const { dateOnly } = require('../services/journal');
 
 // Stock transfers between locations:
 //   draft (editable) -> sent (stock leaves the source) -> received / partially_received (stock arrives)
@@ -226,12 +228,14 @@ router.post('/:id/cancel', resolveTransfer, requirePermission('transfers.create'
 });
 
 // Sending takes the stock out of the source: transfer_out movements, units go in_transit.
+// Body: { date? } the day the goods left (default today).
 router.post('/:id/send', resolveTransfer, requirePermission('transfers.send', { location: fromLocation }), async (req, res) => {
     const result = await withTransaction(res, 'Gagal mengirim transfer', async (conn) => {
         const [[t]] = await conn.execute('SELECT * FROM stock_transfers WHERE id = ? FOR UPDATE', [req.transfer.id]);
         if (t.status !== 'draft') throw new AppError('Transfer ini sudah dikirim atau dibatalkan');
         const full = await loadTransfer(conn, t.id);
-        const ctx = ctxOf(req);
+        const doc = await documentDate(conn, req.body.date, { label: 'Tanggal kirim' });
+        const ctx = { ...ctxOf(req), occurredAt: doc.at };
         const common = { refType: 'transfer', refId: t.id, note: t.number };
 
         for (const item of full.items) {
@@ -252,7 +256,7 @@ router.post('/:id/send', resolveTransfer, requirePermission('transfers.send', { 
             await conn.execute('UPDATE stock_transfer_items SET unit_cost = ? WHERE id = ?', [unitCost, item.id]);
         }
 
-        await conn.execute("UPDATE stock_transfers SET status = 'sent', sent_by = ?, sent_at = NOW(3) WHERE id = ?", [req.user.id, t.id]);
+        await conn.execute("UPDATE stock_transfers SET status = 'sent', sent_by = ?, sent_at = ? WHERE id = ?", [req.user.id, doc.at, t.id]);
         await logAudit(conn, req, { action: 'send', entity: 'transfer', entityId: t.id, locationId: t.from_location_id });
         return loadTransfer(conn, t.id);
     });
@@ -260,17 +264,23 @@ router.post('/:id/send', resolveTransfer, requirePermission('transfers.send', { 
 });
 
 // Body (all optional; omitted means everything arrived):
-//   { items: [{ item_id, qty_received }], missing_unit_ids: [...], note }
+//   { items: [{ item_id, qty_received }], missing_unit_ids: [...], note, date }
+// date: the day the goods arrived (default today; not before they were sent).
+// The value of what arrived moves from the source's inventory to the destination's in the books.
 router.post('/:id/receive', resolveTransfer, requirePermission('transfers.receive', { location: toLocation }), async (req, res) => {
     const result = await withTransaction(res, 'Gagal menerima transfer', async (conn) => {
         const [[t]] = await conn.execute('SELECT * FROM stock_transfers WHERE id = ? FOR UPDATE', [req.transfer.id]);
         if (t.status !== 'sent') throw new AppError(t.status === 'draft' ? 'Transfer belum dikirim' : 'Transfer ini sudah diterima');
         const full = await loadTransfer(conn, t.id);
-        const ctx = ctxOf(req);
+        const doc = await documentDate(conn, req.body.date, {
+            label: 'Tanggal terima', notBefore: dateOnly(t.sent_at), notBeforeLabel: 'tanggal kirim',
+        });
+        const ctx = { ...ctxOf(req), occurredAt: doc.at };
         const common = { refType: 'transfer', refId: t.id, note: t.number };
         const qtyOverrides = new Map((Array.isArray(req.body.items) ? req.body.items : []).map((i) => [String(i.item_id), Number(i.qty_received)]));
         const missing = new Set((Array.isArray(req.body.missing_unit_ids) ? req.body.missing_unit_ids : []).map(String));
         let complete = true;
+        let receivedValue = 0;
 
         for (const item of full.items) {
             if (item.is_serialized) {
@@ -279,6 +289,8 @@ router.post('/:id/receive', resolveTransfer, requirePermission('transfers.receiv
                     if (missing.has(u.unit_id)) { complete = false; continue; }
                     await stock.landUnit(conn, ctx, { unitId: u.unit_id, locationId: t.to_location_id, ...common });
                     await conn.execute("UPDATE stock_transfer_units SET outcome = 'received' WHERE transfer_item_id = ? AND unit_id = ?", [item.id, u.unit_id]);
+                    const [[unit]] = await conn.execute('SELECT unit_cost FROM product_units WHERE id = ?', [u.unit_id]);
+                    receivedValue += Number(unit.unit_cost);
                     received += 1;
                 }
                 await conn.execute('UPDATE stock_transfer_items SET qty_received = ? WHERE id = ?', [received, item.id]);
@@ -293,15 +305,19 @@ router.post('/:id/receive', resolveTransfer, requirePermission('transfers.receiv
                         locationId: t.to_location_id, variantId: item.variant_id, qtyChange: qty,
                         unitCost: Number(item.unit_cost), reason: 'transfer_in', ...common,
                     });
+                    receivedValue += qty * Number(item.unit_cost);
                 }
                 await conn.execute('UPDATE stock_transfer_items SET qty_received = ? WHERE id = ?', [qty, item.id]);
             }
         }
 
         await conn.execute(
-            'UPDATE stock_transfers SET status = ?, received_by = ?, received_at = NOW(3), receive_note = ? WHERE id = ?',
-            [complete ? 'received' : 'partially_received', req.user.id, req.body.note || null, t.id]
+            'UPDATE stock_transfers SET status = ?, received_by = ?, received_at = ?, receive_note = ? WHERE id = ?',
+            [complete ? 'received' : 'partially_received', req.user.id, doc.at, req.body.note || null, t.id]
         );
+        await posting.postTransferReceived(conn, ctx, {
+            transferId: t.id, number: t.number, fromLocationId: t.from_location_id, toLocationId: t.to_location_id, value: receivedValue,
+        });
         await logAudit(conn, req, { action: 'receive', entity: 'transfer', entityId: t.id, locationId: t.to_location_id, after: { complete, missing_units: [...missing] } });
         return loadTransfer(conn, t.id);
     });
@@ -323,7 +339,10 @@ router.post('/:id/resolve', resolveTransfer, requirePermission('stock.adjust', {
         const [[t]] = await conn.execute('SELECT * FROM stock_transfers WHERE id = ? FOR UPDATE', [req.transfer.id]);
         if (!['sent', 'partially_received'].includes(t.status)) throw new AppError('Tidak ada barang dalam pengiriman pada transfer ini');
         const full = await loadTransfer(conn, t.id);
-        const ctx = ctxOf(req);
+        const doc = await documentDate(conn, req.body.date, {
+            label: 'Tanggal', notBefore: dateOnly(t.sent_at), notBeforeLabel: 'tanggal kirim',
+        });
+        const ctx = { ...ctxOf(req), occurredAt: doc.at };
         const note = `${t.number}: ${String(req.body.note).trim()}`;
         let settled = 0;
         let lostValue = 0;

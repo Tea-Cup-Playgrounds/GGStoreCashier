@@ -53,12 +53,14 @@ class CartItem {
   }
 
   /// The line as POST /api/sales expects it. Prices of goods come from the catalog on the
-  /// server; services / digital items send the price typed at the counter.
-  Map<String, dynamic> toSaleLine() {
+  /// server; services / digital items send the price typed at the counter. [withPrice] sends the
+  /// price of every line: for a sale priced on this device while offline, so the server records
+  /// what the customer was actually charged.
+  Map<String, dynamic> toSaleLine({bool withPrice = false}) {
     return {
       'variant_id': int.parse(product.id),
       if (product.isSerialized) 'unit_ids': unitIds else 'qty': quantity,
-      if (!product.hasStock) 'unit_price': price,
+      if (withPrice || !product.hasStock) 'unit_price': price,
       if (note != null && note!.isNotEmpty) 'description': note,
     };
   }

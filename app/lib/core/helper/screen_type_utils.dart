@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:gg_store_cashier/core/constants/screen_breakpoints.dart';
 
 ScreenType getScreenType(BuildContext context) {

@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:developer' as dev;
 import 'package:dotted_border/dotted_border.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';

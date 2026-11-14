@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import 'package:gg_store_cashier/features/devices/data/device_service.dart';

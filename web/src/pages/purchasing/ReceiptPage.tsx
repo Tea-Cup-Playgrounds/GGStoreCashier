@@ -80,6 +80,7 @@ function ReceiptEditor({ receipt }: { receipt: Receipt | null }) {
   const [invoiceNo, setInvoiceNo] = useState(receipt?.invoice_no ?? '');
   const [invoiceDate, setInvoiceDate] = useState(receipt?.invoice_date ?? today());
   const [dueDate, setDueDate] = useState(receipt?.due_date ?? '');
+  const [receivedDate, setReceivedDate] = useState(receipt?.received_date ?? today());
   const [note, setNote] = useState(receipt?.note ?? '');
   const [items, setItems] = useState<ItemRow[]>(() => (receipt ? toRows(receipt) : []));
   const [picking, setPicking] = useState(false);
@@ -95,6 +96,7 @@ function ReceiptEditor({ receipt }: { receipt: Receipt | null }) {
     invoice_no: invoiceNo.trim() || null,
     invoice_date: invoiceDate || null,
     due_date: dueDate || null,
+    received_date: receivedDate || null,
     note: note.trim() || null,
     items: items.map((i) => {
       const units = i.isSerialized ? parseUnits(i.identifiers, i.grade) : [];
@@ -192,6 +194,9 @@ function ReceiptEditor({ receipt }: { receipt: Receipt | null }) {
           <Field label="No. faktur"><Input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} /></Field>
           <Field label="Tanggal faktur"><Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} /></Field>
           <Field label="Jatuh tempo"><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
+          <Field label="Tanggal barang diterima" hint="Stok, jurnal, dan nomor memakai tanggal ini">
+            <Input type="date" value={receivedDate} max={today()} onChange={(e) => setReceivedDate(e.target.value)} />
+          </Field>
           <Field label="Catatan"><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         </div>
       </Card>
@@ -266,7 +271,7 @@ function PostedReceipt({ receipt }: { receipt: Receipt }) {
       </Link>
       <PageHeader
         title={receipt.number}
-        description={`${receipt.supplier_name} → ${receipt.location_name} · diposting ${formatDate(receipt.posted_at)} oleh ${receipt.posted_by_name ?? '—'}`}
+        description={`${receipt.supplier_name} → ${receipt.location_name} · diterima ${formatDate(receipt.received_date ?? receipt.posted_at)} · diposting ${formatDate(receipt.posted_at)} oleh ${receipt.posted_by_name ?? '—'}`}
         actions={outstanding > 0.004 && <Button variant="primary" onClick={() => setPaying(true)}>Catat pembayaran</Button>}
       />
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">

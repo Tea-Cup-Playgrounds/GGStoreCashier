@@ -6,7 +6,7 @@ import type { Grade, StockRow } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { LocationSelect, useLocationChoice } from '../../lib/locations';
 import { GRADES, VariantPicker, type PickedVariant } from '../../lib/catalog';
-import { formatRp } from '../../lib/format';
+import { formatRp, today } from '../../lib/format';
 import { Badge, Button, Checkbox, DataTable, Field, Input, Modal, PageHeader, QueryState, Select, Toolbar, useToast } from '../../components/ui';
 
 type Action = { kind: 'adjust' | 'price' | 'units'; row: Pick<StockRow, 'variant_id' | 'name' | 'is_serialized' | 'on_hand' | 'sell_price' | 'location_price' | 'base_price'> };
@@ -125,12 +125,17 @@ function AdjustDialog({ locationId, row, onClose, onSaved }: { locationId: numbe
   const [qty, setQty] = useState('');
   const [unitCost, setUnitCost] = useState('');
   const [note, setNote] = useState('');
+  const [date, setDate] = useState(today());
+  const [opening, setOpening] = useState(false);
   const change = Number(qty);
   const save = useMutation({
     mutationFn: () =>
       api('/stock/adjust', {
         method: 'POST',
-        body: { location_id: locationId, variant_id: row.variant_id, qty_change: change, unit_cost: change > 0 && unitCost !== '' ? Number(unitCost) : undefined, note: note.trim() },
+        body: {
+          location_id: locationId, variant_id: row.variant_id, qty_change: change, note: note.trim(), date, opening,
+          unit_cost: change > 0 && unitCost !== '' ? Number(unitCost) : undefined,
+        },
       }),
     onSuccess: () => {
       toast.success('Stok disesuaikan');
@@ -147,7 +152,12 @@ function AdjustDialog({ locationId, row, onClose, onSaved }: { locationId: numbe
       footer={
         <>
           <Button onClick={onClose}>Batal</Button>
-          <Button variant="primary" loading={save.isPending} disabled={!Number.isInteger(change) || change === 0 || !note.trim()} onClick={() => save.mutate()}>
+          <Button
+            variant="primary"
+            loading={save.isPending}
+            disabled={!Number.isInteger(change) || change === 0 || !note.trim() || (opening && (change < 0 || unitCost === ''))}
+            onClick={() => save.mutate()}
+          >
             Simpan
           </Button>
         </>
@@ -161,9 +171,22 @@ function AdjustDialog({ locationId, row, onClose, onSaved }: { locationId: numbe
         <Field label="HPP per unit" hint="Untuk penambahan; memengaruhi HPP rata-rata">
           <Input type="number" min={0} value={unitCost} onChange={(e) => setUnitCost(e.target.value)} disabled={!(change > 0)} />
         </Field>
-        <Field label="Alasan" className="sm:col-span-2">
+        <Field label="Tanggal">
+          <Input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label="Alasan">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="mis. Stok awal, barang rusak, koreksi hitung" />
         </Field>
+        <div className="sm:col-span-2">
+          <Checkbox
+            label="Stok awal (barang yang sudah ada sebelum memakai sistem)"
+            checked={opening}
+            onChange={(e) => setOpening(e.target.checked)}
+          />
+          <p className="mt-1 text-xs text-stone-500">
+            Nilainya masuk ke Ekuitas Saldo Awal, bukan selisih persediaan. Wajib jumlah positif dan HPP per unit.
+          </p>
+        </div>
       </div>
     </Modal>
   );
@@ -212,6 +235,8 @@ function RegisterUnitsDialog({ locationId, row, onClose, onSaved }: { locationId
   const [units, setUnits] = useState<UnitRow[]>([{ imei1: '', imei2: '', serial_number: '', condition_grade: 'new' }]);
   const [unitCost, setUnitCost] = useState('');
   const [note, setNote] = useState('');
+  const [date, setDate] = useState(today());
+  const [opening, setOpening] = useState(false);
   const save = useMutation({
     mutationFn: () =>
       api<{ message: string }>('/stock/units', {
@@ -220,6 +245,8 @@ function RegisterUnitsDialog({ locationId, row, onClose, onSaved }: { locationId
           location_id: locationId,
           variant_id: row.variant_id,
           note: note.trim() || undefined,
+          date,
+          opening,
           units: units.map((u) => ({
             imei1: u.imei1.trim() || null,
             imei2: u.imei2.trim() || null,
@@ -246,7 +273,7 @@ function RegisterUnitsDialog({ locationId, row, onClose, onSaved }: { locationId
       footer={
         <>
           <Button onClick={onClose}>Batal</Button>
-          <Button variant="primary" loading={save.isPending} disabled={units.length === 0} onClick={() => save.mutate()}>
+          <Button variant="primary" loading={save.isPending} disabled={units.length === 0 || (opening && unitCost === '')} onClick={() => save.mutate()}>
             Daftarkan {units.length} unit
           </Button>
         </>
@@ -260,6 +287,12 @@ function RegisterUnitsDialog({ locationId, row, onClose, onSaved }: { locationId
         <Field label="Catatan">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="mis. Stok awal" />
         </Field>
+        <Field label="Tanggal">
+          <Input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <div className="flex items-end pb-2">
+          <Checkbox label="Stok awal (nilai ke Ekuitas Saldo Awal; HPP wajib)" checked={opening} onChange={(e) => setOpening(e.target.checked)} />
+        </div>
       </div>
       <div className="space-y-2">
         {units.map((u, i) => (

@@ -84,6 +84,12 @@ Hak akses: setiap pengguna punya penugasan di `user_locations` (role per lokasi)
 | `knex_migrations` | Riwayat migrasi (knex). |
 | `knex_migrations_lock` | Kunci migrasi (knex). |
 
+### Belum dideskripsikan
+
+| Tabel | Deskripsi |
+| --- | --- |
+| `expenses` |  |
+
 ---
 
 ## Kolom per tabel
@@ -270,6 +276,7 @@ Relasi: `brand_id` → `brands.id`, `category_id` → `categories.id`, `tax_rate
 | attributes | json | ya |  |  |
 | base_price | decimal(15,2) |  | 0.00 |  |
 | min_price | decimal(15,2) | ya |  |  |
+| cost_price | decimal(15,2) | ya |  |  |
 | is_active | tinyint(1) |  | 1 |  |
 | created_at | datetime | ya | CURRENT_TIMESTAMP |  |
 | updated_at | datetime(3) | ya | CURRENT_TIMESTAMP(3) | index |
@@ -305,7 +312,7 @@ Relasi: `location_id` → `locations.id`, `variant_id` → `product_variants.id`
 | condition_grade | enum('new','A','B','C') |  | new |  |
 | unit_cost | decimal(15,2) |  | 0.00 |  |
 | sell_price | decimal(15,2) | ya |  |  |
-| source_type | enum('purchase','trade_in','adjustment','return') |  |  |  |
+| source_type | enum('purchase','trade_in','adjustment','return','opening') |  |  |  |
 | source_id | char(36) | ya |  |  |
 | sold_sale_line_id | char(36) | ya |  |  |
 | warranty_until | date | ya |  |  |
@@ -325,7 +332,7 @@ Relasi: `location_id` → `locations.id`, `variant_id` → `product_variants.id`
 | unit_id | char(36) | ya |  | index |
 | qty_change | int |  |  |  |
 | unit_cost | decimal(15,2) |  | 0.00 |  |
-| reason | enum('purchase','purchase_return','sale','sale_return','transfer_out','transfer_in','adjustment','opname','trade_in','service_part','write_off') |  |  |  |
+| reason | enum('purchase','purchase_return','sale','sale_return','transfer_out','transfer_in','adjustment','opname','trade_in','service_part','write_off','opening') |  |  |  |
 | ref_type | varchar(30) | ya |  | index |
 | ref_id | varchar(36) | ya |  |  |
 | user_id | int | ya |  | index |
@@ -383,6 +390,7 @@ Relasi: `location_id` → `locations.id`, `unit_id` → `product_units.id`, `use
 | invoice_no | varchar(50) | ya |  |  |
 | invoice_date | date | ya |  |  |
 | due_date | date | ya |  |  |
+| received_date | date | ya |  |  |
 | status | enum('draft','posted') |  | draft |  |
 | subtotal | decimal(15,2) |  | 0.00 |  |
 | tax_total | decimal(15,2) |  | 0.00 |  |
@@ -506,6 +514,7 @@ Relasi: `transfer_item_id` → `stock_transfer_items.id` (cascade), `unit_id` �
 | created_by | int | ya |  |  |
 | approved_by | int | ya |  |  |
 | approved_at | datetime(3) | ya |  |  |
+| adjustment_date | date | ya |  |  |
 | created_at | datetime(3) |  | CURRENT_TIMESTAMP(3) |  |
 | updated_at | datetime(3) |  | CURRENT_TIMESTAMP(3) |  |
 
@@ -765,7 +774,7 @@ Relasi: `closed_by` → `users.id`
 | number | varchar(30) |  |  | UNIQUE |
 | entry_date | date |  |  | index |
 | location_id | int | ya |  | index |
-| source_type | enum('sale','sale_void','sale_return','goods_receipt','supplier_payment','stock_adjustment','opname','transfer','cash_session','expense','manual') |  |  | index |
+| source_type | enum('sale','sale_void','sale_return','goods_receipt','supplier_payment','stock_adjustment','opname','transfer','cash_session','expense','manual','expense_void','opening_balance','pulsa_deposit') |  |  | index |
 | source_id | varchar(36) | ya |  |  |
 | memo | varchar(255) | ya |  |  |
 | status | enum('posted','void') |  | posted |  |
@@ -816,3 +825,26 @@ Relasi: `account_id` → `accounts.id`, `entry_id` → `journal_entries.id` (cas
 | --- | --- | --- | --- | --- |
 | index | int unsigned |  |  | PK, auto |
 | is_locked | int | ya |  |  |
+
+### `expenses`
+
+| Kolom | Tipe | Null | Default | Kunci |
+| --- | --- | --- | --- | --- |
+| id | char(36) |  |  | PK |
+| number | varchar(30) |  |  | UNIQUE |
+| location_id | int | ya |  | index |
+| expense_date | date |  |  |  |
+| account_id | int |  |  | index |
+| amount | decimal(15,2) |  |  |  |
+| paid_from | enum('cash','bank') |  |  |  |
+| payee | varchar(150) | ya |  |  |
+| note | text | ya |  |  |
+| status | enum('posted','void') |  | posted |  |
+| void_reason | text | ya |  |  |
+| voided_by | int | ya |  | index |
+| voided_at | datetime(3) | ya |  |  |
+| created_by | int | ya |  | index |
+| created_at | datetime(3) |  | CURRENT_TIMESTAMP(3) |  |
+| updated_at | datetime(3) |  | CURRENT_TIMESTAMP(3) |  |
+
+Relasi: `account_id` → `accounts.id`, `created_by` → `users.id`, `location_id` → `locations.id`, `voided_by` → `users.id`

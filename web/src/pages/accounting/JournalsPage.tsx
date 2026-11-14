@@ -20,8 +20,14 @@ export const SOURCE_TYPES: Record<string, string> = {
   transfer: 'Transfer',
   cash_session: 'Shift kasir',
   expense: 'Biaya',
+  expense_void: 'Pembatalan biaya',
+  opening_balance: 'Saldo awal',
+  pulsa_deposit: 'Top up deposit pulsa',
   manual: 'Jurnal manual',
 };
+
+/** Journals voided from the journal screen; the rest are voided through their documents. */
+const VOIDABLE_HERE = ['manual', 'opening_balance', 'pulsa_deposit'];
 
 export const useAccounts = () =>
   useQuery({ queryKey: ['accounts'], queryFn: () => api<{ accounts: Account[] }>('/accounting/accounts').then((r) => r.accounts), staleTime: 60_000 });
@@ -98,14 +104,16 @@ export function JournalsPage() {
   );
 }
 
-function JournalDialog({ id, onClose }: { id: string; onClose: () => void }) {
+export function JournalDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const { access } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
+  const locations = useLocations();
   const [reason, setReason] = useState('');
   const journal = useQuery({ queryKey: ['journal', id], queryFn: () => api<{ journal: Journal }>(`/accounting/journals/${id}`).then((r) => r.journal) });
   const j = journal.data;
-  const canVoid = j && j.source_type === 'manual' && j.status === 'posted' && !j.reverses_entry_id && access.can('accounting.post_manual', j.location_id);
+  const canVoid = j && VOIDABLE_HERE.includes(j.source_type) && j.status === 'posted' && !j.reverses_entry_id && access.can('accounting.post_manual', j.location_id);
+  const locationCode = (id: number | null) => (id == null ? 'Pusat' : locations.data?.find((l) => l.id === id)?.code ?? `#${id}`);
   const total = (key: 'debit' | 'credit') => j?.lines.reduce((s, l) => s + toNumber(l[key]), 0) ?? 0;
 
   return (
@@ -150,13 +158,14 @@ function JournalDialog({ id, onClose }: { id: string; onClose: () => void }) {
             rowKey={(l) => l.id}
             columns={[
               { header: 'Akun', cell: (l) => <span><span className="font-mono text-xs">{l.account_code}</span> {l.account_name}</span> },
+              { header: 'Lokasi', cell: (l) => locationCode(l.location_id) },
               { header: 'Keterangan', cell: (l) => l.memo ?? '' },
               { header: 'Debit', align: 'right', cell: (l) => (toNumber(l.debit) ? formatRp(l.debit) : '') },
               { header: 'Kredit', align: 'right', cell: (l) => (toNumber(l.credit) ? formatRp(l.credit) : '') },
             ]}
             footer={
               <tr>
-                <td className="px-3 py-2" colSpan={2}>Total</td>
+                <td className="px-3 py-2" colSpan={3}>Total</td>
                 <td className="num px-3 py-2 text-right">{formatRp(total('debit'))}</td>
                 <td className="num px-3 py-2 text-right">{formatRp(total('credit'))}</td>
               </tr>

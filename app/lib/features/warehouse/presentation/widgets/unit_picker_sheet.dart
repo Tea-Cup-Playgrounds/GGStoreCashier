@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:gg_store_cashier/core/helper/imei_validator.dart';
 import 'package:gg_store_cashier/core/models/catalog.dart';
 import 'package:gg_store_cashier/core/services/catalog_service.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
+import 'package:gg_store_cashier/shared/widgets/barcode_scanner_page.dart';
 
 /// Picks in-stock units of one variant at a location. Scanning (or typing) an IMEI and pressing
 /// enter ticks the matching unit. Returns the selected unit ids, or null when dismissed.
@@ -101,9 +102,17 @@ class _UnitPickerSheetState extends State<UnitPickerSheet> {
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
               onSubmitted: _onScan,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Scan IMEI / serial untuk memilih',
-                prefixIcon: Icon(Icons.qr_code_scanner_rounded),
+                prefixIcon: const Icon(Icons.qr_code_scanner_rounded),
+                suffixIcon: IconButton(
+                  tooltip: 'Scan dengan kamera',
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  onPressed: () async {
+                    final code = await scanWithCamera(context, title: 'Scan IMEI / serial');
+                    if (code != null) _onScan(code);
+                  },
+                ),
                 isDense: true,
               ),
             ),

@@ -193,7 +193,8 @@ const groups = [
       { method: 'POST', path: '/api/sales/quote', auth: 'sales.create', desc: 'Price a cart (PPN-inclusive, vouchers) without saving.', errors: [] },
       {
         method: 'POST', path: '/api/sales', auth: 'sales.create',
-        desc: 'Create a sale (INV-…). Idempotent by client UUID: re-sending the same id returns the stored sale (200). Change only from cash; a customer is required when IMEI units are sold.',
+        desc: 'Create a sale (INV-…). Idempotent by client UUID: re-sending the same id returns the stored sale (200). Change only from cash; a customer is required when IMEI units are sold. ' +
+          'Offline sales (offline: true) already happened, so they are stored as they were: stock may go negative, the charged price / voucher / closed shift stand, and what differs goes to sync_flags.issues for review.',
         body: [
           { name: 'id', type: 'string', required: false, desc: 'Client UUID (offline queue)' },
           loc(),
@@ -203,10 +204,16 @@ const groups = [
           { name: 'payments', type: 'array', required: true, desc: '[{ payment_method_id, amount, reference? }]' },
           { name: 'customer_id | customer', type: 'object', required: false, desc: 'Existing id or { name, phone } to register' },
           { name: 'voucher_code', type: 'string', required: false, desc: '' },
+          { name: 'offline', type: 'boolean', required: false, desc: 'Sale made offline / queued on the device; recorded as it happened' },
+          { name: 'priced_on_device', type: 'boolean', required: false, desc: 'Offline: the device priced the cart; keeps lines[].unit_price and discount. Cash only' },
+          { name: 'discount', type: 'number', required: false, desc: 'Sale-level discount (manual; offline + priced_on_device: the discount the device gave)' },
+          { name: 'cashier_id', type: 'number', required: false, desc: 'Offline: who made the sale, if someone else uploads it' },
+          { name: 'charged_total', type: 'number', required: false, desc: 'Offline: total the device charged (flagged if it differs)' },
         ],
         errors: [{ code: 400, msg: 'Validation / underpaid / unit not available' }, { code: 403, msg: 'No sales.create at location' }],
       },
-      { method: 'GET', path: '/api/sales', auth: 'sales.create', desc: 'Sales at your locations (reports.view_location or sales.void also allowed).', errors: [] },
+      { method: 'GET', path: '/api/sales', auth: 'sales.create', desc: 'Sales at your locations (reports.view_location or sales.void also allowed). ?sync=offline for offline sales, ?sync=issues for offline sales with unchecked differences.', errors: [] },
+      { method: 'POST', path: '/api/sales/:id/sync-review', auth: 'sales.void', desc: 'Mark the differences on an offline sale as checked. Body: { note? }', errors: [] },
       { method: 'GET', path: '/api/sales/:id', auth: 'sales.create', desc: 'One sale with lines, payments and returns.', errors: [] },
       { method: 'POST', path: '/api/sales/:id/void', auth: 'sales.void', desc: 'Void a sale (stock back, journal reversed).', errors: [] },
       { method: 'POST', path: '/api/sales/:id/returns', auth: 'sales.void', desc: 'Return lines (RT-…); returned units can be marked defective.', errors: [] },
@@ -243,11 +250,25 @@ const groups = [
       { method: 'POST', path: '/api/accounting/journals/:id/void', auth: 'accounting.post_manual', desc: 'Void a manual entry by reversal.', errors: [] },
       { method: 'GET', path: '/api/accounting/trial-balance', auth: 'accounting.view', desc: 'Trial balance for a date range.', errors: [] },
       { method: 'GET', path: '/api/accounting/profit-loss', auth: 'accounting.view', desc: 'Profit & loss.', errors: [] },
+      { method: 'GET', path: '/api/accounting/balance-sheet', auth: 'accounting.view', desc: 'Balance sheet (Neraca) at ?to= (default today) and ?location_id=. Profit of this year and earlier years is computed from income/expense accounts; totals.difference is 0 when balanced.', errors: [] },
+      { method: 'GET', path: '/api/accounting/ledger', auth: 'accounting.view', desc: 'General ledger (Buku Besar) of ?account_id= between ?from=&to=: opening, lines with running balance, closing (max 5000 lines, then truncated: true).', errors: [] },
+      { method: 'POST', path: '/api/accounting/opening-balances', auth: 'accounting.post_manual', desc: 'Opening balances. Body: { date, location_id?, memo?, lines: [{ account_code, debit | credit }] }. Balance-sheet accounts only (stock: opening stock instead); the difference goes to 3-3000 Ekuitas Saldo Awal.', errors: [] },
       { method: 'GET', path: '/api/accounting/periods', auth: 'accounting.view', desc: 'Accounting periods.', errors: [] },
       { method: 'POST', path: '/api/accounting/periods/:year/:month/close', auth: 'accounting.close_period', desc: 'Close a month.', errors: [] },
       { method: 'POST', path: '/api/accounting/periods/:year/:month/reopen', auth: 'accounting.close_period', desc: 'Reopen a month.', errors: [] },
       { method: 'GET', path: '/api/accounting/mappings', auth: 'accounting.view', desc: 'Which account each posting rule uses.', errors: [] },
       { method: 'PUT', path: '/api/accounting/mappings', auth: 'settings.manage', desc: 'Change account mappings.', errors: [] },
+    ]
+  },
+  {
+    name: 'Expenses & pulsa deposit', icon: '💸', prefix: '/api/expenses',
+    endpoints: [
+      { method: 'GET', path: '/api/expenses/categories', auth: 'expenses.manage | accounting.view', desc: 'Expense categories (expense accounts the system does not book itself).', errors: [] },
+      { method: 'GET', path: '/api/expenses', auth: 'expenses.manage | accounting.view', desc: 'Expenses (?location_id, from, to, account_id, status) with total and per-category totals.', errors: [] },
+      { method: 'POST', path: '/api/expenses', auth: 'expenses.manage', desc: 'Record an expense (EXP-…). Body: { location_id?, date, account_id | account_code, amount, paid_from: cash | bank, payee?, note? }. Posts Dr expense / Cr cash or bank.', errors: [] },
+      { method: 'POST', path: '/api/expenses/:id/void', auth: 'expenses.manage', desc: 'Void an expense with a reversing journal. Body: { reason }', errors: [] },
+      { method: 'GET', path: '/api/pulsa-deposit', auth: 'expenses.manage | accounting.view', desc: 'Pulsa deposit: current balance, top-ups and monthly usage (?location_id, from, to).', errors: [] },
+      { method: 'POST', path: '/api/pulsa-deposit/top-ups', auth: 'expenses.manage', desc: 'Top up the deposit. Body: { location_id?, date, amount, paid_from: cash | bank, note? }. Each pulsa sale uses the deposit at its variant cost_price.', errors: [] },
     ]
   },
   {

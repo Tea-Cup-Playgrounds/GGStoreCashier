@@ -68,7 +68,8 @@ const postEntry = async (conn, ctx, { date, locationId = null, sourceType, sourc
         if (!account.is_active) throw new AppError(`Akun ${account.code} tidak aktif`);
     }
 
-    let entryDate = dateOnly(date);
+    // Without an explicit date the entry takes its document's date (ctx.occurredAt), else today.
+    let entryDate = dateOnly(date ?? ctx.occurredAt);
     if (await isPeriodClosed(conn, entryDate)) {
         if (strict) throw new AppError(`Periode ${entryDate.slice(0, 7)} sudah ditutup`);
         entryDate = dateOnly();
@@ -76,7 +77,7 @@ const postEntry = async (conn, ctx, { date, locationId = null, sourceType, sourc
     }
 
     const id = uuidv7();
-    const number = await nextDocumentNumber(conn, 'JV', locationId);
+    const number = await nextDocumentNumber(conn, 'JV', locationId, entryDate);
     await conn.execute(
         `INSERT INTO journal_entries (id, number, entry_date, location_id, source_type, source_id, memo, reverses_entry_id, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -120,4 +121,4 @@ const hasEntry = async (conn, sourceType, sourceId) => {
     return rows.length > 0;
 };
 
-module.exports = { postEntry, reverseSource, hasEntry, resolveAccount, dateOnly, toCents, fromCents };
+module.exports = { postEntry, reverseSource, hasEntry, resolveAccount, dateOnly, isPeriodClosed, toCents, fromCents };

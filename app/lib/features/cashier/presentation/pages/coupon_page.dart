@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/voucher_service.dart';
@@ -41,6 +41,8 @@ class _CouponPageState extends State<CouponPage> {
           'discount': voucher.discountType == 'percent' ? voucher.discountValue : null,
           'fixedDiscount': voucher.discountType == 'fixed' ? voucher.discountValue : null,
           'discountType': voucher.discountType,
+          'targetType': voucher.targetType,
+          'targetId': voucher.targetId,
           'description': voucher.description ?? voucher.discountLabel,
         });
       }

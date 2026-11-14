@@ -18,9 +18,11 @@
     "migrate:status": "knex --knexfile API/knexfile.js migrate:status",
     "migrate:make": "knex --knexfile API/knexfile.js migrate:make",
     "seed": "knex --knexfile API/knexfile.js seed:run",
+    "seed:demo-year": "node API/scripts/demo-year.js",
     "accounting:backfill": "node API/scripts/backfill-journals.js",
     "db:docs": "node API/scripts/schema-doc.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test \"API/test/*.test.js\"",
+    "test:integration": "node --test --test-concurrency=1 \"API/test/integration/*.test.js\""
   },
   "keywords": [],
   "author": "",

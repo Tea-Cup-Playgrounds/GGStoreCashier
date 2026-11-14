@@ -129,6 +129,9 @@ class SaleResult {
   final double changeTotal;
   final String? customerName;
 
+  /// The whole sale as the API returned it (lines, payments, location...), for the receipt.
+  final Map<String, dynamic> json;
+
   const SaleResult({
     required this.id,
     required this.number,
@@ -138,9 +141,11 @@ class SaleResult {
     this.paidTotal = 0,
     this.changeTotal = 0,
     this.customerName,
+    this.json = const {},
   });
 
   factory SaleResult.fromJson(Map<String, dynamic> json) => SaleResult(
+        json: json,
         id: json['id'].toString(),
         number: json['number']?.toString() ?? '',
         grandTotal: parseDouble(json['grand_total']),

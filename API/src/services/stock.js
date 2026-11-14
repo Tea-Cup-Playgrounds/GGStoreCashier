@@ -118,16 +118,17 @@ const lockLevel = async (conn, locationId, variantId) => {
     return { qty: Number(level.qty), avgCost: Number(level.avg_cost) };
 };
 
+// A movement is dated by its document (ctx.occurredAt: goods received, item returned...) or now.
 const writeMovement = async (conn, ctx, m) => {
     const id = uuidv7();
     await conn.execute(
         `INSERT INTO stock_movements
-            (id, location_id, variant_id, unit_id, qty_change, unit_cost, reason, ref_type, ref_id, user_id, device_id, note)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, location_id, variant_id, unit_id, qty_change, unit_cost, reason, ref_type, ref_id, user_id, device_id, note, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             id, m.locationId, m.variantId, m.unitId || null, m.qtyChange, toMoney(m.unitCost || 0), m.reason,
             m.refType || null, m.refId === undefined || m.refId === null ? null : String(m.refId),
-            ctx.userId || null, ctx.deviceId || null, m.note || null,
+            ctx.userId || null, ctx.deviceId || null, m.note || null, ctx.occurredAt || new Date(),
         ]
     );
     return id;

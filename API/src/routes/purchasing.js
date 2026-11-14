@@ -9,6 +9,8 @@ const { AppError, withTransaction } = require('../utils/transaction');
 const { ctxOf, requireLocation, parseDate, parseMoney } = require('../utils/request');
 const { uuidv7 } = require('../utils/uuid');
 const posting = require('../services/posting');
+const { documentDate } = require('../services/documentDate');
+const { dateOnly } = require('../services/journal');
 
 const router = express.Router();
 
@@ -195,6 +197,7 @@ router.get('/receipts', requirePermission('purchases.manage'), async (req, res) 
 const loadReceipt = async (db, id) => {
     const [[receipt]] = await db.execute(
         `SELECT r.*, DATE_FORMAT(r.invoice_date, '%Y-%m-%d') AS invoice_date, DATE_FORMAT(r.due_date, '%Y-%m-%d') AS due_date,
+                DATE_FORMAT(r.received_date, '%Y-%m-%d') AS received_date,
                 s.name AS supplier_name, s.code AS supplier_code, l.code AS location_code, l.name AS location_name,
                 l.type AS location_type, ${paymentStatusSql} AS payment_status,
                 cu.name AS created_by_name, pu.name AS posted_by_name
@@ -257,6 +260,8 @@ const readReceiptBody = async (conn, body) => {
     const invoiceDate = parseDate(body.invoice_date);
     const dueDate = parseDate(body.due_date);
     if (invoiceDate === undefined || dueDate === undefined) throw new AppError('Format tanggal harus YYYY-MM-DD');
+    // The day the goods arrived: their stock movements, journal and number use it (default today).
+    const received = await documentDate(conn, body.received_date, { label: 'Tanggal terima' });
 
     if (!Array.isArray(body.items) || body.items.length === 0) throw new AppError('Minimal satu barang wajib diisi');
     if (body.items.length > 300) throw new AppError('Maksimal 300 baris per penerimaan');
@@ -302,6 +307,7 @@ const readReceiptBody = async (conn, body) => {
         invoiceNo: body.invoice_no ? String(body.invoice_no).trim().slice(0, 50) : null,
         invoiceDate,
         dueDate,
+        receivedDate: received.date,
         note: body.note ? String(body.note) : null,
         items,
         subtotal: round2(items.reduce((s, i) => s + i.subtotal, 0)),
@@ -334,12 +340,12 @@ router.post('/receipts', requirePermission('purchases.manage'), requireLocation,
     const result = await withTransaction(res, 'Gagal membuat penerimaan barang', async (conn) => {
         const data = await readReceiptBody(conn, req.body);
         const id = uuidv7();
-        const number = await nextDocumentNumber(conn, 'GR', req.locationId);
+        const number = await nextDocumentNumber(conn, 'GR', req.locationId, data.receivedDate);
         await conn.execute(
-            `INSERT INTO goods_receipts (id, number, supplier_id, location_id, invoice_no, invoice_date, due_date,
+            `INSERT INTO goods_receipts (id, number, supplier_id, location_id, invoice_no, invoice_date, due_date, received_date,
                                          subtotal, tax_total, grand_total, note, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, number, data.supplierId, req.locationId, data.invoiceNo, data.invoiceDate, data.dueDate,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, number, data.supplierId, req.locationId, data.invoiceNo, data.invoiceDate, data.dueDate, data.receivedDate,
                 data.subtotal, data.taxTotal, round2(data.subtotal + data.taxTotal), data.note, req.user.id]
         );
         await writeReceiptItems(conn, id, data.items);
@@ -356,10 +362,10 @@ router.put('/receipts/:id', resolveReceipt, requirePermission('purchases.manage'
         if (receipt.status !== 'draft') throw new AppError('Penerimaan yang sudah diposting tidak dapat diubah');
         const data = await readReceiptBody(conn, req.body);
         await conn.execute(
-            `UPDATE goods_receipts SET supplier_id = ?, invoice_no = ?, invoice_date = ?, due_date = ?, note = ?,
+            `UPDATE goods_receipts SET supplier_id = ?, invoice_no = ?, invoice_date = ?, due_date = ?, received_date = ?, note = ?,
                                        subtotal = ?, tax_total = ?, grand_total = ?
              WHERE id = ?`,
-            [data.supplierId, data.invoiceNo, data.invoiceDate, data.dueDate, data.note,
+            [data.supplierId, data.invoiceNo, data.invoiceDate, data.dueDate, data.receivedDate, data.note,
                 data.subtotal, data.taxTotal, round2(data.subtotal + data.taxTotal), receipt.id]
         );
         await writeReceiptItems(conn, receipt.id, data.items);
@@ -387,7 +393,10 @@ router.post('/receipts/:id/post', resolveReceipt, requirePermission('purchases.m
         const [[receipt]] = await conn.execute('SELECT * FROM goods_receipts WHERE id = ? FOR UPDATE', [req.params.id]);
         if (receipt.status !== 'draft') throw new AppError('Penerimaan ini sudah diposting');
         const [[location]] = await conn.execute('SELECT type FROM locations WHERE id = ?', [receipt.location_id]);
-        const ctx = ctxOf(req);
+        // Checked again: the receive date's period may have been closed since the draft was made.
+        const doc = await documentDate(conn, receipt.received_date ? dateOnly(receipt.received_date) : null, { label: 'Tanggal terima' });
+        await conn.execute('UPDATE goods_receipts SET received_date = ? WHERE id = ?', [doc.date, receipt.id]);
+        const ctx = { ...ctxOf(req), occurredAt: doc.at };
         const full = await loadReceipt(conn, receipt.id);
 
         for (const item of full.items) {
@@ -437,12 +446,12 @@ router.post('/payments', async (req, res, next) => {
     }
 }, requirePermission('purchases.manage', { location: (req) => req.receiptLocationId }), async (req, res) => {
     const amount = parseMoney(req.body.amount);
-    const paidAt = parseDate(req.body.paid_at) ?? new Date().toISOString().slice(0, 10);
     if (Number.isNaN(amount) || amount <= 0) return res.status(400).json({ error: 'Jumlah pembayaran harus lebih dari 0' });
     if (!PAYMENT_METHODS.includes(req.body.method)) return res.status(400).json({ error: 'Metode harus cash, transfer, giro, atau other' });
-    if (paidAt === undefined) return res.status(400).json({ error: 'Format tanggal harus YYYY-MM-DD' });
 
     const result = await withTransaction(res, 'Gagal mencatat pembayaran', async (conn) => {
+        // Local date (not UTC), not in the future or a closed period.
+        const paidAt = (await documentDate(conn, req.body.paid_at, { label: 'Tanggal bayar' })).date;
         const [[receipt]] = await conn.execute('SELECT * FROM goods_receipts WHERE id = ? FOR UPDATE', [req.body.receipt_id]);
         if (receipt.status !== 'posted') throw new AppError('Hanya penerimaan yang sudah diposting yang dapat dibayar');
         const outstanding = round2(Number(receipt.grand_total) - Number(receipt.paid_total));

@@ -18,6 +18,10 @@ class SalesService {
   static Future<SaleResult> createSale(Map<String, dynamic> body) async =>
       ApiClient.one(await ApiClient.request('POST', '/api/sales', data: body), 'sale', SaleResult.fromJson);
 
+  /// One sale with its lines, payments and location (for showing or reprinting the receipt).
+  static Future<SaleResult> getSale(String id) async =>
+      ApiClient.one(await ApiClient.request('GET', '/api/sales/$id'), 'sale', SaleResult.fromJson);
+
   // ── customers ─────────────────────────────────────────────────────────────
 
   static Future<List<Customer>> searchCustomers(String query) async {

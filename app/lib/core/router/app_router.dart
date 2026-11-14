@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
@@ -16,6 +16,7 @@ import 'package:gg_store_cashier/features/inventory/presentation/pages/product_f
 import 'package:gg_store_cashier/features/settings/presentation/pages/appearance_page.dart';
 import 'package:gg_store_cashier/features/inventory/presentation/pages/category_form_page.dart';
 import 'package:gg_store_cashier/features/cashier/presentation/pages/coupon_page.dart';
+import 'package:gg_store_cashier/features/sync/presentation/pages/sync_queue_page.dart';
 import 'package:gg_store_cashier/features/settings/presentation/pages/branch_edit_page.dart';
 import 'package:gg_store_cashier/features/users/presentation/pages/user_management_page.dart';
 import 'package:gg_store_cashier/features/vouchers/presentation/pages/voucher_management_page.dart';
@@ -41,6 +42,7 @@ mixin AppRouter {
   static const String branchEdit = '/branch/edit/:id';
   static const String voucherManagement = '/vouchers';
   static const String cashierCoupon = '/cashier/coupon';
+  static const String syncQueue = '/sync';
   static const String categoryForm = '/inventory/category/form';
   static const String voucherCreate = '/vouchers/new';
   static const String voucherEdit = '/vouchers/edit/:id';
@@ -174,6 +176,12 @@ mixin AppRouter {
         name: 'cashierCoupon',
         pageBuilder: (context, state) =>
             TransitionFactory.getSlideBuilder(context: context, state: state, child: const CouponPage()),
+      ),
+      GoRoute(
+        path: AppRouter.syncQueue,
+        name: 'syncQueue',
+        pageBuilder: (context, state) =>
+            TransitionFactory.getSlideBuilder(context: context, state: state, child: const SyncQueuePage()),
       ),
       // Pages with bottom nav scaffold
       StatefulShellRoute.indexedStack(

@@ -4,6 +4,8 @@ class Product {
   final String id;
   final String name;
   final String? barcode;
+  /// Variant SKU; scanning or typing it finds the product just like the barcode.
+  final String? sku;
   final int? categoryId;
   final double costPrice;
   final double sellPrice;
@@ -24,6 +26,7 @@ class Product {
     required this.id,
     required this.name,
     this.barcode,
+    this.sku,
     this.categoryId,
     required this.costPrice,
     required this.sellPrice,
@@ -45,7 +48,8 @@ class Product {
     return Product(
       id: v.id.toString(),
       name: p.variantLabel(v),
-      barcode: v.barcode ?? v.sku,
+      barcode: v.barcode,
+      sku: v.sku,
       categoryId: p.categoryId,
       costPrice: v.avgCost ?? 0,
       sellPrice: v.price,
@@ -73,6 +77,7 @@ class Product {
       id: json['id'].toString(),
       name: json['name'] as String,
       barcode: json['barcode'] as String?,
+      sku: json['sku'] as String?,
       categoryId: json['category_id'] as int?,
       costPrice: parsePrice(json['cost_price']),
       sellPrice: parsePrice(json['sell_price']),
@@ -94,6 +99,7 @@ class Product {
       'id': id,
       'name': name,
       'barcode': barcode,
+      'sku': sku,
       'category_id': categoryId,
       'cost_price': costPrice,
       'sell_price': sellPrice,
@@ -130,6 +136,7 @@ class Product {
       id: id ?? this.id,
       name: name ?? this.name,
       barcode: barcode ?? this.barcode,
+      sku: sku,
       categoryId: categoryId ?? this.categoryId,
       costPrice: costPrice ?? this.costPrice,
       sellPrice: sellPrice ?? this.sellPrice,
