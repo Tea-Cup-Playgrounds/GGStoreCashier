@@ -1,6 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gg_store_cashier/core/models/access.dart';
+import 'package:gg_store_cashier/core/provider/access_provider.dart';
+import 'package:gg_store_cashier/core/router/app_router.dart';
 import 'package:gg_store_cashier/core/services/connectivity_monitor.dart';
+import 'package:gg_store_cashier/features/finance/presentation/pages/finance_page.dart';
 import 'package:gg_store_cashier/core/services/notification_service.dart';
 import 'package:gg_store_cashier/core/services/offline_queue.dart';
 import 'package:gg_store_cashier/core/services/sync_service.dart';
@@ -54,6 +58,11 @@ class _ScaffoldWithBottomNavbarState extends ConsumerState<ScaffoldWithBottomNav
   }
 
   void _onTap(int index) {
+    // Tapping the open tab again returns to its first screen, also when screens were pushed with
+    // Navigator.push (finance and warehouse pages), which the route reset alone leaves in place.
+    if (index == widget.navigationShell.currentIndex) {
+      _branchNavigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+    }
     widget.navigationShell.goBranch(
       index,
       initialLocation: index == widget.navigationShell.currentIndex,
@@ -114,16 +123,14 @@ class _PortraitLayout extends ConsumerWidget {
             height: 80,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: _navItems(pendingCount).asMap().entries.map((e) {
-                final i = e.key;
-                final item = e.value;
+              children: _navItems(pendingCount, ref.watch(currentAccessProvider)).map((item) {
                 return _BottomNavItem(
                   icon: item.icon,
                   activeIcon: item.activeIcon,
                   label: item.label,
-                  isActive: currentIndex == i,
+                  isActive: currentIndex == item.branch,
                   badgeCount: item.badge,
-                  onTap: () => onTap(i),
+                  onTap: () => onTap(item.branch),
                 );
               }).toList(),
             ),
@@ -150,7 +157,8 @@ class _LandscapeLayout extends ConsumerWidget {
     final pendingCount = ref.watch(pendingOfflineCountProvider).valueOrNull ?? 0;
     final cs = Theme.of(context).colorScheme;
     final currentIndex = navigationShell.currentIndex;
-    final items = _navItems(pendingCount);
+    final items = _navItems(pendingCount, ref.watch(currentAccessProvider));
+    final selected = items.indexWhere((i) => i.branch == currentIndex);
 
     return Scaffold(
       body: SafeArea(
@@ -169,8 +177,8 @@ class _LandscapeLayout extends ConsumerWidget {
                       ),
                     ),
                     child: NavigationRail(
-                      selectedIndex: currentIndex,
-                      onDestinationSelected: onTap,
+                      selectedIndex: selected < 0 ? null : selected,
+                      onDestinationSelected: (position) => onTap(items[position].branch),
                       backgroundColor: cs.surface,
                       labelType: NavigationRailLabelType.all,
                       selectedIconTheme: const IconThemeData(color: AppTheme.gold, size: 22),
@@ -218,19 +226,32 @@ class _LandscapeLayout extends ConsumerWidget {
 
 // ── Shared nav item data ──────────────────────────────────────────────────────
 
+/// Navigator of each StatefulShellBranch, in branch order (see AppRouter).
+final _branchNavigatorKeys = [
+  AppRouter.homeNavKey,
+  AppRouter.cashierNavKey,
+  AppRouter.inventoryNavKey,
+  AppRouter.settingsNavKey,
+  AppRouter.financeNavKey,
+];
+
 class _NavItemData {
   final IconData icon;
   final IconData activeIcon;
   final String label;
   final int badge;
-  const _NavItemData(this.icon, this.activeIcon, this.label, {this.badge = 0});
+  /// Index of the StatefulShellBranch the item opens (see AppRouter); the display order differs
+  /// because Finance (branch 4) sits before Settings and is hidden without finance access.
+  final int branch;
+  const _NavItemData(this.icon, this.activeIcon, this.label, {required this.branch, this.badge = 0});
 }
 
-List<_NavItemData> _navItems(int pendingCount) => [
-      const _NavItemData(Icons.home_outlined, Icons.home, 'Home'),
-      _NavItemData(Icons.shopping_cart_outlined, Icons.shopping_cart, 'Cashier', badge: pendingCount),
-      const _NavItemData(Icons.inventory_2_outlined, Icons.inventory_2, 'Inventory'),
-      const _NavItemData(Icons.settings_outlined, Icons.settings, 'Settings'),
+List<_NavItemData> _navItems(int pendingCount, UserAccess access) => [
+      const _NavItemData(Icons.home_outlined, Icons.home, 'Home', branch: 0),
+      _NavItemData(Icons.shopping_cart_outlined, Icons.shopping_cart, 'Cashier', branch: 1, badge: pendingCount),
+      const _NavItemData(Icons.inventory_2_outlined, Icons.inventory_2, 'Inventory', branch: 2),
+      if (canUseFinance(access)) const _NavItemData(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Finance', branch: 4),
+      const _NavItemData(Icons.settings_outlined, Icons.settings, 'Settings', branch: 3),
     ];
 
 // ── Portrait bottom nav item widget ──────────────────────────────────────────

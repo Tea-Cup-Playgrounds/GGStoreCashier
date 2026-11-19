@@ -73,7 +73,7 @@ export function TransfersPage() {
             { header: 'Status', cell: (t) => <Badge tone={TRANSFER_STATUS[t.status][1]}>{TRANSFER_STATUS[t.status][0]}</Badge> },
             { header: 'Dibuat', cell: (t) => formatDateTime(t.created_at) },
             { header: 'Dikirim', cell: (t) => formatDateTime(t.sent_at) },
-            { header: 'Catatan', cell: (t) => <span className="text-stone-600">{t.note ?? ''}</span> },
+            { header: 'Catatan', wrap: true, cell: (t) => <span className="text-stone-600">{t.note ?? ''}</span> },
           ]}
         />
       </QueryState>

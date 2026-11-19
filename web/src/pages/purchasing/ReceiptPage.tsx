@@ -274,7 +274,7 @@ function PostedReceipt({ receipt }: { receipt: Receipt }) {
         description={`${receipt.supplier_name} → ${receipt.location_name} · diterima ${formatDate(receipt.received_date ?? receipt.posted_at)} · diposting ${formatDate(receipt.posted_at)} oleh ${receipt.posted_by_name ?? '—'}`}
         actions={outstanding > 0.004 && <Button variant="primary" onClick={() => setPaying(true)}>Catat pembayaran</Button>}
       />
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
         <Card><div className="text-xs text-stone-500">Total</div><div className="num text-lg font-semibold">{formatRp(receipt.grand_total)}</div><div className="text-xs text-stone-500">PPN {formatRp(receipt.tax_total)}</div></Card>
         <Card><div className="text-xs text-stone-500">Dibayar</div><div className="num text-lg font-semibold">{formatRp(receipt.paid_total)}</div></Card>
         <Card><div className="text-xs text-stone-500">Sisa hutang</div><div className="num text-lg font-semibold">{formatRp(outstanding)}</div></Card>

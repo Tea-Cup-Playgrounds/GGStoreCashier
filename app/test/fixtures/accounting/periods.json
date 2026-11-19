@@ -1,0 +1,88 @@
+{
+ "periods": [
+  {
+   "year": 2026,
+   "month": 10,
+   "status": "closed",
+   "closed_at": "2026-11-07T22:05:00.864Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 9,
+   "status": "closed",
+   "closed_at": "2026-10-07T22:05:00.267Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 8,
+   "status": "closed",
+   "closed_at": "2026-09-07T22:05:00.204Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 7,
+   "status": "closed",
+   "closed_at": "2026-08-07T22:05:00.842Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 6,
+   "status": "closed",
+   "closed_at": "2026-07-07T22:05:00.488Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 5,
+   "status": "closed",
+   "closed_at": "2026-06-07T22:05:00.390Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 4,
+   "status": "closed",
+   "closed_at": "2026-05-07T22:05:00.529Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 3,
+   "status": "closed",
+   "closed_at": "2026-04-07T22:05:00.549Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 2,
+   "status": "closed",
+   "closed_at": "2026-03-07T22:05:00.642Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2026,
+   "month": 1,
+   "status": "closed",
+   "closed_at": "2026-02-07T22:05:00.692Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2025,
+   "month": 12,
+   "status": "closed",
+   "closed_at": "2026-01-07T22:05:00.541Z",
+   "closed_by_name": "Akuntan"
+  },
+  {
+   "year": 2025,
+   "month": 11,
+   "status": "closed",
+   "closed_at": "2025-12-07T22:05:00.547Z",
+   "closed_by_name": "Akuntan"
+  }
+ ]
+}

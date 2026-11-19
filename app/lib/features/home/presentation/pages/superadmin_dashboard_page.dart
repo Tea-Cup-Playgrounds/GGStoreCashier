@@ -1,58 +1,40 @@
-// ignore_for_file: library_private_types_in_public_api
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
+
+import '../../../../core/helper/currency_formatter.dart';
+import '../../../../core/models/business_overview.dart';
+import '../../../../core/provider/auth_provider.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/services/analytics_service.dart';
 import '../../../../core/services/connectivity_monitor.dart';
 import '../../../../core/services/location_service.dart';
-import '../../../../core/helper/currency_formatter.dart';
-import '../../../../core/helper/date_formatter.dart';
-import '../../../../core/provider/auth_provider.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/live_clock.dart';
 
-const _palette = [
-  Color(0xFFD4AF37),
-  Color(0xFF6366F1),
-  Color(0xFF10B981),
-  Color(0xFFF59E0B),
-  Color(0xFFEF4444),
-  Color(0xFF8B5CF6),
-  Color(0xFF06B6D4),
-  Color(0xFFF97316),
-];
-
-const _periods = [
-  _Period('7 Days', 7),
-  _Period('14 Days', 14),
-  _Period('30 Days', 30),
-  _Period('90 Days', 90),
-];
-
-class _Period {
-  final String label;
-  final int days;
-  const _Period(this.label, this.days);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
+/// Owner home: "how is the business doing, and does anything need me?"
+///
+/// Reading order follows the owner's questions: today (with a fair comparison), this month,
+/// what needs action, then performance over one period that every chart below shares.
 class SuperAdminDashboardPage extends ConsumerStatefulWidget {
   const SuperAdminDashboardPage({super.key});
+
   @override
-  ConsumerState<SuperAdminDashboardPage> createState() => _DashState();
+  ConsumerState<SuperAdminDashboardPage> createState() => _SuperAdminDashboardPageState();
 }
 
-class _DashState extends ConsumerState<SuperAdminDashboardPage> {
-  bool _loading = true;
-  bool _isDataStale = false;
-  String? _error;
-  Map<String, dynamic>? _summary;
-  List<Map<String, dynamic>> _trend = [], _branch = [], _cat = [], _top = [];
-  int _trendDays = 30, _catDays = 30;
-  String _branchDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+class _SuperAdminDashboardPageState extends ConsumerState<SuperAdminDashboardPage> {
+  static const _periods = [7, 30, 90];
+
+  int _days = 7;
+  OverviewResult? _result;
+  bool _refreshing = false;
+  bool _failed = false;
 
   StreamSubscription<ConnectivityStatus>? _connectivitySub;
   ConnectivityStatus? _lastConnectivity;
@@ -62,9 +44,10 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
     super.initState();
     _load();
     LocationService.requestPermission();
+    // Back online after an outage: replace the cached copy with fresh numbers.
     _connectivitySub = ConnectivityMonitor.instance.statusStream.listen((status) {
       if (_lastConnectivity == ConnectivityStatus.offline && status == ConnectivityStatus.online) {
-        _load();
+        _load(force: true);
       }
       _lastConnectivity = status;
     });
@@ -76,638 +59,1016 @@ class _DashState extends ConsumerState<SuperAdminDashboardPage> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool force = false}) async {
     setState(() {
-      _loading = true;
-      _error = null;
+      _refreshing = true;
+      _failed = false;
     });
     try {
-      final r = await Future.wait([
-        AnalyticsService.getSummary(),
-        AnalyticsService.getRevenueTrend(_trendDays),
-        AnalyticsService.getBranchRevenue(_branchDate),
-        AnalyticsService.getCategorySales(_catDays),
-        AnalyticsService.getTopProducts(30),
-      ]);
-      if (mounted) {
-        setState(() {
-          _summary = r[0] as Map<String, dynamic>;
-          _trend = r[1] as List<Map<String, dynamic>>;
-          _branch = r[2] as List<Map<String, dynamic>>;
-          _cat = r[3] as List<Map<String, dynamic>>;
-          _top = r[4] as List<Map<String, dynamic>>;
-          _isDataStale = false;
-          _loading = false;
-        });
+      final result = await AnalyticsService.getOverview(_days, forceRefresh: force);
+      if (!mounted) return;
+      setState(() => _result = result);
+    } catch (_) {
+      if (!mounted) return;
+      if (_result == null) {
+        setState(() => _failed = true);
+      } else {
+        // Keep what is on screen; say so instead of replacing it with an error page.
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Gagal memperbarui. Data yang tampil adalah data terakhir.'),
+          behavior: SnackBarBehavior.floating,
+        ));
       }
-    } catch (e) {
-      if (mounted) {
-        if (_summary != null) {
-          // We have previous data — show it as stale instead of error
-          setState(() {
-            _isDataStale = true;
-            _loading = false;
-          });
-        } else {
-          setState(() {
-            _error = e.toString();
-            _loading = false;
-          });
-        }
-      }
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
     }
   }
 
-  Future<void> _reloadTrend() async {
-    final d = await AnalyticsService.getRevenueTrend(_trendDays, forceRefresh: true);
-    if (mounted) setState(() => _trend = d);
-  }
-
-  Future<void> _reloadBranch() async {
-    final d = await AnalyticsService.getBranchRevenue(_branchDate, forceRefresh: true);
-    if (mounted) setState(() => _branch = d);
-  }
-
-  Future<void> _reloadCat() async {
-    final d = await AnalyticsService.getCategorySales(_catDays, forceRefresh: true);
-    if (mounted) setState(() => _cat = d);
+  void _selectPeriod(int days) {
+    if (days == _days) return;
+    setState(() => _days = days);
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authProvider).user;
+    final name = ref.watch(authProvider).user?.name ?? 'Owner';
+    final result = _result;
 
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.gold));
-    }
-    if (_error != null) {
-      return Center(
-          child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.error_outline, size: 56, color: AppTheme.destructive),
-          const SizedBox(height: 16),
-          Text('Gagal memuat analitik', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(_error!,
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Coba Lagi')),
-        ]),
-      ));
+    if (result == null) {
+      return SafeArea(child: _failed ? _ErrorState(onRetry: () => _load(force: true)) : const _DashboardSkeleton());
     }
 
-    // RefreshIndicator directly on CustomScrollView — no PullToRefresh wrapper
+    final data = result.data;
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(force: true),
         color: AppTheme.gold,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _buildHeader(user?.name ?? 'SuperAdmin'),
-                  const SizedBox(height: 20),
-                  _buildKpiGrid(),
-                  const SizedBox(height: 24),
-                  _buildCard(
-                    title: 'Tren Pendapatan',
-                    subtitle: 'Pendapatan harian — semua cabang',
-                    trailing: _periodDrop(_trendDays, (v) {
-                      setState(() => _trendDays = v);
-                      _reloadTrend();
-                    }),
-                    child: SizedBox(
-                      height: 220,
-                      child: _trend.isEmpty
-                          ? _emptyState('Tidak ada data pendapatan untuk periode ini')
-                          : _TrendChart(data: _trend),
+        child: LayoutBuilder(builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 840;
+          final gap = wide ? 20.0 : 16.0;
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(wide ? 24 : 16, 12, wide ? 24 : 16, 100),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _Header(
+                            name: name,
+                            fetchedAt: result.fetchedAt,
+                            refreshing: _refreshing,
+                            onRefresh: () => _load(force: true),
+                          ),
+                          if (result.stale) ...[
+                            const SizedBox(height: 12),
+                            _StaleBanner(fetchedAt: result.fetchedAt, onRetry: () => _load(force: true)),
+                          ],
+                          SizedBox(height: gap),
+                          _pair(
+                            wide,
+                            gap,
+                            _TodayCard(today: data.today, activeBranches: data.activeBranchesToday, branchCount: data.branches.length),
+                            _MonthCard(month: data.month),
+                            flex: (3, 2),
+                          ),
+                          SizedBox(height: gap),
+                          _AttentionCard(attention: data.attention),
+                          SizedBox(height: gap + 8),
+                          _PeriodHeader(
+                            days: _days,
+                            periods: _periods,
+                            from: data.period.from,
+                            to: data.period.to,
+                            onChanged: _selectPeriod,
+                          ),
+                          const SizedBox(height: 12),
+                          AnimatedOpacity(
+                            duration: const Duration(milliseconds: 150),
+                            // The numbers below belong to the previous period until the new ones arrive.
+                            opacity: _refreshing && data.period.days != _days ? 0.45 : 1,
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                              _TrendCard(period: data.period),
+                              SizedBox(height: gap),
+                              _pair(wide, gap, _BranchCard(branches: data.branches, days: data.period.days),
+                                  _CategoryCard(categories: data.categories, days: data.period.days)),
+                              SizedBox(height: gap),
+                              _ProductCard(products: data.products, days: data.period.days),
+                            ]),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  _buildCard(
-                    title: 'Pendapatan per Cabang',
-                    subtitle: 'Pendapatan per cabang pada tanggal yang dipilih',
-                    trailing: _datePick(),
-                    child: SizedBox(
-                      height: 240,
-                      child: _branch.isEmpty ? _emptyState('Tidak ada data cabang') : _BranchChart(data: _branch),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildCard(
-                    title: 'Penjualan per Kategori',
-                    subtitle: 'Kategori yang paling banyak dibeli',
-                    trailing: _periodDrop(_catDays, (v) {
-                      setState(() => _catDays = v);
-                      _reloadCat();
-                    }),
-                    child: _cat.isEmpty
-                        ? SizedBox(height: 160, child: _emptyState('Tidak ada data kategori'))
-                        : _PieChart(data: _cat),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildCard(
-                    title: 'Produk Terlaris',
-                    subtitle: 'Penjualan terbaik — 30 hari terakhir',
-                    child: _top.isEmpty
-                        ? SizedBox(height: 160, child: _emptyState('Tidak ada data produk'))
-                        : _TopChart(data: _top),
-                  ),
-                ]),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        }),
       ),
     );
   }
 
-  Widget _buildHeader(String name) {
-    return Row(children: [
-      Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Dashboard Analitik',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-        Text('Selamat datang, $name',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-      ])),
-      const LiveClock(),
-      const SizedBox(width: 4),
-      if (_isDataStale)
-        const Tooltip(
-          message: 'Data mungkin tidak terbaru',
-          child: Icon(Icons.cloud_off, size: 14, color: Colors.orange),
-        ),
-      IconButton(onPressed: _load, icon: const Icon(Icons.refresh), tooltip: 'Perbarui semua'),
-    ]);
-  }
-
-  Widget _buildKpiGrid() {
-    if (_summary == null) return const SizedBox.shrink();
-    final today = Map<String, dynamic>.from(_summary!['today'] as Map);
-    final month = Map<String, dynamic>.from(_summary!['month'] as Map);
-    final all = Map<String, dynamic>.from(_summary!['allTime'] as Map);
-    final act = _summary!['activeBranchesToday'];
-
-    final items = [
-      _KpiData("Pendapatan Hari Ini", CurrencyFormatter.formatToCompactRupiah(_d(today['revenue'])), Icons.today,
-          _palette[0]),
-      _KpiData("Transaksi Hari Ini", '${today['transactions']}', Icons.receipt_outlined, _palette[1]),
-      _KpiData("Pendapatan Bulan Ini", CurrencyFormatter.formatToCompactRupiah(_d(month['revenue'])),
-          Icons.calendar_month, _palette[2]),
-      _KpiData("Cabang Aktif", '$act', Icons.store_outlined, _palette[3]),
-      _KpiData("Total Pendapatan", CurrencyFormatter.formatToCompactRupiah(_d(all['revenue'])), Icons.bar_chart,
-          _palette[5]),
-      _KpiData("Total Transaksi", '${all['transactions']}', Icons.shopping_bag_outlined, _palette[6]),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.65,
-      ),
-      itemCount: items.length,
-      itemBuilder: (_, i) => _KpiCard(data: items[i]),
-    );
-  }
-
-  Widget _buildCard({
-    required String title,
-    required String subtitle,
-    required Widget child,
-    Widget? trailing,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(children: [
-            Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 2),
-              Text(subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
-            ])),
-            if (trailing != null) ...[const SizedBox(width: 8), trailing],
-          ]),
-          const SizedBox(height: 20),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _emptyState(String msg) => Center(
-        child: Text(msg, style: const TextStyle(color: AppTheme.mutedForeground)),
-      );
-
-  Widget _periodDrop(int val, ValueChanged<int> cb) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
-          value: val,
-          isDense: true,
-          dropdownColor: cs.surface,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface),
-          items: _periods.map((p) => DropdownMenuItem(value: p.days, child: Text(p.label))).toList(),
-          onChanged: (v) {
-            if (v != null) cb(v);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _datePick() {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: () async {
-        final p = await showDatePicker(
-          context: context,
-          initialDate: DateTime.tryParse(_branchDate) ?? DateTime.now(),
-          firstDate: DateTime(2024),
-          lastDate: DateTime.now(),
-        );
-        if (p != null) {
-          setState(() => _branchDate = DateFormat('yyyy-MM-dd').format(p));
-          _reloadBranch();
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.calendar_today_outlined, size: 14, color: cs.onSurface.withValues(alpha: 0.7)),
-          const SizedBox(width: 6),
-          Text(DateFormatter.format(_branchDate),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface)),
-        ]),
-      ),
-    );
-  }
-
-  static double _d(dynamic v) {
-    if (v is double) return v;
-    if (v is int) return v.toDouble();
-    return double.tryParse(v?.toString() ?? '') ?? 0;
-  }
-}
-
-// ── KPI card ──────────────────────────────────────────────────────────────────
-class _KpiData {
-  final String label, value;
-  final IconData icon;
-  final Color color;
-  const _KpiData(this.label, this.value, this.icon, this.color);
-}
-
-class _KpiCard extends StatelessWidget {
-  final _KpiData data;
-  const _KpiCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: data.color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(data.icon, color: data.color, size: 20),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(data.value,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: data.color),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-            Text(data.label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-          ],
-        )),
+  /// Side by side on wide screens, stacked on phones.
+  Widget _pair(bool wide, double gap, Widget a, Widget b, {(int, int) flex = (1, 1)}) {
+    if (!wide) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [a, SizedBox(height: gap), b]);
+    return IntrinsicHeight(
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Expanded(flex: flex.$1, child: a),
+        SizedBox(width: gap),
+        Expanded(flex: flex.$2, child: b),
       ]),
     );
   }
 }
 
-// ── Revenue trend line chart ──────────────────────────────────────────────────
-double _n(dynamic v) {
-  if (v is double) return v;
-  if (v is int) return v.toDouble();
-  return double.tryParse(v?.toString() ?? '') ?? 0.0;
-}
+// ── tokens ────────────────────────────────────────────────────────────────────
 
-class _TrendChart extends StatelessWidget {
-  final List<Map<String, dynamic>> data;
-  const _TrendChart({required this.data});
+class _Tokens {
+  final Color card, border, muted, text, accentText, track;
+  const _Tokens(this.card, this.border, this.muted, this.text, this.accentText, this.track);
 
-  @override
-  Widget build(BuildContext context) {
-    final spots = data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), _n(e.value['revenue']))).toList();
-
-    final maxY = spots.isEmpty ? 1.0 : spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
-
-    return LineChart(LineChartData(
-      minY: 0,
-      maxY: maxY == 0 ? 1 : maxY * 1.25,
-      clipData: const FlClipData.all(),
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: false,
-        getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.withValues(alpha: 0.15), strokeWidth: 1),
-      ),
-      borderData: FlBorderData(show: false),
-      titlesData: FlTitlesData(
-        leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 56,
-          getTitlesWidget: (v, _) => Text(
-            CurrencyFormatter.formatToCompactRupiah(v),
-            style: const TextStyle(fontSize: 9, color: AppTheme.mutedForeground),
-          ),
-        )),
-        bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 22,
-          interval: data.length <= 7 ? 1 : (data.length / 5).ceilToDouble(),
-          getTitlesWidget: (v, _) {
-            final idx = v.toInt();
-            if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
-            final raw = data[idx]['date']?.toString() ?? '';
-            final label = DateFormatter.formatAxis(raw);
-            return Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.mutedForeground)),
-            );
-          },
-        )),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      ),
-      lineBarsData: [
-        LineChartBarData(
-          spots: spots,
-          isCurved: true,
-          color: _palette[0],
-          barWidth: 2.5,
-          dotData: const FlDotData(show: false),
-          belowBarData: BarAreaData(show: true, color: _palette[0].withValues(alpha: 0.1)),
-        )
-      ],
-      lineTouchData: LineTouchData(
-          touchTooltipData: LineTouchTooltipData(
-        getTooltipItems: (ts) => ts
-            .map((s) => LineTooltipItem(
-                  CurrencyFormatter.formatToCompactRupiah(s.y),
-                  const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                ))
-            .toList(),
-      )),
-    ));
+  factory _Tokens.of(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return dark
+        ? const _Tokens(AppTheme.card, AppTheme.border, AppTheme.mutedForeground, AppTheme.foreground, AppTheme.goldLight,
+            Color(0xFF262626))
+        : const _Tokens(AppTheme.lightCard, AppTheme.lightBorder, AppTheme.lightMutedForeground, AppTheme.lightForeground,
+            Color(0xFF7A6200), Color(0xFFEFEBE3));
   }
 }
 
-// ── Branch bar chart ──────────────────────────────────────────────────────────
-class _BranchChart extends StatelessWidget {
-  final List<Map<String, dynamic>> data;
-  const _BranchChart({required this.data});
+// ── formatting ────────────────────────────────────────────────────────────────
+
+const _monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const _monthsLong = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+const _weekdays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+final _count = NumberFormat.decimalPattern('id_ID');
+String _time(DateTime t) => '${t.hour.toString().padLeft(2, '0')}.${t.minute.toString().padLeft(2, '0')}';
+String _longDate(DateTime d) => '${_weekdays[d.weekday - 1]}, ${d.day} ${_monthsLong[d.month - 1]} ${d.year}';
+String _shortDate(DateTime d) => '${d.day} ${_monthsShort[d.month - 1]}';
+String _rupiah(num v) => CurrencyFormatter.formatToRupiah(v);
+String _compact(num v) => CurrencyFormatter.formatToCompactRupiah(v);
+
+String _range(DateTime? from, DateTime? to) {
+  if (from == null || to == null) return '';
+  if (from.year != to.year) return '${_shortDate(from)} ${from.year} – ${_shortDate(to)} ${to.year}';
+  if (from.month == to.month) return '${from.day}–${to.day} ${_monthsShort[to.month - 1]} ${to.year}';
+  return '${_shortDate(from)} – ${_shortDate(to)} ${to.year}';
+}
+
+String _greeting() {
+  final hour = DateTime.now().hour;
+  if (hour < 10) return 'Selamat pagi';
+  if (hour < 15) return 'Selamat siang';
+  if (hour < 18) return 'Selamat sore';
+  return 'Selamat malam';
+}
+
+// ── building blocks ───────────────────────────────────────────────────────────
+
+class _Panel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  const _Panel({required this.child, this.padding = const EdgeInsets.all(16)});
 
   @override
   Widget build(BuildContext context) {
-    final maxY = data.isEmpty ? 1.0 : data.map((e) => _n(e['revenue'])).fold(0.0, (a, b) => a > b ? a : b);
-
-    return BarChart(BarChartData(
-      maxY: maxY == 0 ? 1 : maxY * 1.3,
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: false,
-        getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.withValues(alpha: 0.15), strokeWidth: 1),
+    final t = _Tokens.of(context);
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.border),
       ),
-      borderData: FlBorderData(show: false),
-      titlesData: FlTitlesData(
-        bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 36,
-          getTitlesWidget: (v, _) {
-            final i = v.toInt();
-            if (i < 0 || i >= data.length) return const SizedBox.shrink();
-            final name = data[i]['branch_name']?.toString() ?? '';
-            final short = name.length > 9 ? '${name.substring(0, 8)}…' : name;
-            return Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(short,
-                  style: const TextStyle(fontSize: 9, color: AppTheme.mutedForeground), textAlign: TextAlign.center),
-            );
-          },
-        )),
-        leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 56,
-          getTitlesWidget: (v, _) => Text(
-            CurrencyFormatter.formatToCompactRupiah(v),
-            style: const TextStyle(fontSize: 9, color: AppTheme.mutedForeground),
-          ),
-        )),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      ),
-      barGroups: data.asMap().entries.map((e) {
-        final rev = _n(e.value['revenue']);
-        final color = _palette[e.key % _palette.length];
-        return BarChartGroupData(x: e.key, barRods: [
-          BarChartRodData(
-            toY: rev,
-            color: color,
-            width: 20,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-            backDrawRodData:
-                BackgroundBarChartRodData(show: true, toY: maxY * 1.3, color: color.withValues(alpha: 0.07)),
-          ),
-        ]);
-      }).toList(),
-      barTouchData: BarTouchData(
-          touchTooltipData: BarTouchTooltipData(
-        getTooltipItem: (group, _, rod, __) => BarTooltipItem(
-          '${data[group.x]['branch_name']}\n${CurrencyFormatter.formatToCompactRupiah(rod.toY)}',
-          const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-        ),
-      )),
-    ));
+      child: child,
+    );
   }
 }
 
-// ── Category pie chart ────────────────────────────────────────────────────────
-class _PieChart extends StatefulWidget {
-  final List<Map<String, dynamic>> data;
-  const _PieChart({required this.data});
-  @override
-  State<_PieChart> createState() => _PieChartState();
-}
-
-class _PieChartState extends State<_PieChart> {
-  int _touched = -1;
+class _PanelTitle extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  const _PanelTitle(this.title, {this.subtitle});
 
   @override
   Widget build(BuildContext context) {
-    final total = widget.data.fold(0.0, (s, e) => s + _n(e['total_qty']));
-
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      SizedBox(
-        height: 200,
-        child: PieChart(PieChartData(
-          pieTouchData: PieTouchData(touchCallback: (_, r) {
-            setState(() => _touched = r?.touchedSection?.touchedSectionIndex ?? -1);
-          }),
-          sectionsSpace: 2,
-          centerSpaceRadius: 36,
-          sections: widget.data.asMap().entries.map((e) {
-            final qty = _n(e.value['total_qty']);
-            final pct = total > 0 ? qty / total * 100 : 0.0;
-            final isTouched = e.key == _touched;
-            final color = _palette[e.key % _palette.length];
-            return PieChartSectionData(
-              value: qty,
-              color: color,
-              radius: isTouched ? 72 : 60,
-              title: '${pct.toStringAsFixed(1)}%',
-              titleStyle: TextStyle(fontSize: isTouched ? 13 : 11, fontWeight: FontWeight.bold, color: Colors.white),
-            );
-          }).toList(),
-        )),
-      ),
-      const SizedBox(height: 16),
-      // Legend — 2-column grid, max 4 rows = 8 items
-      GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 4.5,
-          mainAxisSpacing: 4,
-          crossAxisSpacing: 4,
-        ),
-        itemCount: widget.data.length > 8 ? 8 : widget.data.length,
-        itemBuilder: (_, i) {
-          final color = _palette[i % _palette.length];
-          return Row(children: [
-            Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-            const SizedBox(width: 4),
-            Expanded(
-                child: Text(
-              widget.data[i]['category_name']?.toString() ?? 'Unknown',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            )),
-          ]);
-        },
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Semantics(header: true, child: Text(title, style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(subtitle!, style: text.bodySmall?.copyWith(color: t.muted)),
+          ],
+        ]),
       ),
     ]);
   }
 }
 
-// ── Top products progress bars ────────────────────────────────────────────────
-class _TopChart extends StatelessWidget {
-  final List<Map<String, dynamic>> data;
-  const _TopChart({required this.data});
+/// Direction + percentage + what it is compared with. Never colour alone: the arrow and the
+/// sign carry the meaning for colour-blind users and screen readers.
+class _Delta extends StatelessWidget {
+  final double? change;
+  final String comparedWith;
+  const _Delta({required this.change, required this.comparedWith});
 
   @override
   Widget build(BuildContext context) {
-    final maxQty = data.isEmpty ? 1.0 : data.map((e) => _n(e['total_qty'])).fold(0.0, (a, b) => a > b ? a : b);
-    final top = data.take(8).toList();
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme.bodySmall;
+    final c = change;
+    if (c == null) {
+      return Text('Belum ada pembanding $comparedWith', style: text?.copyWith(color: t.muted));
+    }
+    final flat = c.abs() < 0.005;
+    final up = c > 0;
+    final color = flat ? t.muted : (up ? AppTheme.success : AppTheme.destructive);
+    final pct = (c.abs() * 100).toStringAsFixed(c.abs() < 0.1 ? 1 : 0).replaceAll('.', ',');
+    final label = flat ? 'Sama' : '${up ? '+' : '−'}$pct%';
+    final spoken = flat ? 'sama' : '${up ? 'naik' : 'turun'} $pct persen';
+    return Semantics(
+      label: '$spoken $comparedWith',
+      excludeSemantics: true,
+      child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 2, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(flat ? Icons.remove : (up ? Icons.arrow_upward : Icons.arrow_downward), size: 13, color: color),
+            const SizedBox(width: 2),
+            Text(label, style: text?.copyWith(color: color, fontWeight: FontWeight.w700)),
+          ]),
+        ),
+        Text(comparedWith, style: text?.copyWith(color: t.muted)),
+      ]),
+    );
+  }
+}
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: top.asMap().entries.map((e) {
-        final qty = _n(e.value['total_qty']);
-        final pct = maxQty > 0 ? qty / maxQty : 0.0;
-        final color = _palette[e.key % _palette.length];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(
-                  child: Text(
-                e.value['name']?.toString() ?? '',
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              )),
-              const SizedBox(width: 8),
-              Text('${qty.toInt()} sold',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.bold)),
+class _Stat extends StatelessWidget {
+  final String label;
+  final String value;
+  const _Stat(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: text.labelSmall?.copyWith(color: t.muted)),
+      const SizedBox(height: 2),
+      Text(value,
+          style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()]),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis),
+    ]);
+  }
+}
+
+class _ShareBar extends StatelessWidget {
+  final double value;
+  const _ShareBar(this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: LinearProgressIndicator(
+        value: value.clamp(0, 1).toDouble(),
+        minHeight: 6,
+        backgroundColor: _Tokens.of(context).track,
+        valueColor: const AlwaysStoppedAnimation(AppTheme.gold),
+      ),
+    );
+  }
+}
+
+class _EmptyNote extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  const _EmptyNote(this.icon, this.message);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(children: [
+        Icon(icon, color: t.muted, size: 28),
+        const SizedBox(height: 8),
+        Text(message, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.muted)),
+      ]),
+    );
+  }
+}
+
+// ── header & status ───────────────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  final String name;
+  final DateTime fetchedAt;
+  final bool refreshing;
+  final VoidCallback onRefresh;
+  const _Header({required this.name, required this.fetchedAt, required this.refreshing, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${_greeting()}, $name', style: text.bodyMedium?.copyWith(color: t.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 2),
+          Semantics(
+            header: true,
+            child: Text('Ringkasan bisnis', style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(height: 2),
+          Text('${_longDate(DateTime.now())} · semua cabang', style: text.bodySmall?.copyWith(color: t.muted)),
+        ]),
+      ),
+      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        SizedBox(
+          width: 48,
+          height: 48,
+          child: refreshing
+              ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold),
+                )
+              : IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh), tooltip: 'Muat ulang'),
+        ),
+        Text('Diperbarui ${_time(fetchedAt)}', style: text.labelSmall?.copyWith(color: t.muted)),
+      ]),
+    ]);
+  }
+}
+
+class _StaleBanner extends StatelessWidget {
+  final DateTime fetchedAt;
+  final VoidCallback onRetry;
+  const _StaleBanner({required this.fetchedAt, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final sameDay = DateUtils.isSameDay(fetchedAt, DateTime.now());
+    final when = sameDay ? 'pukul ${_time(fetchedAt)}' : '${_shortDate(fetchedAt)} pukul ${_time(fetchedAt)}';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
+      ),
+      child: Row(children: [
+        const Icon(Icons.cloud_off_outlined, color: AppTheme.warning, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text('Tidak terhubung ke server. Menampilkan data $when.', style: text.bodySmall),
+        ),
+        TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
+      ]),
+    );
+  }
+}
+
+// ── today & month ─────────────────────────────────────────────────────────────
+
+class _TodayCard extends StatelessWidget {
+  final Totals today;
+  final int activeBranches;
+  final int branchCount;
+  const _TodayCard({required this.today, required this.activeBranches, required this.branchCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    final noSales = today.transactions == 0;
+    return _Panel(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Text('Pendapatan hari ini', style: text.labelLarge?.copyWith(color: t.muted)),
+        const SizedBox(height: 6),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _rupiah(today.revenue),
+            style: text.displaySmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: t.text,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (noSales)
+          Text('Belum ada penjualan hari ini', style: text.bodySmall?.copyWith(color: t.muted))
+        else
+          _Delta(change: today.revenueChange, comparedWith: 'vs kemarin di jam yang sama'),
+        const SizedBox(height: 16),
+        Divider(height: 1, color: t.border),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _Stat('Transaksi', _count.format(today.transactions))),
+          Expanded(child: _Stat('Rata-rata', noSales ? '—' : _compact(today.averageTicket))),
+          Expanded(child: _Stat('Cabang aktif', '$activeBranches dari $branchCount')),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _MonthCard extends StatelessWidget {
+  final Totals month;
+  const _MonthCard({required this.month});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    final now = DateTime.now();
+    return _Panel(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Text('Bulan ini · ${_monthsLong[now.month - 1]}', style: text.labelLarge?.copyWith(color: t.muted)),
+        const SizedBox(height: 6),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _rupiah(month.revenue),
+            style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _Delta(change: month.revenueChange, comparedWith: 'vs tanggal 1–${now.day} bulan lalu'),
+        const SizedBox(height: 16),
+        Divider(height: 1, color: t.border),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _Stat('Transaksi', _count.format(month.transactions))),
+          Expanded(child: _Stat('Rata-rata', month.transactions == 0 ? '—' : _compact(month.averageTicket))),
+        ]),
+      ]),
+    );
+  }
+}
+
+// ── needs attention ───────────────────────────────────────────────────────────
+
+class _Issue {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String detail;
+  final String? route;
+  const _Issue(this.icon, this.color, this.title, this.detail, {this.route});
+}
+
+class _AttentionCard extends StatelessWidget {
+  final Attention attention;
+  const _AttentionCard({required this.attention});
+
+  List<_Issue> get _issues {
+    final a = attention;
+    return [
+      if (a.cashDifferenceCount > 0)
+        _Issue(Icons.account_balance_wallet_outlined, AppTheme.destructive,
+            'Selisih kas di ${a.cashDifferenceCount} shift hari ini', 'Total selisih ${_rupiah(a.cashDifferenceTotal)}'),
+      if (a.outOfStock > 0)
+        _Issue(Icons.remove_shopping_cart_outlined, AppTheme.destructive, '${_count.format(a.outOfStock)} produk habis',
+            'Stok 0 di cabang; pelanggan tidak bisa membeli', route: AppRouter.inventory),
+      if (a.overdueShifts > 0)
+        _Issue(Icons.schedule, AppTheme.warning, '${a.overdueShifts} shift terbuka lebih dari 12 jam',
+            'Kemungkinan lupa ditutup; kas shift belum dihitung'),
+      if (a.lowStock > 0)
+        _Issue(Icons.inventory_2_outlined, AppTheme.warning, '${_count.format(a.lowStock)} produk stok menipis',
+            'Di bawah batas pemesanan ulang', route: AppRouter.inventory),
+      if (a.voidedToday > 0)
+        _Issue(Icons.block, AppTheme.warning, '${a.voidedToday} penjualan dibatalkan hari ini', 'Periksa alasan pembatalan'),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    final issues = _issues;
+
+    if (issues.isEmpty) {
+      return _Panel(
+        child: Row(children: [
+          const Icon(Icons.check_circle_outline, color: AppTheme.success),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Tidak ada yang perlu ditindaklanjuti', style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Text('Kas, stok dan shift semua cabang aman.', style: text.bodySmall?.copyWith(color: t.muted)),
             ]),
-            const SizedBox(height: 5),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: pct,
-                minHeight: 8,
-                backgroundColor: color.withValues(alpha: 0.12),
-                valueColor: AlwaysStoppedAnimation(color),
+          ),
+        ]),
+      );
+    }
+
+    return _Panel(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _PanelTitle('Perlu perhatian', subtitle: '${issues.length} hal untuk ditindaklanjuti'),
+        const SizedBox(height: 8),
+        for (final issue in issues) _IssueRow(issue),
+      ]),
+    );
+  }
+}
+
+class _IssueRow extends StatelessWidget {
+  final _Issue issue;
+  const _IssueRow(this.issue);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    final route = issue.route;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: route == null ? null : () => context.go(route),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(color: issue.color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+              child: Icon(issue.icon, color: issue.color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(issue.title, style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(issue.detail, style: text.bodySmall?.copyWith(color: t.muted)),
+              ]),
+            ),
+            if (route != null) Icon(Icons.chevron_right, color: t.muted),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ── performance over a period ─────────────────────────────────────────────────
+
+class _PeriodHeader extends StatelessWidget {
+  final int days;
+  final List<int> periods;
+  final DateTime? from;
+  final DateTime? to;
+  final ValueChanged<int> onChanged;
+  const _PeriodHeader({required this.days, required this.periods, this.from, this.to, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    final title = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Semantics(header: true, child: Text('Performa', style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
+      Text('$days hari terakhir · ${_range(from, to)}', style: text.bodySmall?.copyWith(color: t.muted)),
+    ]);
+    final selector = SegmentedButton<int>(
+      segments: [for (final d in periods) ButtonSegment(value: d, label: Text('$d hari'))],
+      selected: {days},
+      showSelectedIcon: false,
+      onSelectionChanged: (s) => onChanged(s.first),
+      style: ButtonStyle(
+        visualDensity: VisualDensity.standard,
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? AppTheme.gold.withValues(alpha: 0.18) : null,
+        ),
+      ),
+    );
+    return LayoutBuilder(builder: (context, c) {
+      if (c.maxWidth < 520) {
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [title, const SizedBox(height: 12), selector]);
+      }
+      return Row(children: [Expanded(child: title), selector]);
+    });
+  }
+}
+
+class _TrendCard extends StatelessWidget {
+  final PeriodSummary period;
+  const _TrendCard({required this.period});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    final hasSales = period.daily.any((d) => d.revenue > 0);
+    return _Panel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Pendapatan', style: text.labelLarge?.copyWith(color: t.muted)),
+        const SizedBox(height: 4),
+        Wrap(crossAxisAlignment: WrapCrossAlignment.end, spacing: 12, runSpacing: 4, children: [
+          Text(_rupiah(period.revenue),
+              style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text('${_count.format(period.transactions)} transaksi', style: text.bodySmall?.copyWith(color: t.muted)),
+          ),
+        ]),
+        const SizedBox(height: 6),
+        _Delta(change: period.revenueChange, comparedWith: 'vs ${period.days} hari sebelumnya'),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 200,
+          child: hasSales
+              ? _TrendChart(daily: period.daily)
+              : const _EmptyNote(Icons.show_chart, 'Belum ada penjualan di periode ini'),
+        ),
+      ]),
+    );
+  }
+}
+
+class _TrendChart extends StatelessWidget {
+  final List<DailyRevenue> daily;
+  const _TrendChart({required this.daily});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final maxRevenue = daily.map((d) => d.revenue).fold<double>(0, math.max);
+    final yInterval = _niceInterval(maxRevenue / 3);
+    final maxY = (maxRevenue / yInterval).ceil() * yInterval;
+    final labelEvery = math.max(1, (daily.length / 6).ceil());
+    final axisStyle = TextStyle(fontSize: 11, color: t.muted);
+
+    return LineChart(
+      LineChartData(
+        minY: 0,
+        maxY: maxY <= 0 ? 1 : maxY,
+        minX: 0,
+        maxX: (daily.length - 1).toDouble(),
+        clipData: const FlClipData.all(),
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          drawVerticalLine: false,
+          horizontalInterval: yInterval,
+          getDrawingHorizontalLine: (_) => FlLine(color: t.border, strokeWidth: 1),
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 52,
+              interval: yInterval,
+              getTitlesWidget: (v, meta) => v == meta.max && v != 0
+                  ? const SizedBox.shrink()
+                  : SideTitleWidget(axisSide: meta.axisSide, child: Text(_compact(v).replaceFirst('Rp', ''), style: axisStyle)),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 26,
+              interval: 1,
+              getTitlesWidget: (v, meta) {
+                final i = v.round();
+                final fromEnd = daily.length - 1 - i;
+                if (i < 0 || i >= daily.length || v != i || fromEnd % labelEvery != 0) return const SizedBox.shrink();
+                return SideTitleWidget(
+                  axisSide: meta.axisSide,
+                  fitInside: SideTitleFitInsideData.fromTitleMeta(meta, distanceFromEdge: 0),
+                  child: Text(_shortDate(daily[i].date), style: axisStyle),
+                );
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipColor: (_) => const Color(0xFF1F1F1F),
+            getTooltipItems: (spots) => spots.map((s) {
+              final d = daily[s.x.round()];
+              return LineTooltipItem(
+                '${_weekdays[d.date.weekday - 1]}, ${_shortDate(d.date)}\n',
+                const TextStyle(color: Color(0xFFBDBDBD), fontSize: 11),
+                children: [
+                  TextSpan(
+                    text: _rupiah(d.revenue),
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(
+                    text: '\n${_count.format(d.transactions)} transaksi',
+                    style: const TextStyle(color: Color(0xFFBDBDBD), fontSize: 11),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: [for (var i = 0; i < daily.length; i++) FlSpot(i.toDouble(), daily[i].revenue)],
+            isCurved: true,
+            preventCurveOverShooting: true,
+            color: AppTheme.gold,
+            barWidth: 2.5,
+            dotData: FlDotData(show: daily.length <= 7),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppTheme.gold.withValues(alpha: 0.25), AppTheme.gold.withValues(alpha: 0)],
               ),
             ),
-          ]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 1, 2 or 5 times a power of ten, so axis labels read as round numbers.
+  static double _niceInterval(double raw) {
+    if (raw <= 0) return 1;
+    final magnitude = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
+    final step = raw / magnitude;
+    final nice = step <= 1 ? 1 : (step <= 2 ? 2 : (step <= 5 ? 5 : 10));
+    return nice * magnitude;
+  }
+}
+
+class _BranchCard extends StatelessWidget {
+  final List<BranchPerformance> branches;
+  final int days;
+  const _BranchCard({required this.branches, required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    final total = branches.fold<double>(0, (s, b) => s + b.revenue);
+    final top = branches.fold<double>(0, (m, b) => math.max(m, b.revenue));
+
+    return _Panel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const _PanelTitle('Cabang', subtitle: 'Diurutkan dari pendapatan tertinggi'),
+        const SizedBox(height: 12),
+        if (branches.isEmpty)
+          const _EmptyNote(Icons.storefront_outlined, 'Belum ada cabang aktif')
+        else
+          for (final b in branches)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  Flexible(
+                    child: Text(b.name,
+                        style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  if (b.code.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Text(b.code, style: text.labelSmall?.copyWith(color: t.muted)),
+                  ],
+                  if (b.openShifts > 0) ...[const SizedBox(width: 8), const _OpenShiftBadge()],
+                  const Spacer(),
+                  const SizedBox(width: 8),
+                  Text(b.revenue > 0 ? _compact(b.revenue) : '—',
+                      style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
+                ]),
+                const SizedBox(height: 6),
+                _ShareBar(top > 0 ? b.revenue / top : 0),
+                const SizedBox(height: 4),
+                Text(
+                  b.revenue > 0
+                      ? '${_count.format(b.transactions)} transaksi · ${(b.revenue / total * 100).round()}% dari total'
+                      : 'Belum ada penjualan dalam $days hari',
+                  style: text.labelSmall?.copyWith(color: t.muted),
+                ),
+              ]),
+            ),
+      ]),
+    );
+  }
+}
+
+class _OpenShiftBadge extends StatelessWidget {
+  const _OpenShiftBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'shift sedang buka',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(color: AppTheme.success.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppTheme.success, shape: BoxShape.circle)),
+          const SizedBox(width: 4),
+          Text('Buka',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.success, fontWeight: FontWeight.w700)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _CategoryCard extends StatelessWidget {
+  final List<RankedItem> categories;
+  final int days;
+  const _CategoryCard({required this.categories, required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    final total = categories.fold<double>(0, (s, c) => s + c.revenue);
+
+    // Five named rows at most; the rest add up to "Lainnya" so the shares still total 100%.
+    final rows = categories.take(5).toList();
+    if (categories.length > 5) {
+      final rest = categories.skip(5);
+      rows.add(RankedItem('Lainnya', rest.fold(0, (s, c) => s + c.revenue), rest.fold(0, (s, c) => s + c.qty)));
+    }
+
+    return _Panel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const _PanelTitle('Kategori', subtitle: 'Bagian dari pendapatan'),
+        const SizedBox(height: 12),
+        if (total <= 0)
+          const _EmptyNote(Icons.category_outlined, 'Belum ada penjualan di periode ini')
+        else
+          for (final c in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(c.name,
+                        style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  Text('${(c.revenue / total * 100).round()}%',
+                      style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
+                ]),
+                const SizedBox(height: 6),
+                _ShareBar(c.revenue / total),
+                const SizedBox(height: 4),
+                Text('${_compact(c.revenue)} · ${_count.format(c.qty)} item',
+                    style: text.labelSmall?.copyWith(color: t.muted)),
+              ]),
+            ),
+      ]),
+    );
+  }
+}
+
+class _ProductCard extends StatelessWidget {
+  final List<RankedItem> products;
+  final int days;
+  const _ProductCard({required this.products, required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    return _Panel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const _PanelTitle('Produk terlaris', subtitle: 'Berdasarkan jumlah terjual, semua cabang'),
+        const SizedBox(height: 8),
+        if (products.isEmpty)
+          const _EmptyNote(Icons.shopping_bag_outlined, 'Belum ada produk terjual di periode ini')
+        else
+          for (var i = 0; i < products.length; i++) ...[
+            if (i > 0) Divider(height: 1, color: t.border),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(children: [
+                SizedBox(
+                  width: 28,
+                  child: Text('${i + 1}',
+                      style: text.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: i == 0 ? t.accentText : t.muted,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      )),
+                ),
+                Expanded(
+                  child: Text(products[i].name,
+                      style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 2, overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 12),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text('${_count.format(products[i].qty)} terjual',
+                      style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
+                  Text(_compact(products[i].revenue), style: text.labelSmall?.copyWith(color: t.muted)),
+                ]),
+              ]),
+            ),
+          ],
+      ]),
+    );
+  }
+}
+
+// ── loading & error ───────────────────────────────────────────────────────────
+
+/// Mirrors the real layout so the page does not jump when data arrives.
+class _DashboardSkeleton extends StatelessWidget {
+  const _DashboardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final base = dark ? const Color(0xFF1A1A1A) : const Color(0xFFEDEAE3);
+    final highlight = dark ? const Color(0xFF262626) : const Color(0xFFF7F5F0);
+    Widget block(double height, {double? width, double radius = 16}) => Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            height: height,
+            width: width ?? double.infinity,
+            decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(radius)),
+          ),
         );
-      }).toList(),
+    return Semantics(
+      label: 'Memuat ringkasan bisnis',
+      child: Shimmer.fromColors(
+        baseColor: base,
+        highlightColor: highlight,
+        child: ListView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          children: [
+            block(14, width: 160, radius: 6),
+            const SizedBox(height: 8),
+            block(26, width: 220, radius: 6),
+            const SizedBox(height: 20),
+            block(190),
+            const SizedBox(height: 16),
+            block(150),
+            const SizedBox(height: 16),
+            block(120),
+            const SizedBox(height: 24),
+            block(22, width: 140, radius: 6),
+            const SizedBox(height: 12),
+            block(300),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ErrorState({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _Tokens.of(context);
+    final text = Theme.of(context).textTheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.cloud_off_outlined, size: 48, color: t.muted),
+          const SizedBox(height: 16),
+          Text('Ringkasan belum bisa dimuat', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text(
+            'Periksa koneksi internet dan pastikan server berjalan, lalu coba lagi.',
+            textAlign: TextAlign.center,
+            style: text.bodyMedium?.copyWith(color: t.muted),
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Coba lagi')),
+        ]),
+      ),
     );
   }
 }

@@ -161,7 +161,7 @@ export function OpeningBalancesPage() {
               { header: 'Nomor', cell: (j) => <span className="font-mono text-xs">{j.number}</span> },
               { header: 'Tanggal', cell: (j) => formatDate(j.entry_date) },
               { header: 'Lokasi', cell: (j) => j.location_code ?? 'Pusat' },
-              { header: 'Keterangan', cell: (j) => j.memo },
+              { header: 'Keterangan', wrap: true, cell: (j) => j.memo },
               { header: 'Jumlah', align: 'right', cell: (j) => formatRp(j.amount) },
               { header: '', cell: (j) => (j.status === 'void' ? <Badge tone="red">Dibatalkan</Badge> : j.reverses_entry_id ? <Badge tone="amber">Pembalik</Badge> : null) },
             ]}

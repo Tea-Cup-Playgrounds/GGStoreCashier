@@ -1,0 +1,103 @@
+{
+ "expenses": [
+  {
+   "id": "01a1c5a6-b80e-7dd0-a8e6-3321c557c6fb",
+   "number": "EXP-BR01-261110-0001",
+   "location_id": 2,
+   "location_code": "BR01",
+   "expense_date": "2026-11-10",
+   "account_id": 29,
+   "account_code": "6-9000",
+   "account_name": "Beban Lain-lain",
+   "amount": 100000,
+   "paid_from": "cash",
+   "payee": "Pengelola ruko",
+   "note": "Iuran keamanan & kebersihan November 2026",
+   "status": "posted",
+   "created_by_name": "Admin Cabang Satu"
+  },
+  {
+   "id": "01a1a89c-a5d2-79dc-b164-0564b34fc96e",
+   "number": "EXP-BR01-261105-0001",
+   "location_id": 2,
+   "location_code": "BR01",
+   "expense_date": "2026-11-05",
+   "account_id": 28,
+   "account_code": "6-3000",
+   "account_name": "Listrik, Air & Internet",
+   "amount": 1849000,
+   "paid_from": "bank",
+   "payee": "PLN",
+   "note": "Listrik Oktober 2026",
+   "status": "posted",
+   "created_by_name": "Akuntan"
+  },
+  {
+   "id": "01a1a89c-a5d2-7ae1-8b0b-2ee2ed0292c2",
+   "number": "EXP-BR01-261105-0002",
+   "location_id": 2,
+   "location_code": "BR01",
+   "expense_date": "2026-11-05",
+   "account_id": 28,
+   "account_code": "6-3000",
+   "account_name": "Listrik, Air & Internet",
+   "amount": 154000,
+   "paid_from": "bank",
+   "payee": "PDAM",
+   "note": "Air Oktober 2026",
+   "status": "posted",
+   "created_by_name": "Akuntan"
+  },
+  {
+   "id": "01a1a89c-a5d2-7b11-8492-36b69e248307",
+   "number": "EXP-BR01-261105-0003",
+   "location_id": 2,
+   "location_code": "BR01",
+   "expense_date": "2026-11-05",
+   "account_id": 28,
+   "account_code": "6-3000",
+   "account_name": "Listrik, Air & Internet",
+   "amount": 385000,
+   "paid_from": "bank",
+   "payee": "Internet",
+   "note": "Internet November 2026",
+   "status": "posted",
+   "created_by_name": "Akuntan"
+  },
+  {
+   "id": "01a19c73-d985-779e-b36f-4d3d086366e0",
+   "number": "EXP-BR01-261102-0001",
+   "location_id": 2,
+   "location_code": "BR01",
+   "expense_date": "2026-11-02",
+   "account_id": 35,
+   "account_code": "6-6000",
+   "account_name": "Perlengkapan Toko",
+   "amount": 340000,
+   "paid_from": "cash",
+   "payee": "Toko grosir",
+   "note": "Kantong plastik, kertas struk, alat tulis",
+   "status": "posted",
+   "created_by_name": "Admin Cabang Satu"
+  }
+ ],
+ "total": 8828000,
+ "by_category": [
+  {
+   "category": "6-9000 Beban Lain-lain",
+   "amount": 100000
+  },
+  {
+   "category": "6-3000 Listrik, Air & Internet",
+   "amount": 2388000
+  },
+  {
+   "category": "6-6000 Perlengkapan Toko",
+   "amount": 340000
+  },
+  {
+   "category": "6-1000 Beban Sewa",
+   "amount": 6000000
+  }
+ ]
+}

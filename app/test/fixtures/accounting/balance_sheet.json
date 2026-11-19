@@ -1,0 +1,102 @@
+{
+ "to": "2026-11-14",
+ "assets": [
+  {
+   "id": 2,
+   "code": "1-1100",
+   "name": "Kas",
+   "balance": 28879930
+  },
+  {
+   "id": 3,
+   "code": "1-1200",
+   "name": "Bank",
+   "balance": 658892847.52
+  },
+  {
+   "id": 4,
+   "code": "1-1300",
+   "name": "Piutang QRIS / E-Wallet",
+   "balance": 8175000
+  },
+  {
+   "id": 5,
+   "code": "1-1310",
+   "name": "Piutang EDC (Kartu)",
+   "balance": 16550000
+  },
+  {
+   "id": 6,
+   "code": "1-1400",
+   "name": "Persediaan Barang",
+   "balance": 265628919.4
+  },
+  {
+   "id": 7,
+   "code": "1-1500",
+   "name": "PPN Masukan",
+   "balance": 59690817.5
+  },
+  {
+   "id": 8,
+   "code": "1-1600",
+   "name": "Deposit Pulsa",
+   "balance": 11437200
+  }
+ ],
+ "liabilities": [
+  {
+   "id": 10,
+   "code": "2-1100",
+   "name": "Hutang Usaha",
+   "balance": 214759803
+  },
+  {
+   "id": 11,
+   "code": "2-1200",
+   "name": "PPN Keluaran",
+   "balance": 85795729.89
+  }
+ ],
+ "equity": [
+  {
+   "id": 13,
+   "code": "3-1000",
+   "name": "Modal Pemilik",
+   "balance": 300000000
+  },
+  {
+   "id": 32,
+   "code": "3-1100",
+   "name": "Prive Pemilik",
+   "balance": -360000000
+  },
+  {
+   "id": 15,
+   "code": "3-3000",
+   "name": "Ekuitas Saldo Awal",
+   "balance": 376777500
+  },
+  {
+   "id": null,
+   "code": null,
+   "name": "Laba ditahan (tahun-tahun sebelumnya)",
+   "balance": 78762683.49,
+   "computed": true
+  },
+  {
+   "id": null,
+   "code": null,
+   "name": "Laba tahun berjalan 2026",
+   "balance": 353158998.04,
+   "computed": true
+  }
+ ],
+ "totals": {
+  "assets": 1049254714.42,
+  "liabilities": 300555532.89,
+  "equity": 748699181.53,
+  "liabilities_and_equity": 1049254714.42,
+  "difference": 0
+ }
+}

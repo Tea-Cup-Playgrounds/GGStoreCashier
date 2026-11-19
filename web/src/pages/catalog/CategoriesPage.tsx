@@ -28,7 +28,7 @@ export function CategoriesPage() {
               onRowClick={canManage ? (c) => setCategory(c) : undefined}
               columns={[
                 { header: 'Nama', cell: (c) => <span className="font-medium">{c.name}</span> },
-                { header: 'Deskripsi', cell: (c) => c.description ?? '—' },
+                { header: 'Deskripsi', wrap: true, cell: (c) => c.description ?? '—' },
               ]}
             />
           </QueryState>

@@ -33,9 +33,12 @@ fvm flutter pub get
 
 ### 3. Konfigurasi environment
 
-Buat file `.env` di root proyek:
+Salin `example.env` menjadi `.env` di root proyek, lalu isi nilainya:
 
 ```env
+PORT=5000
+NODE_ENV=development
+
 # Database
 DB_HOST=localhost
 DB_PORT=3306
@@ -43,39 +46,74 @@ DB_USER=your_user
 DB_PASS=your_password
 DB_NAME=gg_store
 
-# API
-PORT=3000
 JWT_SECRET=your_secret_key
+CORS_ORIGIN=http://localhost:5173
 
-# Ngrok (untuk development)
-NGROK_API_URL=http://localhost:3000
+# Ngrok (opsional)
+NGROK_AUTHTOKEN=
+NGROK_API_URL=your-domain.ngrok-free.app
 NGROK_API_TIMEOUT=30000
 ```
 
 ### 4. Siapkan database (migrasi)
 
-Buat database kosong sesuai `DB_NAME`, lalu jalankan:
+Pastikan MySQL sudah jalan (misalnya lewat Laragon) dan `.env` sudah berisi `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`
+dan `DB_NAME`. Database tidak perlu dibuat manual. Satu perintah membuat database `DB_NAME` (jika belum ada),
+menjalankan semua migrasi, lalu seed akun dev:
 
 ```bash
-npm run migrate
+npm run db setup
 ```
+
+Setelah itu login dengan salah satu akun dev (kata sandi `SEED_PASSWORD`, default `Password#123`):
+
+| Username                 | Role                                   |
+| ------------------------ | -------------------------------------- |
+| `superadmin`             | Pemilik (semua lokasi)                 |
+| `admin1`..`admin3`       | Kepala cabang di Cabang 1..3 (BR01..BR03) |
+| `kasir1`..`kasir3`       | Kasir di Cabang 1..3                   |
+| `gudang`                 | Staf gudang (WH)                       |
+| `akuntan`                | Akuntan (semua lokasi)                 |
+
+Alur sehari-hari:
+
+```bash
+npm run db migrate              # setelah git pull yang membawa migrasi baru
+npm run db migrate:fresh --seed # mulai dari nol: hapus semua tabel, migrasi, seed (khusus dev)
+npm run db migrate:status       # cek migrasi yang belum dijalankan
+```
+
+Akun dev memakai kata sandi yang diketahui, jadi seed menolak berjalan jika `NODE_ENV=production` (kecuali
+`ALLOW_DEV_SEED=true`).
 
 Skema database dikelola dengan migrasi [Knex](https://knexjs.org) di `API/migrations/`. Migrasi pertama (`baseline`) membuat skema awal jika tabel belum ada; pada database lama yang sudah berisi tabel, migrasi ini hanya dicatat sebagai sudah dijalankan tanpa mengubah data.
 
-| Perintah                          | Fungsi                                              |
-| --------------------------------- | --------------------------------------------------- |
-| `npm run migrate`                 | Menjalankan semua migrasi yang belum dijalankan.    |
-| `npm run migrate:status`          | Menampilkan migrasi yang sudah dan belum dijalankan. |
-| `npm run migrate:rollback`        | Membatalkan batch migrasi terakhir.                 |
-| `npm run migrate:make -- <nama>`  | Membuat file migrasi baru.                          |
-| `npm run seed`                    | Menjalankan seed di `API/seeds/`.                   |
+Semua perintah database lewat `npm run db <perintah>` (mirip `php artisan`; `npm run db` saja menampilkan bantuan):
+
+| Perintah                               | Fungsi                                                                 |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| `npm run db setup`                     | Membuat database, menjalankan semua migrasi, lalu semua seed.          |
+| `npm run db create`                    | Membuat database `DB_NAME` jika belum ada.                             |
+| `npm run db migrate`                   | Menjalankan migrasi yang belum dijalankan (membuat database jika perlu). |
+| `npm run db migrate:status`            | Menampilkan migrasi yang sudah dan belum dijalankan.                   |
+| `npm run db migrate:rollback`          | Membatalkan batch terakhir (`--step=N`: N migrasi terakhir).           |
+| `npm run db migrate:fresh`             | Menghapus semua tabel lalu migrasi ulang (`--seed`: sekaligus seed).   |
+| `npm run db seed [nama]`               | Menjalankan semua seed, atau hanya seed yang namanya diawali `[nama]`. |
+| `npm run db wipe`                      | Menghapus semua tabel dan view.                                        |
+| `npm run db make:migration <nama>`     | Membuat file migrasi baru di `API/migrations/`.                        |
+| `npm run db make:seed <nama>`          | Membuat file seed baru di `API/seeds/`.                                |
+| `npm run db demo --reset`              | Data demo satu tahun (lihat di bawah).                                 |
+| `npm run db backfill` / `npm run db docs` | Sama dengan `accounting:backfill` / `db:docs`.                      |
+
+`migrate:fresh`, `wipe` dan `demo` menolak berjalan jika `NODE_ENV=production`. Migrasi `baseline` tidak bisa
+di-rollback; untuk mulai dari nol pakai `migrate:fresh`. Perintah lama (`npm run migrate`, `npm run seed`, dst.) tetap jalan.
 
 Setiap perubahan skema harus dibuat sebagai file migrasi baru — jangan ubah tabel langsung di database atau mengedit migrasi yang sudah dijalankan.
 
 Setelah migrasi akuntansi (penjualan & jurnal) pertama kali dijalankan, buat jurnal untuk transaksi, penerimaan barang, dan pembayaran supplier yang sudah ada:
 
 ```bash
-npm run accounting:backfill
+npm run db backfill
 ```
 
 Perintah ini aman dijalankan berulang kali; dokumen yang sudah punya jurnal dilewati.
@@ -88,7 +126,7 @@ masih bisa login tetapi tidak bisa melakukan apa pun sampai diberi role.
 Setelah migrasi, perbarui dokumentasi skema:
 
 ```bash
-npm run db:docs
+npm run db docs
 ```
 
 Perintah ini menulis ulang `Database.md` dari skema database yang sedang dipakai.
@@ -98,7 +136,7 @@ Perintah ini menulis ulang `Database.md` dari skema database yang sedang dipakai
 Untuk mencoba laporan akuntansi dengan data yang terasa nyata, isi database dev dengan satu tahun operasional toko:
 
 ```bash
-npm run seed:demo-year -- --reset
+npm run db demo --reset
 ```
 
 `--reset` **menghapus database `DB_NAME`**, lalu membuatnya ulang, menjalankan migrasi dan seed akun dev. Tanpa `--reset`, skrip menolak database yang sudah berisi produk, penjualan atau jurnal. Skrip juga menolak berjalan jika `NODE_ENV=production`.
@@ -141,7 +179,7 @@ npm run dev
 ```
 
 Buka http://localhost:5173. Saat development, Vite meneruskan `/api` dan `/uploads` ke API (default
-`http://localhost:3000`; ubah dengan `API_URL=...` di `web/.env.local`), jadi browser melihat satu origin dan
+`http://localhost:5000`; ubah dengan `API_URL=...` di `web/.env.local`), jadi browser melihat satu origin dan
 cookie sesi API (httpOnly, SameSite=Lax) langsung bekerja. Token tidak pernah disimpan di JavaScript.
 
 Produksi: `npm run build` menghasilkan file statis di `web/dist/`. Sajikan dari domain yang sama dengan API lewat
@@ -187,9 +225,10 @@ Menu dan halaman mengikuti izin pengguna (sama dengan aplikasi kasir); API tetap
 | `API/src/routes/accounting.js`   | JavaScript | Bagan akun, jurnal manual, neraca saldo, laba rugi, tutup periode, pemetaan akun. |
 | `API/src/services/journal.js`    | JavaScript | Mesin jurnal: harus seimbang, tidak bisa diedit (dibatalkan via jurnal pembalik). |
 | `API/src/services/posting.js`    | JavaScript | Aturan jurnal otomatis untuk penjualan, retur, pembelian, stok, dan shift. |
-| `API/scripts/backfill-journals.js` | JavaScript | `npm run accounting:backfill` — membuat jurnal untuk dokumen lama.   |
-| `API/scripts/schema-doc.js`      | JavaScript | `npm run db:docs` — menulis ulang `Database.md` dari skema database.  |
-| `API/scripts/demo-year.js`       | JavaScript | `npm run seed:demo-year -- --reset` — data demo satu tahun lewat kode API dengan jam simulasi (khusus dev). |
+| `API/scripts/db.js`              | JavaScript | `npm run db <perintah>` — migrasi, seed, dan perintah database lain (lihat bagian 4). |
+| `API/scripts/backfill-journals.js` | JavaScript | `npm run db backfill` — membuat jurnal untuk dokumen lama.   |
+| `API/scripts/schema-doc.js`      | JavaScript | `npm run db docs` — menulis ulang `Database.md` dari skema database.  |
+| `API/scripts/demo-year.js`       | JavaScript | `npm run db demo --reset` — data demo satu tahun lewat kode API dengan jam simulasi (khusus dev). |
 | `API/src/routes/purchasing.js`   | JavaScript | Supplier, penerimaan barang (draf → posting ke stok), pembayaran supplier. |
 | `API/src/routes/transfers.js`    | JavaScript | Transfer stok antar lokasi: draf → kirim → terima / selesaikan selisih. |
 | `API/src/routes/opnames.js`      | JavaScript | Stok opname: snapshot, hitung jumlah, scan IMEI, setujui penyesuaian. |
@@ -286,6 +325,8 @@ gunakan `/api/catalog`, `/api/locations` dan `/api/sales`.
 
 ### 📒 Akuntansi
 
+Penjelasan lengkap (aturan jurnal, laporan, halaman web dan aplikasi, serta yang belum selesai) ada di [Accounting.md](Accounting.md).
+
 - **Tanggal dokumen.** Penerimaan barang (tanggal barang diterima), retur, penyesuaian stok, stok opname (tanggal
   penyesuaian), transfer (kirim / terima), pembayaran supplier, dan biaya bisa diberi tanggal sebelumnya. Mutasi stok,
   jurnal, dan nomor dokumen (`GR-BR01-261031-…`) memakai tanggal itu. Tanggal di masa depan dan di periode yang sudah
@@ -335,11 +376,20 @@ socket.emit('join-branch', locationId); // room satu lokasi (harus punya akses p
 socket.emit('join-branch', 0);          // semua lokasi — hanya untuk akses yang mencakup semua lokasi
 ```
 
-| Event           | Payload                                        | Dipicu saat                          |
-| --------------- | ---------------------------------------------- | ------------------------------------ |
-| `sale-created`  | `{ id, number, grand_total, location_id? }`    | Penjualan baru tersimpan             |
-| `stock-changed` | `{ location_id, variant_ids }`                 | Stok berubah karena penjualan        |
-| `server-info`   | status server                                  | Setiap 10 detik (halaman docs)       |
+| Event           | Payload                                                      | Dipicu saat                                              |
+| --------------- | ------------------------------------------------------------ | -------------------------------------------------------- |
+| `changed`       | `{ entity, action, ids, location_id, topics, at }`           | Setiap perubahan data yang berhasil disimpan (lihat bawah) |
+| `sale-created`  | `{ id, number, grand_total, location_id? }`                  | Penjualan baru tersimpan (lama, tetap dikirim)           |
+| `stock-changed` | `{ location_id, variant_ids }`                               | Stok berubah karena penjualan (lama, tetap dikirim)      |
+| `server-info`   | status server                                                | Setiap 10 detik (halaman docs)                           |
+
+`changed` dikirim dari satu tempat (`API/src/services/live.js`): setiap `logAudit()` mencatat perubahan, dan semuanya
+dikirim **setelah** respons sukses (status < 400), jadi transaksi yang gagal/di-rollback tidak pernah diumumkan.
+Perubahan di suatu lokasi dikirim ke room lokasi itu dan room `0`; perubahan tanpa lokasi (katalog, pengguna, kantor
+pusat) ke semua perangkat. Transfer diumumkan ke lokasi asal dan tujuan. Event hanya memberi tahu *apa* yang berubah:
+klien memuat ulang data lewat API biasa (izin tetap dicek). `topics` (mis. `sales`, `stock`, `expenses`, `accounting`,
+`reports`, `catalog`, `access`) menentukan layar mana yang perlu dimuat ulang. Pengiriman tidak dijamin, jadi klien memuat
+ulang semua data yang tampil setiap kali tersambung kembali.
 
 ---
 
@@ -347,7 +397,7 @@ socket.emit('join-branch', 0);          // semua lokasi — hanya untuk akses ya
 
 | Variabel          | Wajib | Deskripsi                                               |
 | ----------------- | ----- | ------------------------------------------------------- |
-| `PORT`            | ❌    | Port server (default: 3000)                             |
+| `PORT`            | ❌    | Port server (default: 5000)                             |
 | `NODE_ENV`        | ❌    | `development` atau `production`                         |
 | `DB_HOST`         | ✅    | Host MySQL                                              |
 | `DB_USER`         | ✅    | Username MySQL                                          |

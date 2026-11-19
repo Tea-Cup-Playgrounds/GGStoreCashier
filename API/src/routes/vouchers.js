@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
+const { queueChange } = require('../services/live');
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -108,6 +109,7 @@ router.post('/', requirePermission('vouchers.manage'), async (req, res) => {
             ]
         );
 
+        queueChange(req, { entity: 'voucher', action: 'create', id: result.insertId });
         res.status(201).json({ message: 'Voucher berhasil dibuat', voucherId: result.insertId });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -155,6 +157,7 @@ router.put('/:id', requirePermission('vouchers.manage'), async (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Voucher tidak ditemukan' });
         }
+        queueChange(req, { entity: 'voucher', action: 'update', id: req.params.id });
         res.json({ message: 'Voucher berhasil diperbarui' });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -175,6 +178,7 @@ router.delete('/:id', requirePermission('vouchers.manage'), async (req, res) => 
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Voucher tidak ditemukan' });
         }
+        queueChange(req, { entity: 'voucher', action: 'delete', id: req.params.id });
         res.json({ message: 'Voucher berhasil dihapus' });
     } catch (err) {
         console.error('Delete voucher error:', err);

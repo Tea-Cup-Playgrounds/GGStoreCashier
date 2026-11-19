@@ -640,3 +640,44 @@ export interface PulsaDeposit {
   top_ups: Array<{ entry_id: string; number: string; date: string; memo: string | null; status: 'posted' | 'void'; location_code: string | null; amount: number }>;
   usage: Array<{ month: string; used: number; sales: number }>;
 }
+
+/** GET /reports/monthly-recap — Rekap Bulanan (see API/src/routes/reports.js). */
+export interface RecapLine {
+  code: string;
+  name: string;
+  amount: number;
+  count: number;
+}
+export interface MonthlyRecap {
+  month: string;
+  from: string;
+  to: string;
+  location_id: number | null;
+  omset: {
+    gross: number;
+    transactions: number;
+    cash: number;
+    qris_debit: number;
+    transfer: number;
+    ewallet: number;
+    expenses: number;
+    expense_lines: RecapLine[];
+    refund: number;
+    discounts: number;
+    net: number;
+  };
+  categories: Array<{ id: number | null; name: string; qty: number; revenue: number; cost: number; gross_profit: number }>;
+  /** Owner and accountant only (accounting.view); null for branch managers. */
+  allocation: {
+    net_revenue: number;
+    operational: number;
+    operational_lines: RecapLine[];
+    stock_purchases: number;
+    stock_goods: number;
+    stock_pulsa: number;
+    debt_payments: number;
+    assets: number;
+    remaining: number;
+    pulsa_balance: number;
+  } | null;
+}

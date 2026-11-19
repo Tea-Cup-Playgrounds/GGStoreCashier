@@ -44,7 +44,7 @@ export function DashboardPage() {
       <PageHeader title={`Halo, ${user?.name ?? ''}`} description="Ringkasan penjualan dan stok." actions={<LocationSelect choice={choice} />} />
       <QueryState query={dashboard}>
         {s && (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
             <Stat label="Pendapatan hari ini" value={formatRp(s.todayRevenue)} hint={`${formatNumber(s.todayTransactions)} transaksi`} />
             <Stat label="Pendapatan bulan ini" value={formatRp(s.monthlyRevenue)} hint={`${formatNumber(s.monthlyTransactions)} transaksi`} />
             <Stat label="Stok menipis" value={formatNumber(s.lowStockCount)} hint="Varian dengan stok 1–5 di cabang" />

@@ -92,7 +92,7 @@ export function JournalsPage() {
             { header: 'Tanggal', cell: (j) => formatDate(j.entry_date) },
             { header: 'Lokasi', cell: (j) => j.location_code ?? 'Pusat' },
             { header: 'Sumber', cell: (j) => SOURCE_TYPES[j.source_type] ?? j.source_type },
-            { header: 'Keterangan', cell: (j) => <span className="text-stone-600">{j.memo}</span> },
+            { header: 'Keterangan', wrap: true, cell: (j) => <span className="text-stone-600">{j.memo}</span> },
             { header: 'Jumlah', align: 'right', cell: (j) => formatRp(j.amount) },
             { header: '', cell: (j) => (j.status === 'void' ? <Badge tone="red">Dibatalkan</Badge> : j.reverses_entry_id ? <Badge tone="amber">Pembalik</Badge> : null) },
           ]}
@@ -159,7 +159,7 @@ export function JournalDialog({ id, onClose }: { id: string; onClose: () => void
             columns={[
               { header: 'Akun', cell: (l) => <span><span className="font-mono text-xs">{l.account_code}</span> {l.account_name}</span> },
               { header: 'Lokasi', cell: (l) => locationCode(l.location_id) },
-              { header: 'Keterangan', cell: (l) => l.memo ?? '' },
+              { header: 'Keterangan', wrap: true, cell: (l) => l.memo ?? '' },
               { header: 'Debit', align: 'right', cell: (l) => (toNumber(l.debit) ? formatRp(l.debit) : '') },
               { header: 'Kredit', align: 'right', cell: (l) => (toNumber(l.credit) ? formatRp(l.credit) : '') },
             ]}

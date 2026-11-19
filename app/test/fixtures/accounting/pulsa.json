@@ -1,0 +1,98 @@
+{
+ "balance": 4072500,
+ "top_ups": [
+  {
+   "entry_id": "01a1b89d-a29c-7df5-945d-18a757ab7bd0",
+   "number": "JV-BR01-261108-0001",
+   "date": "2026-11-08",
+   "memo": "Top up deposit pulsa: Transfer ke server pulsa",
+   "status": "posted",
+   "location_code": "BR01",
+   "amount": 5000000
+  },
+  {
+   "entry_id": "01a16b5e-3dbd-7c26-85d0-89b8f99ada41",
+   "number": "JV-BR01-261024-0001",
+   "date": "2026-10-24",
+   "memo": "Top up deposit pulsa: Transfer ke server pulsa",
+   "status": "posted",
+   "location_code": "BR01",
+   "amount": 5000000
+  },
+  {
+   "entry_id": "01a12345-3541-7537-8d5b-73c4112dff21",
+   "number": "JV-BR01-261010-0001",
+   "date": "2026-10-10",
+   "memo": "Top up deposit pulsa: Transfer ke server pulsa",
+   "status": "posted",
+   "location_code": "BR01",
+   "amount": 5000000
+  },
+  {
+   "entry_id": "01a0e578-e551-7b4a-a18b-3b5f9bad7991",
+   "number": "JV-BR01-260928-0003",
+   "date": "2026-09-28",
+   "memo": "Top up deposit pulsa: Transfer ke server pulsa",
+   "status": "posted",
+   "location_code": "BR01",
+   "amount": 5000000
+  }
+ ],
+ "usage": [
+  {
+   "month": "2026-11",
+   "used": 4144300,
+   "sales": 106
+  },
+  {
+   "month": "2026-10",
+   "used": 11446900,
+   "sales": 252
+  },
+  {
+   "month": "2026-09",
+   "used": 11984300,
+   "sales": 259
+  },
+  {
+   "month": "2026-08",
+   "used": 11509500,
+   "sales": 268
+  },
+  {
+   "month": "2026-07",
+   "used": 11924200,
+   "sales": 274
+  },
+  {
+   "month": "2026-06",
+   "used": 10485000,
+   "sales": 256
+  },
+  {
+   "month": "2026-05",
+   "used": 12488600,
+   "sales": 266
+  },
+  {
+   "month": "2026-04",
+   "used": 9919500,
+   "sales": 239
+  },
+  {
+   "month": "2026-03",
+   "used": 11156000,
+   "sales": 254
+  },
+  {
+   "month": "2026-02",
+   "used": 8245700,
+   "sales": 198
+  },
+  {
+   "month": "2026-01",
+   "used": 9591000,
+   "sales": 223
+  }
+ ]
+}

@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
 const { logAudit } = require('../services/audit');
+const { queueChange } = require('../services/live');
 const stock = require('../services/stock');
 const { nextDocumentNumber } = require('../services/documents');
 const { DISPLAY_NAME_SQL, ON_HAND_SQL } = require('../services/catalog');
@@ -206,7 +207,10 @@ router.put('/:id/counts', resolveOpname, requirePermission('stock.opname', { loc
         }
         return loadOpname(conn, opname.id);
     });
-    if (result) res.json({ message: 'Hitungan disimpan', opname: result });
+    if (result) {
+        queueChange(req, { entity: 'opname', action: 'count', id: req.opname.id, locationId: req.opname.location_id });
+        res.json({ message: 'Hitungan disimpan', opname: result });
+    }
 });
 
 // Body: { identifier } — an IMEI or serial number scanned during the count.
@@ -248,6 +252,7 @@ router.post('/:id/scan', resolveOpname, requirePermission('stock.opname', { loca
             elsewhere: `Unit terdaftar di ${result.unit?.location_code || 'luar stok'} (${result.unit?.status}) — dicatat sebagai temuan`,
             unknown: 'IMEI / nomor seri belum terdaftar — dicatat sebagai temuan',
         };
+        queueChange(req, { entity: 'opname', action: 'scan', id: req.opname.id, locationId: req.opname.location_id });
         res.json({ ...result, message: messages[result.result] });
     }
 });
@@ -259,7 +264,10 @@ router.post('/:id/unscan', resolveOpname, requirePermission('stock.opname', { lo
         await conn.execute('UPDATE stock_opname_units SET found = 0 WHERE opname_id = ? AND unit_id = ?', [opname.id, String(req.body.unit_id || '')]);
         return true;
     });
-    if (result) res.json({ message: 'Pindaian dibatalkan' });
+    if (result) {
+        queueChange(req, { entity: 'opname', action: 'unscan', id: req.opname.id, locationId: req.opname.location_id });
+        res.json({ message: 'Pindaian dibatalkan' });
+    }
 });
 
 // Applies the count: quantity variances become 'opname' movements; expected units that were

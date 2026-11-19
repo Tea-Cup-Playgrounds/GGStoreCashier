@@ -22,6 +22,7 @@ import '../../../../core/services/connectivity_monitor.dart';
 import '../../../../core/services/error_handler.dart';
 import '../../../../shared/widgets/error_page.dart';
 import 'superadmin_dashboard_page.dart';
+import '../../../finance/presentation/pages/finance_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -57,11 +58,12 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Live events mean the data changed: bypass the dashboard cache.
     _txSub ??= ref.listenManual(realtimeTransactionProvider, (prev, next) {
-      if (next.lastUpdateTime != prev?.lastUpdateTime) _loadDashboard();
+      if (next.lastUpdateTime != prev?.lastUpdateTime) _loadDashboard(forceRefresh: true);
     });
     _productSub ??= ref.listenManual(realtimeProductProvider, (prev, next) {
-      if (next.lastUpdateTime != prev?.lastUpdateTime) _loadDashboard();
+      if (next.lastUpdateTime != prev?.lastUpdateTime) _loadDashboard(forceRefresh: true);
     });
     _connectivitySub ??= ref.listenManual(connectivityProvider, (previous, next) {
       if (previous?.valueOrNull == ConnectivityStatus.offline &&
@@ -440,6 +442,12 @@ class _HomePageState extends ConsumerState<HomePage>
                           icon: Icons.add,
                           label: 'Tambah Stok',
                           onTap: () => context.go(AppRouter.inventory),
+                        ),
+                      if (canUseFinance(ref.watch(currentAccessProvider)))
+                        QuickActionCard(
+                          icon: Icons.account_balance_wallet_outlined,
+                          label: 'Keuangan',
+                          onTap: () => context.go(AppRouter.finance),
                         ),
                     ],
                   ),

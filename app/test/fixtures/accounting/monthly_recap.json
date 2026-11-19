@@ -1,0 +1,109 @@
+{
+  "month": "2026-10",
+  "from": "2026-10-01",
+  "to": "2026-10-31",
+  "location_id": null,
+  "omset": {
+    "gross": 620202000,
+    "transactions": 2191,
+    "cash": 248684000,
+    "qris_debit": 281952000,
+    "transfer": 68282000,
+    "ewallet": 20609000,
+    "expenses": 1720000,
+    "expense_lines": [
+      {
+        "code": "6-6000",
+        "name": "Perlengkapan Toko",
+        "amount": 1420000,
+        "count": 6
+      },
+      {
+        "code": "6-9000",
+        "name": "Beban Lain-lain",
+        "amount": 300000,
+        "count": 3
+      }
+    ],
+    "refund": 1303000,
+    "discounts": 675000,
+    "net": 616504000
+  },
+  "categories": [
+    {
+      "id": 1,
+      "name": "Handphone",
+      "qty": 228,
+      "revenue": 439110144,
+      "cost": 357315000,
+      "gross_profit": 81795144
+    },
+    {
+      "id": 2,
+      "name": "Aksesoris",
+      "qty": 2005,
+      "revenue": 115023856,
+      "cost": 56191087,
+      "gross_profit": 58832769
+    },
+    {
+      "id": 4,
+      "name": "Jasa Servis",
+      "qty": 172,
+      "revenue": 33655000,
+      "cost": 0,
+      "gross_profit": 33655000
+    },
+    {
+      "id": 3,
+      "name": "Pulsa & Digital",
+      "qty": 708,
+      "revenue": 30560000,
+      "cost": 28434800,
+      "gross_profit": 2125200
+    }
+  ],
+  "allocation": {
+    "net_revenue": 616504000,
+    "operational": 61070500,
+    "operational_lines": [
+      {
+        "code": "6-1000",
+        "name": "Beban Sewa",
+        "amount": 18000000,
+        "count": 4
+      },
+      {
+        "code": "6-2000",
+        "name": "Gaji Karyawan",
+        "amount": 34500000,
+        "count": 5
+      },
+      {
+        "code": "6-3000",
+        "name": "Listrik, Air & Internet",
+        "amount": 7045500,
+        "count": 11
+      },
+      {
+        "code": "6-4000",
+        "name": "Biaya Administrasi Bank & MDR",
+        "amount": 25000,
+        "count": 1
+      },
+      {
+        "code": "6-5000",
+        "name": "Beban Pemasaran",
+        "amount": 1500000,
+        "count": 1
+      }
+    ],
+    "stock_purchases": 30000000,
+    "stock_goods": 0,
+    "stock_pulsa": 30000000,
+    "debt_payments": 419409615,
+    "assets": 0,
+    "remaining": 106023885,
+    "pulsa_balance": 12689500
+  }
+}

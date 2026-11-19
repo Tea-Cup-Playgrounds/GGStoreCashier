@@ -8,9 +8,9 @@ const { AppError, withTransaction } = require('../utils/transaction');
 const { ctxOf, parseDate, parseMoney } = require('../utils/request');
 const { uuidv7 } = require('../utils/uuid');
 
-// Chart of accounts, journals, trial balance / profit & loss, periods and account mappings.
-// Non-rent costs such as rent, building tax (PBB) or salaries are recorded as manual journals
-// (e.g. Dr 6-1000 Beban Sewa, Cr 1-1100 Kas) until the expenses module arrives.
+// Chart of accounts, journals, manual journals, opening balances, reports (trial balance, profit &
+// loss, balance sheet, ledger), periods and account mappings. Operating costs (rent, salaries, PBB)
+// are recorded through the expenses module (routes/expenses.js), not here.
 const router = express.Router();
 
 router.use(authenticateToken);
@@ -19,10 +19,10 @@ const TYPES = ['asset', 'liability', 'equity', 'income', 'expense'];
 // Normal balance side: assets and expenses grow with debits, the rest with credits.
 const DEBIT_NORMAL = new Set(['asset', 'expense']);
 
-// Location filter for accounting reads. Users with accounting.view everywhere see company-wide
+// Location filter for accounting reads. Users with the permission everywhere see company-wide
 // entries (location NULL) too; others only their locations.
-const scopeClause = (req, column, params) => {
-    const scope = req.access.locationsFor('accounting.view');
+const scopeClause = (req, column, params, permissions = ['accounting.view']) => {
+    const scope = req.access.locationsForAny(...permissions);
     const requested = req.query.location_id ? Number(req.query.location_id) : null;
     if (requested) {
         if (scope !== null && !scope.includes(requested)) throw new AppError('Akses tidak diizinkan', 403);
@@ -262,11 +262,18 @@ router.post('/journals/:id/void', requirePermission('accounting.post_manual'), a
 
 // ── reports ──────────────────────────────────────────────────────────────────
 
-const balances = async (req, { from, to, types }) => {
+// Laba Rugi and Neraca are also open to users who read their own location's reports (branch
+// managers: reports.view_location), limited to their locations. Journals, the ledger, the trial
+// balance and the rest stay with accounting.view.
+const STATEMENT_PERMISSIONS = ['accounting.view', 'reports.view_location'];
+const requireStatementAccess = (req, res, next) =>
+    STATEMENT_PERMISSIONS.some((p) => req.access.can(p)) ? next() : res.status(403).json({ error: 'Akses tidak diizinkan' });
+
+const balances = async (req, { from, to, types, permissions }) => {
     const params = [];
     let where = "WHERE e.status IN ('posted', 'void')";
     // Voided entries stay in the ledger together with their reversals, so both are summed.
-    where += scopeClause(req, 'jl.location_id', params);
+    where += scopeClause(req, 'jl.location_id', params, permissions);
     if (from) { where += ' AND e.entry_date >= ?'; params.push(from); }
     if (to) { where += ' AND e.entry_date <= ?'; params.push(to); }
     const [rows] = await pool.execute(
@@ -295,8 +302,10 @@ router.get('/trial-balance', requirePermission('accounting.view'), handle('Gagal
 }));
 
 // GET /api/accounting/profit-loss?from=&to=&location_id=
-router.get('/profit-loss', requirePermission('accounting.view'), handle('Gagal menyusun laba rugi', async (req, res) => {
-    const rows = await balances(req, { from: parseDate(req.query.from), to: parseDate(req.query.to), types: ['income', 'expense'] });
+router.get('/profit-loss', requireStatementAccess, handle('Gagal menyusun laba rugi', async (req, res) => {
+    const rows = await balances(req, {
+        from: parseDate(req.query.from), to: parseDate(req.query.to), types: ['income', 'expense'], permissions: STATEMENT_PERMISSIONS,
+    });
     const income = rows.filter((r) => r.type === 'income');
     const expense = rows.filter((r) => r.type === 'expense');
     const sum = (list) => Math.round(list.reduce((s, r) => s + r.balance, 0) * 100) / 100;
@@ -322,12 +331,12 @@ const profitOf = (rows) => round2(rows.reduce((s, r) => s + (r.type === 'income'
 // Assets = liabilities + equity at the end of `to` (default today). Profit is not closed into an
 // account at year end: this year's profit (from 1 January) and earlier years' profit are worked
 // out from the income and expense accounts and shown under equity.
-router.get('/balance-sheet', requirePermission('accounting.view'), handle('Gagal menyusun neraca', async (req, res) => {
+router.get('/balance-sheet', requireStatementAccess, handle('Gagal menyusun neraca', async (req, res) => {
     const to = req.query.to ? parseDate(req.query.to) : dateOnly();
     if (!to) return res.status(400).json({ error: 'Format tanggal harus YYYY-MM-DD' });
     const year = to.slice(0, 4);
-    const rows = await balances(req, { to });
-    const thisYear = await balances(req, { from: `${year}-01-01`, to, types: ['income', 'expense'] });
+    const rows = await balances(req, { to, permissions: STATEMENT_PERMISSIONS });
+    const thisYear = await balances(req, { from: `${year}-01-01`, to, types: ['income', 'expense'], permissions: STATEMENT_PERMISSIONS });
     const currentProfit = profitOf(thisYear);
     const priorProfit = round2(profitOf(rows) - currentProfit);
 

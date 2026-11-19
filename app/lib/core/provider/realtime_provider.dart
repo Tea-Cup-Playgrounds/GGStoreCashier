@@ -5,7 +5,9 @@ import '../services/socket_service.dart';
 // Live updates from the API's Socket.IO rooms (see SocketService). Pages watch lastUpdateTime and
 // reload what they show.
 
-/// Stock changed at a location (event `stock-changed`, e.g. after a sale).
+/// Stock changed at a location (event `stock-changed`, e.g. after a sale). After a resync
+/// (reconnect, back from the background) [locationId] is null and [variantIds] empty: anything may
+/// have changed.
 class RealtimeProductState {
   final int? locationId;
   final List<int> variantIds;
@@ -36,6 +38,7 @@ class RealtimeProductNotifier extends StateNotifier<RealtimeProductState> {
         dev.log('Error parsing stock-changed event: $e');
       }
     });
+    SocketService.on(SocketService.resyncEvent, (_) => state = RealtimeProductState(lastUpdateTime: DateTime.now()));
   }
 }
 
@@ -51,6 +54,7 @@ class RealtimeTransactionNotifier extends StateNotifier<RealtimeTransactionState
         dev.log('Error parsing sale-created event: $e');
       }
     });
+    SocketService.on(SocketService.resyncEvent, (_) => state = RealtimeTransactionState(lastUpdateTime: DateTime.now()));
   }
 }
 

@@ -77,8 +77,11 @@ interface ProfitLoss {
   totals: { income: number; cost_of_goods: number; gross_profit: number; expense: number; net_profit: number };
 }
 
+/** Laba Rugi and Neraca are also open to branch managers (their own location's reports). */
+export const STATEMENT_PERMISSIONS = ['accounting.view', 'reports.view_location'];
+
 export function ProfitLossPage() {
-  const choice = useLocationChoice('accounting.view', { allowAll: true });
+  const choice = useLocationChoice(STATEMENT_PERMISSIONS, { allowAll: true });
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(today());
   const report = useQuery({

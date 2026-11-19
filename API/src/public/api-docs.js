@@ -249,8 +249,8 @@ const groups = [
       { method: 'POST', path: '/api/accounting/journals', auth: 'accounting.post_manual', desc: 'Manual entry (JV-…); must balance; closed periods refused.', errors: [] },
       { method: 'POST', path: '/api/accounting/journals/:id/void', auth: 'accounting.post_manual', desc: 'Void a manual entry by reversal.', errors: [] },
       { method: 'GET', path: '/api/accounting/trial-balance', auth: 'accounting.view', desc: 'Trial balance for a date range.', errors: [] },
-      { method: 'GET', path: '/api/accounting/profit-loss', auth: 'accounting.view', desc: 'Profit & loss.', errors: [] },
-      { method: 'GET', path: '/api/accounting/balance-sheet', auth: 'accounting.view', desc: 'Balance sheet (Neraca) at ?to= (default today) and ?location_id=. Profit of this year and earlier years is computed from income/expense accounts; totals.difference is 0 when balanced.', errors: [] },
+      { method: 'GET', path: '/api/accounting/profit-loss', auth: 'accounting.view or reports.view_location', desc: 'Profit & loss for ?from=&to=&location_id=. Branch managers (reports.view_location) get only their own locations.', errors: [] },
+      { method: 'GET', path: '/api/accounting/balance-sheet', auth: 'accounting.view or reports.view_location', desc: 'Balance sheet (Neraca) at ?to= (default today) and ?location_id=; branch managers get only their own locations. Profit of this year and earlier years is computed from income/expense accounts; totals.difference is 0 when balanced.', errors: [] },
       { method: 'GET', path: '/api/accounting/ledger', auth: 'accounting.view', desc: 'General ledger (Buku Besar) of ?account_id= between ?from=&to=: opening, lines with running balance, closing (max 5000 lines, then truncated: true).', errors: [] },
       { method: 'POST', path: '/api/accounting/opening-balances', auth: 'accounting.post_manual', desc: 'Opening balances. Body: { date, location_id?, memo?, lines: [{ account_code, debit | credit }] }. Balance-sheet accounts only (stock: opening stock instead); the difference goes to 3-3000 Ekuitas Saldo Awal.', errors: [] },
       { method: 'GET', path: '/api/accounting/periods', auth: 'accounting.view', desc: 'Accounting periods.', errors: [] },
@@ -269,6 +269,7 @@ const groups = [
       { method: 'POST', path: '/api/expenses/:id/void', auth: 'expenses.manage', desc: 'Void an expense with a reversing journal. Body: { reason }', errors: [] },
       { method: 'GET', path: '/api/pulsa-deposit', auth: 'expenses.manage | accounting.view', desc: 'Pulsa deposit: current balance, top-ups and monthly usage (?location_id, from, to).', errors: [] },
       { method: 'POST', path: '/api/pulsa-deposit/top-ups', auth: 'expenses.manage', desc: 'Top up the deposit. Body: { location_id?, date, amount, paid_from: cash | bank, note? }. Each pulsa sale uses the deposit at its variant cost_price.', errors: [] },
+      { method: 'GET', path: '/api/reports/monthly-recap', auth: 'reports.view_location | reports.view_all | accounting.view', desc: 'Rekap Bulanan (?month=YYYY-MM, location_id). omset: omset sistem, cash / QRIS+debit / transfer / e-wallet, pengeluaran (expenses paid from cash), refund, komplimen (discounts), omset bersih; categories: revenue, cost, gross profit. allocation (accounting.view only, else null): operasional (bank-paid expenses per category), pembelian stok (paid on receipt + pulsa top-ups), pembayaran hutang, aset (1-2xxx), sisa uang, pulsa balance.', errors: [] },
     ]
   },
   {
@@ -294,7 +295,7 @@ const groups = [
       { method: 'GET', path: '/api/test', auth: 'public', desc: 'Connectivity test for the Flutter app.', response: { status: 'OK', message: 'Connection successful', timestamp: '2026-01-01T00:00:00.000Z', ip: '::1' }, errors: [] },
       { method: 'GET', path: '/api/docs', auth: 'owner', desc: 'This API documentation page.', response: '(HTML page)', errors: [{ code: 302, msg: 'Redirect to /api/docs/login if not signed in as an owner' }] },
       { method: 'GET', path: '/api/docs/info', auth: 'owner', desc: 'Server info JSON (ngrok URL, uptime, env).', errors: [{ code: 302, msg: 'Redirect to /api/docs/login' }] },
-      { method: 'SOCKET', path: 'socket.io', auth: 'required', desc: 'Connect with auth { token } (or Authorization header). emit join-branch <locationId> (0 = every location, only with all-location access). Events: sale-created, stock-changed { location_id, variant_ids }.', errors: [] },
+      { method: 'SOCKET', path: 'socket.io', auth: 'required', desc: 'Connect with auth { token } (or Authorization header). emit join-branch <locationId> (0 = every location, only with all-location access). Events: changed { entity, action, ids, location_id, topics, at } after every successful change (to the location room and room 0; no location = everyone; transfers to both locations); legacy sale-created, stock-changed { location_id, variant_ids }.', errors: [] },
     ]
   },
 ];

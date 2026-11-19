@@ -1,0 +1,121 @@
+{
+ "income": [
+  {
+   "id": 17,
+   "code": "4-1000",
+   "name": "Penjualan Barang",
+   "type": "income",
+   "debit": 426126.12,
+   "credit": 199819747.75,
+   "balance": 199393621.63
+  },
+  {
+   "id": 18,
+   "code": "4-2000",
+   "name": "Pendapatan Jasa",
+   "type": "income",
+   "debit": 0,
+   "credit": 12684684.73,
+   "balance": 12684684.73
+  },
+  {
+   "id": 19,
+   "code": "4-3000",
+   "name": "Pendapatan Pulsa & Digital",
+   "type": "income",
+   "debit": 0,
+   "credit": 10924324.4,
+   "balance": 10924324.4
+  }
+ ],
+ "expense": [
+  {
+   "id": 22,
+   "code": "5-1000",
+   "name": "Harga Pokok Penjualan",
+   "type": "expense",
+   "debit": 175072410.88,
+   "credit": 223067.28,
+   "balance": 174849343.6
+  },
+  {
+   "id": 23,
+   "code": "5-2000",
+   "name": "Selisih Persediaan",
+   "type": "expense",
+   "debit": 227385.24,
+   "credit": 0,
+   "balance": 227385.24
+  },
+  {
+   "id": 25,
+   "code": "6-1000",
+   "name": "Beban Sewa",
+   "type": "expense",
+   "debit": 18000000,
+   "credit": 0,
+   "balance": 18000000
+  },
+  {
+   "id": 28,
+   "code": "6-3000",
+   "name": "Listrik, Air & Internet",
+   "type": "expense",
+   "debit": 6796500,
+   "credit": 0,
+   "balance": 6796500
+  },
+  {
+   "id": 33,
+   "code": "6-4000",
+   "name": "Biaya Administrasi Bank & MDR",
+   "type": "expense",
+   "debit": 1409513,
+   "credit": 0,
+   "balance": 1409513
+  },
+  {
+   "id": 34,
+   "code": "6-5000",
+   "name": "Beban Pemasaran",
+   "type": "expense",
+   "debit": 1500000,
+   "credit": 0,
+   "balance": 1500000
+  },
+  {
+   "id": 35,
+   "code": "6-6000",
+   "name": "Perlengkapan Toko",
+   "type": "expense",
+   "debit": 1070000,
+   "credit": 0,
+   "balance": 1070000
+  },
+  {
+   "id": 29,
+   "code": "6-9000",
+   "name": "Beban Lain-lain",
+   "type": "expense",
+   "debit": 300000,
+   "credit": 0,
+   "balance": 300000
+  },
+  {
+   "id": 30,
+   "code": "6-9100",
+   "name": "Selisih Kas",
+   "type": "expense",
+   "debit": 140000,
+   "credit": 0,
+   "balance": 140000
+  }
+ ],
+ "totals": {
+  "income": 223002630.76,
+  "cost_of_goods": 175076728.84,
+  "gross_profit": 47925901.92,
+  "expense": 204292741.84,
+  "net_profit": 18709888.92
+ }
+}

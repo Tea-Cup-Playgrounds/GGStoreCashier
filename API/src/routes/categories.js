@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { authenticateToken, requirePermission } = require("../middleware/auth");
+const { queueChange } = require("../services/live");
 const { uploadCategory, deleteFile, validateUploadedImage } = require("../utils/upload");
 
 const router = express.Router();
@@ -71,6 +72,7 @@ router.post("/", requirePermission("catalog.manage"), uploadCategory.single("cat
     // Get the created category
     const [categories] = await pool.execute("SELECT * FROM categories WHERE id = ?", [result.insertId]);
 
+    queueChange(req, { entity: "category", action: "create", id: result.insertId });
     res.status(201).json({
       message: "Category created successfully",
       categoryId: result.insertId,
@@ -142,6 +144,7 @@ router.put("/:id", requirePermission("catalog.manage"), uploadCategory.single("c
     // Get updated category
     const [categories] = await pool.execute("SELECT * FROM categories WHERE id = ?", [req.params.id]);
 
+    queueChange(req, { entity: "category", action: "update", id: req.params.id });
     res.json({
       message: "Category updated successfully",
       category: categories[0],
@@ -185,6 +188,7 @@ router.delete("/:id", requirePermission("catalog.manage"), async (req, res) => {
       deleteFile(`API/uploads/categories/${categories[0].category_image}`);
     }
 
+    queueChange(req, { entity: "category", action: "delete", id: req.params.id });
     res.json({ message: "Category deleted successfully" });
   } catch (error) {
     console.error("Delete category error:", error);

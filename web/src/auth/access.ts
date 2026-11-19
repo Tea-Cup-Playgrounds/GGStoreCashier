@@ -47,6 +47,17 @@ export class Access {
     return [...new Set(matching.map((a) => a.locationId as number))];
   }
 
+  /** Union of locationsFor() over several permissions: null if any of them covers every location. */
+  locationsForAny(...permissions: string[]): number[] | null {
+    const ids = new Set<number>();
+    for (const permission of permissions) {
+      const scope = this.locationsFor(permission);
+      if (scope === null) return null;
+      scope.forEach((id) => ids.add(id));
+    }
+    return [...ids];
+  }
+
   get roleLabel(): string {
     if (this.isOwner) return 'Owner';
     const names = [...new Set(this.assignments.map((a) => a.roleName))];

@@ -8,10 +8,11 @@ import { downloadCsv } from '../../lib/csv';
 import { firstOfMonth, formatDate, formatRp, today } from '../../lib/format';
 import { Badge, Button, Card, DataTable, Field, Input, PageHeader, QueryState, Select, Toolbar } from '../../components/ui';
 import { JournalDialog, SOURCE_TYPES, useAccounts } from './JournalsPage';
+import { STATEMENT_PERMISSIONS } from './ReportsPages';
 
 /** Neraca: assets = liabilities + equity at a date. This year's and earlier years' profit come from the income and expense accounts. */
 export function BalanceSheetPage() {
-  const choice = useLocationChoice('accounting.view', { allowAll: true });
+  const choice = useLocationChoice(STATEMENT_PERMISSIONS, { allowAll: true });
   const [to, setTo] = useState(today());
   const report = useQuery({
     queryKey: ['balance-sheet', choice.locationId, to],
@@ -166,7 +167,7 @@ export function LedgerPage() {
                   { header: 'Tanggal', cell: (e) => formatDate(e.date) },
                   { header: 'Nomor', cell: (e) => <span className="font-mono text-xs">{e.number}</span> },
                   { header: 'Lokasi', cell: (e) => e.location_code ?? 'Pusat' },
-                  { header: 'Keterangan', cell: (e) => <span className="text-stone-600">{e.line_memo || e.memo}</span> },
+                  { header: 'Keterangan', wrap: true, cell: (e) => <span className="text-stone-600">{e.line_memo || e.memo}</span> },
                   { header: 'Debit', align: 'right', cell: (e) => (e.debit ? formatRp(e.debit) : '') },
                   { header: 'Kredit', align: 'right', cell: (e) => (e.credit ? formatRp(e.credit) : '') },
                   { header: 'Saldo', align: 'right', cell: (e) => <span className={e.balance < 0 ? 'text-red-600' : ''}>{formatRp(e.balance)}</span> },

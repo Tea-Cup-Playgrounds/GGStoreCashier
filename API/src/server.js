@@ -15,6 +15,7 @@ const jwt = require("jsonwebtoken");
 const pool = require("./db");
 const { loadAccess } = require("./services/access");
 const { ensureUploadDirs } = require("./utils/upload");
+const { liveEvents } = require("./services/live");
 
 // Track ngrok public URL
 let ngrokUrl = null;
@@ -38,6 +39,7 @@ const salesRoutes = require("./routes/sales");
 const accountingRoutes = require("./routes/accounting");
 const expenseRoutes = require("./routes/expenses");
 const pulsaDepositRoutes = require("./routes/pulsa_deposit");
+const reportRoutes = require("./routes/reports");
 
 const app = express();
 const server = http.createServer(app);
@@ -83,6 +85,7 @@ io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token || (header && header.split(" ")[1]);
     if (!token) return next(new Error("unauthorized"));
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.purpose) return next(new Error("unauthorized")); // e.g. docs sessions are not API tokens
     const [users] = await pool.execute("SELECT id, is_active FROM users WHERE id = ?", [decoded.userId]);
     if (users.length === 0 || !users[0].is_active) return next(new Error("unauthorized"));
     socket.data.userId = users[0].id;
@@ -126,6 +129,9 @@ io.on("connection", (socket) => {
 
 // Make io accessible to routes
 app.set("io", io);
+
+// Live updates: changes announced after each successful request (services/live.js).
+app.use(liveEvents(io));
 
 // Middleware
 app.use(
@@ -179,8 +185,10 @@ app.use(
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-// Serve static files from uploads directory (inside API folder)
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Serve public image folders only. Attendance photos (absensi) and temp uploads are not public.
+for (const folder of ["products", "categories", "thumbnails"]) {
+  app.use(`/uploads/${folder}`, express.static(path.join(__dirname, "../uploads", folder)));
+}
 
 // Serve public assets (api-docs.js, favicon, etc.)
 app.use(express.static(path.join(__dirname, "public")));
@@ -215,6 +223,7 @@ app.use("/api/sales", salesRoutes);
 app.use("/api/accounting", accountingRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/pulsa-deposit", pulsaDepositRoutes);
+app.use("/api/reports", reportRoutes);
 
 // ── Docs session middleware ───────────────────────────────────────────────────
 const DOCS_SESSION_COOKIE = "docs_session";
@@ -360,7 +369,7 @@ const errorHandler = (err, req, res, next) => {
 
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Socket.IO enabled for real-time updates`);

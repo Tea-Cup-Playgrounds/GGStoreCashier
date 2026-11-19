@@ -23,6 +23,22 @@ let server;
 let pool;
 let jwt;
 
+// Live events published by the API (services/live.js), recorded by a stand-in for Socket.IO.
+const liveLog = [];
+const fakeIo = {
+    emit: (event, payload) => liveLog.push({ rooms: ['*'], event, payload }),
+    to(room) {
+        const rooms = [room];
+        const chain = {
+            to: (r) => (rooms.push(r), chain),
+            emit: (event, payload) => liveLog.push({ rooms: [...rooms], event, payload }),
+        };
+        return chain;
+    },
+};
+// Events go out when the response finishes; give that a moment after fetch resolves.
+const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+
 const call = async (method, url, user, body) => {
     const token = jwt.sign({ userId: USERS[user] }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const res = await fetch(base + url, {
@@ -75,8 +91,9 @@ test('accounting module', { skip }, async (t) => {
         const app = express();
         app.use(express.json());
         app.use(cookieParser());
+        app.use(require('../../src/services/live').liveEvents(fakeIo));
         for (const [prefix, file] of [['catalog', 'catalog'], ['stock', 'stock'], ['purchasing', 'purchasing'], ['transfers', 'transfers'],
-            ['opnames', 'opnames'], ['sales', 'sales'], ['accounting', 'accounting'], ['expenses', 'expenses'], ['pulsa-deposit', 'pulsa_deposit']]) {
+            ['opnames', 'opnames'], ['sales', 'sales'], ['accounting', 'accounting'], ['expenses', 'expenses'], ['pulsa-deposit', 'pulsa_deposit'], ['reports', 'reports']]) {
             app.use(`/api/${prefix}`, require(`../../src/routes/${file}`));
         }
         server = app.listen(0);
@@ -290,6 +307,102 @@ test('accounting module', { skip }, async (t) => {
         assert.ok(kas.entries.length >= 4);
         assert.equal(kas.entries.at(-1).balance, kas.closing);
         assert.equal(kas.closing, march.assets.find((a) => a.code === '1-1100').balance, 'ledger closing = balance sheet');
+    });
+
+    await t.test('branch manager: own branch Laba Rugi and Neraca only; detailed books stay closed', async () => {
+        const range = 'from=2026-01-01&to=2026-12-31';
+        const ownerPl = ok(await call('GET', `/api/accounting/profit-loss?${range}&location_id=${BR01}`, 'owner'));
+        const pl = ok(await call('GET', `/api/accounting/profit-loss?${range}&location_id=${BR01}`, 'admin1'));
+        assert.deepEqual(pl.totals, ownerPl.totals);
+        const scoped = ok(await call('GET', `/api/accounting/profit-loss?${range}`, 'admin1'));
+        assert.deepEqual(scoped.totals, ownerPl.totals, 'no location = their own branch, not the company');
+
+        const ownerBs = ok(await call('GET', `/api/accounting/balance-sheet?to=2026-12-31&location_id=${BR01}`, 'owner'));
+        const bs = ok(await call('GET', '/api/accounting/balance-sheet?to=2026-12-31', 'admin1'));
+        assert.deepEqual(bs.totals, ownerBs.totals);
+        assert.equal(bs.totals.difference, 0);
+
+        assert.equal((await call('GET', `/api/accounting/profit-loss?${range}&location_id=${BR02}`, 'admin1')).status, 403, 'other branch');
+        assert.equal((await call('GET', `/api/accounting/balance-sheet?location_id=${BR02}`, 'admin1')).status, 403, 'other branch');
+        for (const url of ['/api/accounting/journals', '/api/accounting/trial-balance', '/api/accounting/accounts']) {
+            assert.equal((await call('GET', url, 'admin1')).status, 403, url);
+        }
+        assert.equal((await call('GET', `/api/accounting/profit-loss?${range}`, 'kasir1')).status, 403, 'cashier');
+    });
+
+    await t.test('monthly recap: spreadsheet formulas, payments add up, branch managers see their branch only', async () => {
+        const recap = ok(await call('GET', '/api/reports/monthly-recap?month=2026-03', 'owner'));
+        const o = recap.omset;
+        const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, `${msg}: ${a} vs ${b}`);
+        near(o.net, o.gross - o.expenses - o.refund - o.discounts, 'omset bersih = sistem − pengeluaran − refund − komplimen');
+        near(o.cash + o.qris_debit + o.transfer + o.ewallet, o.gross - o.discounts, 'payments = what customers paid');
+        assert.ok(o.refund >= 85000, 'the March return is in March');
+        const a = recap.allocation;
+        assert.ok(a, 'owner sees the allocation');
+        near(a.remaining, a.net_revenue - a.operational - a.stock_purchases - a.debt_payments - a.assets, 'sisa uang');
+        near(a.stock_purchases, a.stock_goods + a.stock_pulsa, 'pembelian stok = goods + pulsa');
+
+        const branch = ok(await call('GET', '/api/reports/monthly-recap?month=2026-03', 'admin1'));
+        assert.equal(branch.allocation, null, 'branch managers get the store recap only');
+        const ownerBr01 = ok(await call('GET', `/api/reports/monthly-recap?month=2026-03&location_id=${BR01}`, 'owner'));
+        assert.deepEqual(branch.omset, ownerBr01.omset, 'no location = their own branch');
+        assert.equal((await call('GET', `/api/reports/monthly-recap?month=2026-03&location_id=${BR02}`, 'admin1')).status, 403);
+        assert.equal((await call('GET', '/api/reports/monthly-recap?month=2026-03', 'kasir1')).status, 403);
+        assert.equal((await call('GET', '/api/reports/monthly-recap?month=2026-3', 'owner')).status, 400);
+    });
+
+    await t.test('live events: announced after success, to the right rooms, never for refused requests', async () => {
+        const changed = () => liveLog.filter((e) => e.event === 'changed');
+        const branchRooms = (id) => [`branch-${id}`, 'branch-0'];
+
+        liveLog.length = 0;
+        const body = { date: '2026-04-30', account_code: '6-1000', amount: 150_000, paid_from: 'cash' };
+        assert.equal((await call('POST', '/api/expenses', 'admin1', { ...body, location_id: BR02 })).status, 403);
+        await settle();
+        assert.equal(changed().length, 0, 'a refused request announces nothing');
+
+        const expense = ok(await call('POST', '/api/expenses', 'admin1', { ...body, location_id: BR01 }), 201).expense;
+        await settle();
+        let events = changed();
+        assert.equal(events.length, 1);
+        assert.deepEqual(events[0].rooms, branchRooms(BR01));
+        assert.equal(events[0].payload.entity, 'expense');
+        assert.equal(events[0].payload.action, 'create');
+        assert.equal(events[0].payload.location_id, BR01);
+        assert.deepEqual(events[0].payload.ids, [String(expense.id)]);
+        assert.ok(events[0].payload.topics.includes('expenses') && events[0].payload.topics.includes('reports'));
+
+        // A transfer concerns both locations.
+        liveLog.length = 0;
+        const transfer = ok(await call('POST', '/api/transfers', 'owner', {
+            from_location_id: WH, to_location_id: BR02, items: [{ variant_id: state.charger, qty: 1 }],
+        }), 201).transfer;
+        ok(await call('POST', `/api/transfers/${transfer.id}/send`, 'owner', { date: '2026-04-30' }));
+        await settle();
+        events = changed().filter((e) => e.payload.action === 'send');
+        assert.deepEqual(events.map((e) => e.payload.location_id).sort(), [WH, BR02].sort(), 'sender and receiver both told');
+        assert.ok(events.every((e) => e.payload.topics.includes('stock')));
+
+        // A sale at BR01.
+        liveLog.length = 0;
+        ok(await call('POST', '/api/sales', 'kasir1', {
+            id: randomUUID(), location_id: BR01, occurred_at: '2026-04-30T03:00:00.000Z',
+            lines: [{ variant_id: state.charger, qty: 1 }], payments: [{ payment_method_id: 1, amount: 85000 }],
+        }), 201);
+        await settle();
+        events = changed().filter((e) => e.payload.entity === 'sale');
+        assert.equal(events.length, 1);
+        assert.deepEqual(events[0].rooms, branchRooms(BR01));
+        assert.ok(['sales', 'stock', 'shifts'].every((t) => events[0].payload.topics.includes(t)));
+
+        // No location (catalog): every connected device.
+        liveLog.length = 0;
+        ok(await call('POST', '/api/catalog/products', 'owner', { name: 'Kabel Uji Live', kind: 'goods', variants: [{ sku: 'T-LIVE', base_price: 10000 }] }), 201);
+        await settle();
+        events = changed().filter((e) => e.payload.entity === 'product');
+        assert.equal(events.length, 1);
+        assert.deepEqual(events[0].rooms, ['*']);
+        assert.equal(events[0].payload.location_id, null);
     });
 
     await t.test('stock count approved with a date before it started is refused', async () => {

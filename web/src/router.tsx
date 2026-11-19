@@ -31,6 +31,7 @@ import { JournalsPage } from './pages/accounting/JournalsPage';
 import { ProfitLossPage, TrialBalancePage } from './pages/accounting/ReportsPages';
 import { AccountsPage, MappingsPage, PeriodsPage } from './pages/accounting/AccountsPages';
 import { BalanceSheetPage, LedgerPage } from './pages/accounting/StatementsPages';
+import { MonthlyRecapPage } from './pages/reports/MonthlyRecapPage';
 import { ExpensesPage } from './pages/accounting/ExpensesPage';
 import { PulsaDepositPage } from './pages/accounting/PulsaDepositPage';
 import { OpeningBalancesPage } from './pages/accounting/OpeningBalancesPage';
@@ -85,6 +86,7 @@ export const router = createBrowserRouter([
           { path: 'accounting/expenses', element: page('/accounting/expenses', <ExpensesPage />) },
           { path: 'accounting/pulsa-deposit', element: page('/accounting/pulsa-deposit', <PulsaDepositPage />) },
           { path: 'accounting/opening-balances', element: page('/accounting/opening-balances', <OpeningBalancesPage />) },
+          { path: 'reports/monthly', element: page('/reports/monthly', <MonthlyRecapPage />) },
           { path: 'accounting/balance-sheet', element: page('/accounting/balance-sheet', <BalanceSheetPage />) },
           { path: 'accounting/ledger', element: page('/accounting/ledger', <LedgerPage />) },
           { path: 'accounting/trial-balance', element: page('/accounting/trial-balance', <TrialBalancePage />) },

@@ -20,11 +20,15 @@ export const cx = (...classes: Array<string | false | null | undefined>) => clas
 // ── Buttons ───────────────────────────────────────────────────────────────────
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+// Flat: solid fills or a solid 2px outline, bold labels, no shadows. Disabled states keep a visible
+// outline so the control is still recognisable as a button.
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-brand-500 text-ink-900 hover:bg-brand-600 disabled:bg-brand-100 disabled:text-stone-500',
-  secondary: 'border border-stone-300 bg-white text-stone-800 hover:bg-stone-50 disabled:text-stone-400',
-  ghost: 'text-stone-700 hover:bg-stone-100 disabled:text-stone-400',
-  danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-200',
+  primary:
+    'border-2 border-brand-500 bg-brand-500 text-ink-900 hover:border-brand-600 hover:bg-brand-600 active:bg-brand-400 disabled:border-stone-200 disabled:bg-stone-200 disabled:text-stone-400',
+  secondary:
+    'border-2 border-ink-900 bg-white text-ink-900 hover:bg-brand-100 active:bg-brand-200 disabled:border-stone-300 disabled:bg-white disabled:text-stone-400',
+  ghost: 'border-2 border-transparent text-ink-900 hover:bg-stone-200/70 disabled:text-stone-400',
+  danger: 'border-2 border-red-600 bg-red-600 text-white hover:border-red-700 hover:bg-red-700 disabled:border-red-200 disabled:bg-red-200',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -41,8 +45,9 @@ export function Button({ variant = 'secondary', size = 'md', loading, icon, clas
       {...rest}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:cursor-not-allowed',
-        size === 'sm' ? 'h-8 px-2.5 text-sm' : 'h-10 px-4 text-sm',
+        'inline-flex items-center justify-center gap-1.5 rounded-md font-bold whitespace-nowrap transition-colors disabled:cursor-not-allowed',
+        // Icon-only (no label): square, so the icon is not squeezed by the text padding.
+        children == null ? (size === 'sm' ? 'size-8' : 'size-10') : size === 'sm' ? 'h-8 px-3 text-sm' : 'h-10 px-4 text-sm',
         VARIANTS[variant],
         className,
       )}
@@ -55,8 +60,9 @@ export function Button({ variant = 'secondary', size = 'md', loading, icon, clas
 
 // ── Form controls ─────────────────────────────────────────────────────────────
 
+// 2px outline that turns black with a solid yellow halo on focus (flat: no blur).
 const CONTROL =
-  'w-full rounded-lg border border-stone-300 bg-white px-3 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25 disabled:bg-stone-100';
+  'w-full rounded-md border-2 border-stone-300 bg-white px-3 text-sm font-medium text-ink-900 placeholder:font-normal placeholder:text-stone-400 hover:border-stone-400 focus:border-ink-900 focus:shadow-[0_0_0_3px_var(--color-brand-500)] focus:outline-none focus-visible:outline-none disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-500';
 
 export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...rest} className={cx(CONTROL, 'h-10', className)} />;
@@ -76,8 +82,8 @@ export function Select({ className, children, ...rest }: SelectHTMLAttributes<HT
 
 export function Checkbox({ label, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label: ReactNode }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-stone-700">
-      <input type="checkbox" {...rest} className="size-4 rounded border-stone-300 accent-brand-600" />
+    <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-ink-900">
+      <input type="checkbox" {...rest} className="size-4 rounded-sm border-2 border-ink-900 accent-ink-900" />
       {label}
     </label>
   );
@@ -86,7 +92,7 @@ export function Checkbox({ label, ...rest }: InputHTMLAttributes<HTMLInputElemen
 export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <label className={cx('block', className)}>
-      <span className="mb-1 block text-sm font-medium text-stone-700">{label}</span>
+      <span className="mb-1.5 block text-sm font-bold text-ink-900">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-stone-500">{hint}</span>}
     </label>
@@ -97,10 +103,12 @@ export function Field({ label, hint, children, className }: { label: string; hin
 
 export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-xl font-semibold text-stone-900">{title}</h1>
-        {description && <p className="mt-1 text-sm text-stone-500">{description}</p>}
+        {/* Short yellow bar: the page's anchor point, same mark as the active menu item. */}
+        <div aria-hidden className="mb-2 h-1.5 w-10 bg-brand-500" />
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink-900">{title}</h1>
+        {description && <p className="mt-1 max-w-3xl text-sm text-stone-500">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -109,10 +117,10 @@ export function PageHeader({ title, description, actions }: { title: string; des
 
 export function Card({ title, actions, children, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx('rounded-xl border border-stone-200 bg-white', className)}>
+    <section className={cx('rounded-lg border-2 border-stone-200 bg-white', className)}>
       {(title || actions) && (
-        <div className="flex items-center justify-between gap-2 border-b border-stone-100 px-4 py-3">
-          <h2 className="text-sm font-semibold text-stone-800">{title}</h2>
+        <div className="flex items-center justify-between gap-2 border-b-2 border-stone-200 px-4 py-3">
+          <h2 className="text-base font-extrabold text-ink-900">{title}</h2>
           {actions}
         </div>
       )}
@@ -125,25 +133,27 @@ export function Toolbar({ children }: { children: ReactNode }) {
   return <div className="mb-4 flex flex-wrap items-end gap-3">{children}</div>;
 }
 
+// Flat badges: tinted fill + matching border + bold text, all at 7:1 or better.
 const TONES = {
-  gray: 'bg-stone-100 text-stone-700',
-  green: 'bg-green-100 text-green-800',
-  red: 'bg-red-100 text-red-700',
-  amber: 'bg-amber-100 text-amber-800',
-  blue: 'bg-blue-100 text-blue-800',
-  gold: 'bg-brand-100 text-brand-700',
+  gray: 'border-stone-300 bg-stone-100 text-stone-700',
+  green: 'border-green-300 bg-green-50 text-green-800',
+  red: 'border-red-300 bg-red-50 text-red-800',
+  amber: 'border-amber-300 bg-amber-50 text-amber-900',
+  blue: 'border-blue-300 bg-blue-50 text-blue-800',
+  gold: 'border-brand-500 bg-brand-500 text-ink-900',
 } as const;
 export type Tone = keyof typeof TONES;
 
 export function Badge({ tone = 'gray', children }: { tone?: Tone; children: ReactNode }) {
-  return <span className={cx('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', TONES[tone])}>{children}</span>;
+  return <span className={cx('inline-flex items-center rounded border px-2 py-0.5 text-xs font-bold whitespace-nowrap', TONES[tone])}>{children}</span>;
 }
 
 export function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</div>
-      <div className="num mt-1 text-2xl font-semibold text-stone-900">{value}</div>
+    <div className="rounded-lg border-2 border-stone-200 border-t-brand-500 bg-white p-4">
+      <div className="text-xs font-bold tracking-wide text-stone-500 uppercase">{label}</div>
+      {/* Large amounts wrap instead of being cut off; no money figure is ever truncated. */}
+      <div className="num mt-1 text-lg font-extrabold [overflow-wrap:anywhere] text-ink-900 sm:text-xl xl:text-2xl">{value}</div>
       {hint && <div className="mt-1 text-xs text-stone-500">{hint}</div>}
     </div>
   );
@@ -156,6 +166,8 @@ export interface Column<T> {
   cell: (row: T) => ReactNode;
   align?: 'left' | 'right' | 'center';
   className?: string;
+  /** Free text (notes, addresses): wraps. Every other column stays on one line and the table scrolls. */
+  wrap?: boolean;
 }
 
 export function DataTable<T>({
@@ -175,21 +187,21 @@ export function DataTable<T>({
 }) {
   const align = (a?: 'left' | 'right' | 'center') => (a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left');
   return (
-    <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+    <div className="overflow-x-auto rounded-lg border-2 border-ink-900 bg-white">
       <table className="w-full text-sm">
-        <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
+        <thead className="bg-ink-900 text-xs tracking-wide text-white uppercase">
           <tr>
             {columns.map((c, i) => (
-              <th key={i} className={cx('px-3 py-2.5 font-medium whitespace-nowrap', align(c.align), c.className)}>
+              <th key={i} scope="col" className={cx('px-3 py-3 font-bold whitespace-nowrap', align(c.align), c.className)}>
                 {c.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-stone-100">
+        <tbody className="divide-y divide-stone-200">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-3 py-10 text-center text-stone-500">
+              <td colSpan={columns.length} className="px-3 py-12 text-center font-medium text-stone-500">
                 {empty}
               </td>
             </tr>
@@ -198,10 +210,10 @@ export function DataTable<T>({
               <tr
                 key={rowKey(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={cx(onRowClick && 'cursor-pointer hover:bg-brand-50/60')}
+                className={cx('even:bg-stone-50', onRowClick && 'cursor-pointer hover:bg-brand-100 even:hover:bg-brand-100')}
               >
                 {columns.map((c, i) => (
-                  <td key={i} className={cx('px-3 py-2.5 align-top', align(c.align), c.align === 'right' && 'num', c.className)}>
+                  <td key={i} className={cx('px-3 py-2.5 align-top', c.wrap ? 'min-w-56 whitespace-normal' : 'whitespace-nowrap', align(c.align), c.align === 'right' && 'num', c.className)}>
                     {c.cell(row)}
                   </td>
                 ))}
@@ -209,7 +221,7 @@ export function DataTable<T>({
             ))
           )}
         </tbody>
-        {footer && <tfoot className="border-t border-stone-200 bg-stone-50 font-medium">{footer}</tfoot>}
+        {footer && <tfoot className="border-t-2 border-ink-900 bg-brand-50 font-bold">{footer}</tfoot>}
       </table>
     </div>
   );
@@ -218,7 +230,7 @@ export function DataTable<T>({
 export function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (page: number) => void }) {
   if (totalPages <= 1) return null;
   return (
-    <div className="mt-3 flex items-center justify-end gap-2 text-sm text-stone-600">
+    <div className="mt-3 flex items-center justify-end gap-3 text-sm font-medium text-ink-900">
       <Button size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
         Sebelumnya
       </Button>
@@ -235,12 +247,12 @@ export function Pagination({ page, totalPages, onChange }: { page: number; total
 // ── States ────────────────────────────────────────────────────────────────────
 
 export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cx('size-6 animate-spin text-brand-600', className)} />;
+  return <Loader2 aria-label="Memuat" className={cx('size-6 animate-spin text-ink-900', className)} />;
 }
 
 export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    <div role="alert" className="flex items-start gap-3 rounded-lg border-2 border-red-600 bg-red-50 p-4 text-sm font-medium text-red-800">
       <AlertTriangle className="mt-0.5 size-4 shrink-0" />
       <div className="flex-1">{errorMessage(error)}</div>
       {onRetry && (
@@ -298,18 +310,18 @@ export function Modal({
         e.preventDefault();
         onClose();
       }}
-      className={cx('m-auto w-[calc(100%-2rem)] rounded-xl bg-white p-0 shadow-xl', wide ? 'max-w-4xl' : 'max-w-lg')}
+      className={cx('m-auto w-[calc(100%-2rem)] rounded-lg border-2 border-ink-900 bg-white p-0', wide ? 'max-w-4xl' : 'max-w-lg')}
     >
       {open && (
         <div className="flex max-h-[85vh] flex-col">
-          <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3">
-            <h2 className="text-base font-semibold text-stone-900">{title}</h2>
-            <button type="button" onClick={onClose} className="rounded-md p-1 text-stone-500 hover:bg-stone-100" aria-label="Tutup">
-              <X className="size-4" />
+          <div className="flex items-center justify-between border-b-2 border-ink-900 bg-brand-500 px-5 py-3">
+            <h2 className="text-base font-extrabold text-ink-900">{title}</h2>
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-ink-900 hover:bg-ink-900 hover:text-brand-500" aria-label="Tutup">
+              <X className="size-5" />
             </button>
           </div>
           <div className="overflow-y-auto px-5 py-4">{children}</div>
-          {footer && <div className="flex justify-end gap-2 border-t border-stone-100 px-5 py-3">{footer}</div>}
+          {footer && <div className="flex justify-end gap-2 border-t-2 border-stone-200 bg-stone-50 px-5 py-3">{footer}</div>}
         </div>
       )}
     </dialog>
@@ -375,7 +387,7 @@ export function ConfirmButton({
           </>
         }
       >
-        <div className="text-sm text-stone-700">{message}</div>
+        <div className="text-sm text-ink-900">{message}</div>
       </Modal>
     </>
   );
@@ -412,8 +424,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={t.id}
             role="status"
             className={cx(
-              'pointer-events-auto rounded-lg px-4 py-3 text-sm shadow-lg',
-              t.tone === 'success' ? 'bg-ink-800 text-white' : 'bg-red-600 text-white',
+              'pointer-events-auto rounded-md border-l-8 px-4 py-3 text-sm font-bold',
+              t.tone === 'success' ? 'border-brand-500 bg-ink-900 text-white' : 'border-red-900 bg-red-600 text-white',
             )}
           >
             {t.text}

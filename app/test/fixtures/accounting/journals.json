@@ -1,0 +1,79 @@
+{
+ "journals": [
+  {
+   "id": "01a1cd29-5441-7e90-9ad7-09e6e5b2f636",
+   "number": "JV-BR02-261112-0002",
+   "entry_date": "2026-11-12",
+   "location_id": 3,
+   "location_code": "BR02",
+   "source_type": "manual",
+   "source_id": "01a1cd29-5441-77a2-bc2c-af8b3768e255",
+   "memo": "Pencairan QRIS / e-wallet & EDC BR02",
+   "status": "posted",
+   "reverses_entry_id": null,
+   "created_by_name": "Akuntan",
+   "created_at": "2026-11-12T00:30:00.257Z",
+   "amount": 9659360
+  },
+  {
+   "id": "01a1cd29-5441-77fa-8cb8-44d142365287",
+   "number": "JV-BR03-261112-0001",
+   "entry_date": "2026-11-12",
+   "location_id": 4,
+   "location_code": "BR03",
+   "source_type": "manual",
+   "source_id": "01a1cd29-5441-7c00-8dc5-c441ce9e594a",
+   "memo": "Setoran tunai BR03 ke bank",
+   "status": "posted",
+   "reverses_entry_id": null,
+   "created_by_name": "Akuntan",
+   "created_at": "2026-11-12T00:30:00.257Z",
+   "amount": 6400000
+  },
+  {
+   "id": "01a1cd29-5441-7440-904f-1051da013c2f",
+   "number": "JV-BR01-261112-0001",
+   "entry_date": "2026-11-12",
+   "location_id": 2,
+   "location_code": "BR01",
+   "source_type": "manual",
+   "source_id": "01a1cd29-5441-7c0e-9a36-6691847d5e7d",
+   "memo": "Setoran tunai BR01 ke bank",
+   "status": "posted",
+   "reverses_entry_id": null,
+   "created_by_name": "Akuntan",
+   "created_at": "2026-11-12T00:30:00.257Z",
+   "amount": 6600000
+  },
+  {
+   "id": "01a1cd29-5441-7e60-b2b1-c54d5144a71a",
+   "number": "JV-BR03-261112-0002",
+   "entry_date": "2026-11-12",
+   "location_id": 4,
+   "location_code": "BR03",
+   "source_type": "manual",
+   "source_id": "01a1cd29-5441-7c1b-8901-cd566de60000",
+   "memo": "Pencairan QRIS / e-wallet & EDC BR03",
+   "status": "posted",
+   "reverses_entry_id": null,
+   "created_by_name": "Akuntan",
+   "created_at": "2026-11-12T00:30:00.257Z",
+   "amount": 4722210
+  },
+  {
+   "id": "01a1cd29-5441-7125-a806-ed372d385a59",
+   "number": "JV-BR02-261112-0001",
+   "entry_date": "2026-11-12",
+   "location_id": 3,
+   "location_code": "BR02",
+   "source_type": "manual",
+   "source_id": "01a1cd29-5441-7c44-a73b-fcb311b486df",
+   "memo": "Setoran tunai BR02 ke bank",
+   "status": "posted",
+   "reverses_entry_id": null,
+   "created_by_name": "Akuntan",
+   "created_at": "2026-11-12T00:30:00.257Z",
+   "amount": 4800000
+  }
+ ]
+}

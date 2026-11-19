@@ -92,7 +92,7 @@ class AuthService {
         await _storeAuthData(token, user, rememberMe: rememberMe);
 
         // Connect to Socket.IO for real-time updates
-        SocketService.connect(token, user.defaultLocationId ?? 0);
+        SocketService.ensureConnected(token: token, branchId: user.defaultLocationId ?? 0);
 
         if (ApiConfig.enableLogging) {
           dev.log('Login successful for user: ${user.username}');

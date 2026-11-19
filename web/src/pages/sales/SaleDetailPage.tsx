@@ -101,7 +101,7 @@ export function SaleDetailPage() {
                 columns={[
                   { header: 'Nomor', cell: (r) => <span className="font-mono text-xs">{r.number}</span> },
                   { header: 'Waktu', cell: (r) => formatDateTime(r.created_at) },
-                  { header: 'Alasan', cell: (r) => r.reason },
+                  { header: 'Alasan', wrap: true, cell: (r) => r.reason },
                   { header: 'Dikembalikan via', cell: (r) => r.refund_method },
                   { header: 'Oleh', cell: (r) => r.created_by_name ?? '—' },
                   { header: 'Jumlah', align: 'right', cell: (r) => formatRp(r.refund_total) },

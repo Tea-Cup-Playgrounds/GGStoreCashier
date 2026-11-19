@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 // session cookie just works. API_URL (in web/.env.local) points at the running API.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const target = env.API_URL || 'http://localhost:3000';
+  const target = env.API_URL || 'http://localhost:5000';
   return {
     plugins: [react(), tailwindcss()],
     server: {

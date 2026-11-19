@@ -1,16 +1,50 @@
 @import "tailwindcss";
 
-/* Brand colours follow the Flutter app (AppTheme): gold accent on a dark sidebar. */
+/*
+ * Flat theme: white surfaces, black ink, yellow accent.
+ *   - No shadows or gradients; edges come from solid borders and solid fills.
+ *   - Yellow is a fill (buttons, active nav, highlights) with black text on it, never text on
+ *     white: yellow on white fails contrast (about 1.5:1). Text that must look "brand" uses
+ *     brand-700/800 (dark ochre, 5:1 and up).
+ *   - Greys are neutral (not warm) and the light steps are darkened so secondary text stays
+ *     readable (stone-500 ≈ 7.8:1, stone-400 ≈ 4.7:1 on white).
+ *   - Text is set heavier: "medium" renders at 600 and "semibold" at 700, so labels read clearly.
+ */
 @theme {
-  --color-brand-50: #fbf7e9;
-  --color-brand-100: #f5ecc8;
-  --color-brand-500: #d4af37;
-  --color-brand-600: #c19b26;
-  --color-brand-700: #9a7a1c;
+  --color-brand-50: #fffbe6;
+  --color-brand-100: #fff3b0;
+  --color-brand-200: #ffe866;
+  --color-brand-400: #ffd60a;
+  --color-brand-500: #ffcc00;
+  --color-brand-600: #f0b800;
+  --color-brand-700: #8a6500;
+  --color-brand-800: #6b4e00;
+
   --color-ink-900: #0a0a0a;
-  --color-ink-800: #141414;
-  --color-ink-700: #1f1f1f;
-  --color-ink-600: #292929;
+  --color-ink-800: #161616;
+  --color-ink-700: #242424;
+  --color-ink-600: #333333;
+
+  --color-stone-50: #fafafa;
+  --color-stone-100: #f2f2f2;
+  --color-stone-200: #e3e3e3;
+  --color-stone-300: #cfcfcf;
+  --color-stone-400: #757575;
+  --color-stone-500: #525252;
+  --color-stone-600: #3d3d3d;
+  --color-stone-700: #2b2b2b;
+  --color-stone-800: #1a1a1a;
+  --color-stone-900: #0a0a0a;
+
+  --font-weight-medium: 600;
+  --font-weight-semibold: 700;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.5rem;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -21,14 +55,37 @@ body,
 }
 
 body {
-  @apply bg-stone-50 text-stone-900 antialiased;
+  @apply bg-stone-100 text-ink-900 antialiased;
+}
+
+::selection {
+  background: var(--color-brand-500);
+  color: var(--color-ink-900);
+}
+
+/* One visible focus style for keyboard users: a solid black ring with a yellow gap. Form fields
+   have their own (black border + yellow halo, see CONTROL in ui.tsx). */
+:where(a, button, summary, [tabindex]:not(input, select, textarea)):focus-visible {
+  outline: 3px solid var(--color-ink-900);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--color-brand-500);
 }
 
 /* Native <dialog> used by Modal. */
 dialog::backdrop {
-  background: rgb(0 0 0 / 0.45);
+  background: rgb(10 10 10 / 0.6);
 }
 
 .num {
   font-variant-numeric: tabular-nums;
+}
+
+.hideScrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Chrome, Safari, and Opera */
+.hideScrollbar::-webkit-scrollbar {
+  display: none;
 }

@@ -30,7 +30,7 @@ export function VouchersPage() {
             { header: 'Berlaku untuk', cell: target },
             { header: 'Periode', cell: (v) => `${formatDate(v.valid_from)} – ${formatDate(v.valid_to)}` },
             { header: 'Status', cell: (v) => (v.is_active ? <Badge tone="green">Aktif</Badge> : <Badge>Nonaktif</Badge>) },
-            { header: 'Keterangan', cell: (v) => v.description ?? '' },
+            { header: 'Keterangan', wrap: true, cell: (v) => v.description ?? '' },
           ]}
         />
       </QueryState>

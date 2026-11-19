@@ -40,7 +40,7 @@ export function LocationsPage() {
             { header: 'Kode', cell: (l) => <span className="font-mono">{l.code}</span> },
             { header: 'Nama', cell: (l) => <span className="font-medium">{l.name}</span> },
             { header: 'Tipe', cell: (l) => (l.type === 'warehouse' ? <Badge tone="blue">Gudang</Badge> : <Badge>Cabang</Badge>) },
-            { header: 'Alamat', cell: (l) => l.address ?? '—' },
+            { header: 'Alamat', wrap: true, cell: (l) => l.address ?? '—' },
             { header: 'Telepon', cell: (l) => l.phone ?? '—' },
             { header: 'Status', cell: (l) => (l.is_active ? <Badge tone="green">Aktif</Badge> : <Badge tone="red">Nonaktif</Badge>) },
           ]}

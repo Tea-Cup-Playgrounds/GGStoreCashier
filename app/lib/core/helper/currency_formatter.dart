@@ -26,14 +26,19 @@ class CurrencyFormatter {
 
   /// Format a number to compact Rupiah format
   /// Example: 1500000 -> Rp1,5 Jt
+  /// Indonesian decimals use a comma, and a trailing ",0" is dropped (Rp2 Jt, not Rp2,0 Jt).
   static String formatToCompactRupiah(num amount) {
-    if (amount >= 1000000000) {
-      return 'Rp${(amount / 1000000000).toStringAsFixed(1)} M';
-    } else if (amount >= 1000000) {
-      return 'Rp${(amount / 1000000).toStringAsFixed(1)} Jt';
-    } else if (amount >= 1000) {
-      return 'Rp${(amount / 1000).toStringAsFixed(1)} Rb';
+    final abs = amount.abs();
+    final sign = amount < 0 ? '-' : '';
+    String compact(num value, String unit) {
+      var text = value.toStringAsFixed(1).replaceAll('.', ',');
+      if (text.endsWith(',0')) text = text.substring(0, text.length - 2);
+      return '${sign}Rp$text $unit';
     }
+
+    if (abs >= 1000000000) return compact(abs / 1000000000, 'M');
+    if (abs >= 1000000) return compact(abs / 1000000, 'Jt');
+    if (abs >= 1000) return compact(abs / 1000, 'rb');
     return formatToRupiah(amount);
   }
 }

@@ -6,6 +6,7 @@ import '../../features/cashier/presentation/pages/cashier_page.dart';
 import '../../features/inventory/presentation/pages/inventory_page.dart';
 import '../../features/inventory/presentation/pages/product_detail_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/finance/presentation/pages/finance_page.dart';
 import 'package:gg_store_cashier/core/router/transition_factory.dart';
 import 'package:gg_store_cashier/core/router/auth_guard.dart';
 import 'package:gg_store_cashier/features/devices/presentation/pages/printer_devices_page.dart';
@@ -38,6 +39,7 @@ mixin AppRouter {
   static const String deviceManager = '/devices/manager';
   static const String receiptEditor = '/settings/receipt-editor';
   static const String settings = '/settings';
+  static const String finance = '/finance';
   static const String userManagement = '/users';
   static const String branchEdit = '/branch/edit/:id';
   static const String voucherManagement = '/vouchers';
@@ -53,6 +55,7 @@ mixin AppRouter {
   static final inventoryNavKey = GlobalKey<NavigatorState>();
   static final devicesNavKey = GlobalKey<NavigatorState>();
   static final settingsNavKey = GlobalKey<NavigatorState>();
+  static final financeNavKey = GlobalKey<NavigatorState>();
 
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -213,6 +216,14 @@ mixin AppRouter {
               path: settings,
               name: 'settings',
               builder: (context, state) => const SettingsPage(),
+            ),
+          ]),
+          // Branch 4: shown in the nav before Settings, only to users with finance access.
+          StatefulShellBranch(navigatorKey: financeNavKey, routes: [
+            GoRoute(
+              path: finance,
+              name: 'finance',
+              builder: (context, state) => const FinancePage(),
             ),
           ]),
         ],

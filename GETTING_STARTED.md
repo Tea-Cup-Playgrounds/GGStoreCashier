@@ -22,9 +22,9 @@ cd ..
 
 ### 2. Setup Database
 
-- Buat database MySQL kosong
+- Jalankan MySQL (misalnya lewat Laragon)
 - Perbarui `.env` dengan kredensial database kamu
-- Jalankan `npm run migrate` untuk membuat semua tabel (lihat bagian migrasi di `README.md`)
+- Jalankan `npm run db setup` untuk membuat database, semua tabel, dan akun dev (lihat bagian migrasi di `README.md`)
 
 ---
 

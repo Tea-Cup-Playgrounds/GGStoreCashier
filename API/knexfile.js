@@ -1,5 +1,5 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../.env'), quiet: true });
 
 // Knex is only used for migrations; route handlers keep using the mysql2 pool in src/db.js.
 module.exports = {

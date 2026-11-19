@@ -83,7 +83,7 @@ export function ExpensesPage() {
               { header: 'Nomor', cell: (x) => <span className="font-mono text-xs">{x.number}</span> },
               { header: 'Lokasi', cell: (x) => x.location_code ?? 'Pusat' },
               { header: 'Kategori', cell: (x) => x.account_name },
-              { header: 'Keterangan', cell: (x) => <span className="text-stone-600">{[x.payee, x.note].filter(Boolean).join(' · ')}</span> },
+              { header: 'Keterangan', wrap: true, cell: (x) => <span className="text-stone-600">{[x.payee, x.note].filter(Boolean).join(' · ')}</span> },
               { header: 'Dari', cell: (x) => PAID_FROM[x.paid_from] },
               {
                 header: 'Jumlah',

@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
 const { logAudit } = require('../services/audit');
+const { queueChange } = require('../services/live');
 const stock = require('../services/stock');
 const { nextDocumentNumber } = require('../services/documents');
 const { DISPLAY_NAME_SQL } = require('../services/catalog');
@@ -198,6 +199,7 @@ router.post('/', requirePermission('transfers.create', { location: (req) => req.
         );
         await writeTransferItems(conn, id, data.items);
         await logAudit(conn, req, { action: 'create', entity: 'transfer', entityId: id, locationId: req.locationId, after: { number, to: data.toLocationId, items: data.items.length } });
+        queueChange(req, { entity: 'transfer', action: 'create', id, locationId: data.toLocationId });
         return loadTransfer(conn, id);
     });
     if (result) res.status(201).json({ message: 'Draf transfer dibuat', transfer: result });
@@ -222,6 +224,7 @@ router.post('/:id/cancel', resolveTransfer, requirePermission('transfers.create'
         if (t.status !== 'draft') throw new AppError('Hanya draf yang dapat dibatalkan; transfer yang sudah dikirim diselesaikan lewat penerimaan');
         await conn.execute("UPDATE stock_transfers SET status = 'cancelled' WHERE id = ?", [t.id]);
         await logAudit(conn, req, { action: 'cancel', entity: 'transfer', entityId: t.id, locationId: t.from_location_id });
+        queueChange(req, { entity: 'transfer', action: 'cancel', id: t.id, locationId: t.to_location_id });
         return true;
     });
     if (result) res.json({ message: 'Transfer dibatalkan' });
@@ -258,6 +261,7 @@ router.post('/:id/send', resolveTransfer, requirePermission('transfers.send', { 
 
         await conn.execute("UPDATE stock_transfers SET status = 'sent', sent_by = ?, sent_at = ? WHERE id = ?", [req.user.id, doc.at, t.id]);
         await logAudit(conn, req, { action: 'send', entity: 'transfer', entityId: t.id, locationId: t.from_location_id });
+        queueChange(req, { entity: 'transfer', action: 'send', id: t.id, locationId: t.to_location_id });
         return loadTransfer(conn, t.id);
     });
     if (result) res.json({ message: 'Transfer dikirim', transfer: result });
@@ -319,6 +323,7 @@ router.post('/:id/receive', resolveTransfer, requirePermission('transfers.receiv
             transferId: t.id, number: t.number, fromLocationId: t.from_location_id, toLocationId: t.to_location_id, value: receivedValue,
         });
         await logAudit(conn, req, { action: 'receive', entity: 'transfer', entityId: t.id, locationId: t.to_location_id, after: { complete, missing_units: [...missing] } });
+        queueChange(req, { entity: 'transfer', action: 'receive', id: t.id, locationId: t.from_location_id });
         return loadTransfer(conn, t.id);
     });
     if (result) {
@@ -379,6 +384,7 @@ router.post('/:id/resolve', resolveTransfer, requirePermission('stock.adjust', {
             [req.user.id, t.id]
         );
         await logAudit(conn, req, { action: `resolve_${action}`, entity: 'transfer', entityId: t.id, locationId: t.from_location_id, after: { settled, note: req.body.note } });
+        queueChange(req, { entity: 'transfer', action: `resolve_${action}`, id: t.id, locationId: t.to_location_id });
         return loadTransfer(conn, t.id);
     });
     if (result) res.json({ message: action === 'return' ? 'Sisa barang dikembalikan ke lokasi asal' : 'Sisa barang dihapus sebagai hilang', transfer: result });

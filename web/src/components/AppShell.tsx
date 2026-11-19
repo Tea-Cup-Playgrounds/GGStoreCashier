@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpen,
   BookText,
+  CalendarRange,
   Coins,
   PiggyBank,
   Library,
@@ -54,6 +55,7 @@ const NAV: Array<{ title: string; items: NavItem[] }> = [
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard, visible: () => true },
       { to: '/analytics', label: 'Analitik', icon: BarChart3, visible: (a) => a.can('reports.view_all') },
+      { to: '/reports/monthly', label: 'Rekap Bulanan', icon: CalendarRange, visible: (a) => a.canAny('reports.view_location', 'reports.view_all', 'accounting.view') },
     ],
   },
   {
@@ -91,8 +93,9 @@ const NAV: Array<{ title: string; items: NavItem[] }> = [
       { to: '/accounting/pulsa-deposit', label: 'Deposit Pulsa', icon: Coins, visible: (a) => a.canAny('expenses.manage', 'accounting.view') },
       { to: '/accounting/journals', label: 'Jurnal', icon: BookOpen, visible: (a) => a.can('accounting.view') },
       { to: '/accounting/opening-balances', label: 'Saldo Awal', icon: PiggyBank, visible: (a) => a.can('accounting.view') },
-      { to: '/accounting/balance-sheet', label: 'Neraca', icon: Library, visible: (a) => a.can('accounting.view') },
-      { to: '/accounting/profit-loss', label: 'Laba Rugi', icon: FileSpreadsheet, visible: (a) => a.can('accounting.view') },
+      // Also for branch managers: their own location's statements (reports.view_location).
+      { to: '/accounting/balance-sheet', label: 'Neraca', icon: Library, visible: (a) => a.canAny('accounting.view', 'reports.view_location') },
+      { to: '/accounting/profit-loss', label: 'Laba Rugi', icon: FileSpreadsheet, visible: (a) => a.canAny('accounting.view', 'reports.view_location') },
       { to: '/accounting/trial-balance', label: 'Neraca Saldo', icon: Scale, visible: (a) => a.can('accounting.view') },
       { to: '/accounting/ledger', label: 'Buku Besar', icon: BookText, visible: (a) => a.can('accounting.view') },
       { to: '/accounting/accounts', label: 'Bagan Akun', icon: ListTree, visible: (a) => a.can('accounting.view') },
@@ -118,10 +121,12 @@ export function Guard({ to, children }: { to: string; children: ReactNode }) {
   const item = NAV.flatMap((g) => g.items).find((i) => i.to === to);
   if (item && !item.visible(access)) {
     return (
-      <div className="py-20 text-center text-stone-600">
-        <Lock className="mx-auto mb-3 size-8 text-stone-400" />
-        <h1 className="text-lg font-semibold text-stone-800">Tidak ada akses</h1>
-        <p className="mt-1 text-sm">Role Anda tidak memiliki izin untuk halaman ini.</p>
+      <div className="mx-auto max-w-md py-20 text-center">
+        <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-lg bg-ink-900">
+          <Lock className="size-7 text-brand-500" />
+        </div>
+        <h1 className="text-xl font-extrabold text-ink-900">Tidak ada akses</h1>
+        <p className="mt-1 text-sm text-stone-500">Role Anda tidak memiliki izin untuk halaman ini. Minta admin menambahkan izinnya.</p>
       </div>
     );
   }
@@ -130,13 +135,14 @@ export function Guard({ to, children }: { to: string; children: ReactNode }) {
 
 function Sidebar({ access, onNavigate }: { access: Access; onNavigate?: () => void }) {
   return (
-    <nav className="flex-1 overflow-y-auto px-3 py-4">
+    <nav aria-label="Menu utama" className="flex-1 overflow-y-auto px-3 py-4 hideScrollbar">
       {NAV.map((group) => {
         const items = group.items.filter((i) => i.visible(access));
         if (items.length === 0) return null;
         return (
           <div key={group.title} className="mb-5">
-            <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone-500">{group.title}</div>
+            {/* #a3a3a3 on the black panel: 8:1. */}
+            <div className="px-2.5 pb-1.5 text-[11px] font-bold tracking-widest text-[#a3a3a3] uppercase">{group.title}</div>
             {items.map((item) => (
               <NavLink
                 key={item.to}
@@ -145,8 +151,8 @@ function Sidebar({ access, onNavigate }: { access: Access; onNavigate?: () => vo
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   cx(
-                    'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors',
-                    isActive ? 'bg-brand-500/15 font-medium text-brand-500' : 'text-stone-300 hover:bg-white/5 hover:text-white',
+                    'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-semibold transition-colors',
+                    isActive ? 'bg-brand-500 text-ink-900' : 'text-white hover:bg-white/10',
                   )
                 }
               >
@@ -161,29 +167,57 @@ function Sidebar({ access, onNavigate }: { access: Access; onNavigate?: () => vo
   );
 }
 
+/** Flat logo mark: black "GG" on a yellow square. */
+export function BrandMark({ size = 'md' }: { size?: 'md' | 'lg' }) {
+  return (
+    <div
+      aria-hidden
+      className={cx(
+        'flex shrink-0 items-center justify-center rounded-md bg-brand-500 font-black tracking-tight text-ink-900',
+        size === 'lg' ? 'size-12 text-lg' : 'size-9 text-sm',
+      )}
+    >
+      GG
+    </div>
+  );
+}
+
+const initials = (name?: string | null) => {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return (parts.length === 1 ? parts[0][0] : parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
 export function AppShell() {
   const { user, access, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const panel = (onNavigate?: () => void) => (
     <div className="flex h-full w-64 flex-col bg-ink-900">
-      <div className="flex items-center gap-2 border-b border-white/10 px-5 py-4">
-        <Wallet className="size-5 text-brand-500" />
+      <div className="flex items-center gap-3 border-b-2 border-white/10 px-5 py-4">
+        <BrandMark />
         <div>
-          <div className="text-sm font-semibold text-white">GG Store</div>
-          <div className="text-xs text-stone-400">Back-office</div>
+          <div className="text-base font-extrabold text-white">GG Store</div>
+          <div className="text-xs font-semibold text-[#a3a3a3]">Back-office</div>
         </div>
       </div>
       <Sidebar access={access} onNavigate={onNavigate} />
-      <div className="border-t border-white/10 px-4 py-3">
-        <div className="truncate text-sm font-medium text-white">{user?.name}</div>
-        <div className="truncate text-xs text-stone-400">{access.roleLabel}</div>
+      <div className="border-t-2 border-white/10 p-3">
+        <div className="flex items-center gap-3 px-1">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border-2 border-brand-500 text-xs font-extrabold text-brand-500">
+            {initials(user?.name)}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold text-white">{user?.name}</div>
+            <div className="truncate text-xs font-semibold text-[#a3a3a3]">{access.roleLabel}</div>
+          </div>
+        </div>
         <button
           type="button"
           onClick={() => logout()}
-          className="mt-2 inline-flex items-center gap-1.5 text-xs text-stone-400 hover:text-white"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border-2 border-white/25 py-2 text-sm font-bold text-white hover:border-white hover:bg-white hover:text-ink-900"
         >
-          <LogOut className="size-3.5" /> Keluar
+          <LogOut className="size-4" /> Keluar
         </button>
       </div>
     </div>
@@ -193,17 +227,23 @@ export function AppShell() {
     <div className="flex h-full">
       <aside className="hidden shrink-0 lg:block">{panel()}</aside>
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-ink-900/60" onClick={() => setMobileOpen(false)} />
           <div className="relative h-full w-64">{panel(() => setMobileOpen(false))}</div>
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-3 lg:hidden">
-          <button type="button" onClick={() => setMobileOpen(true)} aria-label="Menu" className="rounded-md p-1 hover:bg-stone-100">
+        <header className="flex items-center gap-3 border-b-2 border-ink-900 bg-ink-900 px-4 py-3 text-white lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Buka menu"
+            className="flex size-10 items-center justify-center rounded-md hover:bg-white/10"
+          >
             {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
-          <span className="text-sm font-semibold">GG Store Back-office</span>
+          <BrandMark />
+          <span className="text-sm font-extrabold">GG Store Back-office</span>
         </header>
         <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 lg:px-8">
           <Outlet />

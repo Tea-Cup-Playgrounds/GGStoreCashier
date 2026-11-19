@@ -13,6 +13,11 @@ const authenticateToken = async (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Tokens with a purpose (e.g. the API docs session) are not API tokens.
+        if (decoded.purpose) {
+            return res.status(401).json({ error: 'Token tidak valid' });
+        }
         
         // Get user from database
         const [users] = await pool.execute(

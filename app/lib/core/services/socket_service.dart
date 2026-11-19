@@ -1,149 +1,197 @@
 // ignore: library_prefixes
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:flutter/widgets.dart';
 import 'dart:developer' as dev;
 import '../config/api_config.dart';
 
+/// Live updates from the API (Socket.IO, see API/src/server.js).
+///
+/// Events are hints that something changed; screens reload what they show through the normal API.
+/// Delivery is not guaranteed (phones sleep, networks drop), so whenever events may have been
+/// missed — the socket reconnects, or the app comes back from the background — listeners get a
+/// [resyncEvent] and reload everything on screen.
+///
+/// Lifecycle:
+///   - [ensureConnected] is called after login and on every authenticated navigation (AuthGuard),
+///     so a session restored at app start ("Remember me") connects too. It is cheap and idempotent.
+///   - The socket reconnects forever with backoff; it never gives up while the user is signed in.
+///   - [disconnect] on logout closes the socket but keeps the listeners: the screens' providers
+///     register them once and live for the whole app run.
 class SocketService {
+  /// Synthetic event: reload everything, live events may have been missed.
+  static const resyncEvent = 'resync';
+
+  /// Events the API emits to location rooms.
+  static const _serverEvents = ['sale-created', 'stock-changed'];
+
+  /// Back from the background after at least this long: treat as a gap and resync.
+  static const _resumeResyncAfter = Duration(seconds: 10);
+
   static IO.Socket? _socket;
-  static bool _isConnected = false;
-  static int? _currentBranchId;
+  static String? _token;
+  static int? _branchId;
+  static bool _connectedOnce = false;
+  static AppLifecycleListener? _lifecycle;
+  static DateTime? _pausedAt;
 
-  // Callbacks for real-time events
-  static final Map<String, List<Function(dynamic)>> _eventListeners = {};
+  /// Whether the live connection is up; for a "Live / Offline" indicator.
+  static final ValueNotifier<bool> connected = ValueNotifier(false);
 
-  static bool get isConnected => _isConnected;
+  static final Map<String, List<void Function(dynamic)>> _eventListeners = {};
 
-  // Initialize socket connection
-  static void connect(String token, int branchId) {
-    if (_socket != null && _isConnected) {
-      dev.log('Socket already connected');
+  static bool get isConnected => connected.value;
+
+  /// Connects with [token] and joins [branchId]'s room (plus the all-locations room, which the
+  /// server grants only to users whose access covers every location). Does nothing when already set
+  /// up for this token and branch; replaces the socket when the token or branch changed.
+  static void ensureConnected({required String token, required int branchId}) {
+    _watchLifecycle();
+    if (_socket != null && _token == token) {
+      if (_branchId != branchId) _switchBranch(branchId);
+      if (!(_socket!.connected)) _socket!.connect();
       return;
     }
+    _dispose();
+    _token = token;
+    _branchId = branchId;
 
     final baseUrl = ApiConfig.apiUrl.replaceAll('/api', '');
-
     dev.log('Connecting to Socket.IO at: $baseUrl');
 
-    _socket = IO.io(
+    final socket = IO.io(
       baseUrl,
       IO.OptionBuilder()
           .setTransports(['websocket', 'polling'])
           .enableAutoConnect()
+          // A fresh manager per login: IO.io caches one per URL, which would keep the old token.
+          .enableForceNew()
           .enableReconnection()
-          .setReconnectionDelay(2000)
-          .setReconnectionDelayMax(10000)
-          .setReconnectionAttempts(3)
+          // No attempt limit: keep trying while signed in (1 s, growing to 15 s between tries).
+          .setReconnectionDelay(1000)
+          .setReconnectionDelayMax(15000)
+          .setRandomizationFactor(0.5)
           // The server refuses connections without a valid token (handshake auth or header).
           .setAuth({'token': token})
           .setExtraHeaders({'Authorization': 'Bearer $token', 'ngrok-skip-browser-warning': 'true'})
           .build(),
     );
+    _socket = socket;
 
-    _socket!.onConnect((_) {
+    socket.onConnect((_) {
       dev.log('Socket.IO connected');
-      _isConnected = true;
-      _currentBranchId = branchId;
-
-      // Join the location room; the all-locations room (0) is only granted to users whose access
-      // covers every location, and the server ignores the request for anyone else.
-      _socket!.emit('join-branch', branchId);
-      _socket!.emit('join-branch', 0);
+      connected.value = true;
+      _joinRooms();
+      // Every connect after the first is a reconnect: events in between were missed.
+      if (_connectedOnce) _notifyListeners(resyncEvent, null);
+      _connectedOnce = true;
     });
-
-    _socket!.onDisconnect((_) {
-      dev.log('Socket.IO disconnected');
-      _isConnected = false;
+    socket.onDisconnect((reason) {
+      dev.log('Socket.IO disconnected: $reason');
+      connected.value = false;
+      // Socket.IO does not reconnect by itself when the server closed the connection on purpose;
+      // while signed in we always want it back.
+      if (reason == 'io server disconnect') {
+        Future<void>.delayed(const Duration(seconds: 2), () {
+          if (identical(_socket, socket) && !socket.connected) socket.connect();
+        });
+      }
     });
-
-    _socket!.onConnectError((error) {
+    socket.onConnectError((error) {
       dev.log('Socket.IO connection error: $error');
-      _isConnected = false;
+      connected.value = false;
     });
+    socket.onError((error) => dev.log('Socket.IO error: $error'));
 
-    _socket!.onError((error) {
-      dev.log('Socket.IO error: $error');
-    });
-
-    // Setup event listeners
-    _setupEventListeners();
-  }
-
-  // Events the API emits to location rooms (see API/src/server.js).
-  static void _setupEventListeners() {
-    for (final event in const ['sale-created', 'stock-changed']) {
-      _socket!.on(event, (data) {
+    for (final event in _serverEvents) {
+      socket.on(event, (data) {
         dev.log('$event: $data');
         _notifyListeners(event, data);
       });
     }
   }
 
-  // Register event listener
-  static void on(String event, Function(dynamic) callback) {
-    if (!_eventListeners.containsKey(event)) {
-      _eventListeners[event] = [];
-    }
-    _eventListeners[event]!.add(callback);
+  /// Backwards-compatible entry point.
+  static void connect(String token, int branchId) => ensureConnected(token: token, branchId: branchId);
+
+  static void _joinRooms() {
+    final socket = _socket;
+    if (socket == null) return;
+    socket.emit('join-branch', _branchId ?? 0);
+    socket.emit('join-branch', 0);
   }
 
-  // Unregister event listener
-  static void off(String event, Function(dynamic) callback) {
-    if (_eventListeners.containsKey(event)) {
-      _eventListeners[event]!.remove(callback);
-    }
+  static void _switchBranch(int branchId) {
+    final socket = _socket;
+    if (socket != null && socket.connected && _branchId != null) socket.emit('leave-branch', _branchId);
+    _branchId = branchId;
+    if (socket != null && socket.connected) _joinRooms();
   }
 
-  // Notify all listeners for an event
+  /// Move to another location's room (the all-locations room is kept).
+  static void changeBranch(int newBranchId) => _switchBranch(newBranchId);
+
+  /// App lifecycle: reconnect and resync when the app comes back after a while in the background
+  /// (mobile OSes usually cut the socket while the app is suspended).
+  static void _watchLifecycle() {
+    _lifecycle ??= AppLifecycleListener(
+      onPause: () => _pausedAt = DateTime.now(),
+      onHide: () => _pausedAt ??= DateTime.now(),
+      onResume: () {
+        final pausedAt = _pausedAt;
+        _pausedAt = null;
+        final socket = _socket;
+        if (socket == null) return;
+        if (!socket.connected) {
+          socket.connect(); // onConnect will resync
+        } else if (pausedAt != null && DateTime.now().difference(pausedAt) >= _resumeResyncAfter) {
+          _notifyListeners(resyncEvent, null);
+        }
+      },
+    );
+  }
+
+  /// Register an event listener. Listeners survive [disconnect] and reconnects.
+  static void on(String event, void Function(dynamic) callback) {
+    _eventListeners.putIfAbsent(event, () => []).add(callback);
+  }
+
+  static void off(String event, void Function(dynamic) callback) {
+    _eventListeners[event]?.remove(callback);
+  }
+
   static void _notifyListeners(String event, dynamic data) {
-    if (_eventListeners.containsKey(event)) {
-      for (var callback in _eventListeners[event]!) {
+    for (final callback in List.of(_eventListeners[event] ?? const <void Function(dynamic)>[])) {
+      try {
         callback(data);
+      } catch (e) {
+        dev.log('Listener for $event failed: $e');
       }
     }
   }
 
-  // Change branch room
-  static void changeBranch(int newBranchId) {
-    if (_socket == null || !_isConnected) {
-      dev.log('Socket not connected, cannot change branch');
-      return;
+  static void _dispose() {
+    final socket = _socket;
+    if (socket != null) {
+      socket.disconnect();
+      socket.dispose();
+      dev.log('Socket.IO disposed');
     }
-
-    if (_currentBranchId != null) {
-      _socket!.emit('leave-branch', _currentBranchId);
-    }
-
-    _currentBranchId = newBranchId;
-    _socket!.emit('join-branch', newBranchId);
-
-    // All-locations room; ignored by the server unless the user's access covers every location.
-    _socket!.emit('join-branch', 0);
-
-    dev.log('Changed to branch: $newBranchId');
+    _socket = null;
+    _token = null;
+    _branchId = null;
+    _connectedOnce = false;
+    connected.value = false;
   }
 
-  // Disconnect socket
-  static void disconnect() {
-    if (_socket != null) {
-      if (_currentBranchId != null) {
-        _socket!.emit('leave-branch', _currentBranchId);
-      }
-      _socket!.disconnect();
-      _socket!.dispose();
-      _socket = null;
-      _isConnected = false;
-      _currentBranchId = null;
-      _eventListeners.clear();
-      dev.log('Socket.IO disconnected and disposed');
-    }
-  }
+  /// Logout: close the connection. Listeners are kept (see class docs).
+  static void disconnect() => _dispose();
 
-  // Emit custom event
   static void emit(String event, dynamic data) {
-    if (_socket != null && _isConnected) {
-      _socket!.emit(event, data);
+    final socket = _socket;
+    if (socket != null && socket.connected) {
+      socket.emit(event, data);
     } else {
-      dev.log('Cannot emit event: Socket not connected');
+      dev.log('Cannot emit $event: socket not connected');
     }
   }
 }

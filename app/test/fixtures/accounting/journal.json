@@ -1,0 +1,59 @@
+{
+ "journal": {
+  "id": "01a1cd29-5441-7e90-9ad7-09e6e5b2f636",
+  "number": "JV-BR02-261112-0002",
+  "entry_date": "2026-11-12",
+  "location_id": 3,
+  "source_type": "manual",
+  "source_id": "01a1cd29-5441-77a2-bc2c-af8b3768e255",
+  "memo": "Pencairan QRIS / e-wallet & EDC BR02",
+  "status": "posted",
+  "reverses_entry_id": null,
+  "created_by": 9,
+  "created_at": "2026-11-12T00:30:00.257Z",
+  "location_code": "BR02",
+  "created_by_name": "Akuntan",
+  "lines": [
+   {
+    "id": "01a1cd29-5441-74ee-bf2d-e173401f8a23",
+    "account_id": 3,
+    "account_code": "1-1200",
+    "account_name": "Bank",
+    "location_id": 3,
+    "debit": "9542296.00",
+    "credit": "0.00",
+    "memo": null
+   },
+   {
+    "id": "01a1cd29-5441-7d26-8494-6e38db0ab53d",
+    "account_id": 33,
+    "account_code": "6-4000",
+    "account_name": "Biaya Administrasi Bank & MDR",
+    "location_id": 3,
+    "debit": "117064.00",
+    "credit": "0.00",
+    "memo": "MDR QRIS 0,7% / EDC 1,5%"
+   },
+   {
+    "id": "01a1cd29-5441-79ac-b692-37c0715960d8",
+    "account_id": 4,
+    "account_code": "1-1300",
+    "account_name": "Piutang QRIS / E-Wallet",
+    "location_id": 3,
+    "debit": "0.00",
+    "credit": "3478360.00",
+    "memo": null
+   },
+   {
+    "id": "01a1cd29-5441-75e2-ae32-a7cda37740e0",
+    "account_id": 5,
+    "account_code": "1-1310",
+    "account_name": "Piutang EDC (Kartu)",
+    "location_id": 3,
+    "debit": "0.00",
+    "credit": "6181000.00",
+    "memo": null
+   }
+  ]
+ }
+}

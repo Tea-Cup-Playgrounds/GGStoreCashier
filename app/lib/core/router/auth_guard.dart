@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
+import '../services/socket_service.dart';
 import '../models/user.dart';
 
 class AuthGuard {
@@ -21,6 +22,8 @@ class AuthGuard {
           await AuthService.logout();
           return '/';
         }
+        // Live updates for restored sessions too; no-op when already connected.
+        SocketService.ensureConnected(token: token, branchId: user.defaultLocationId ?? 0);
         final hasAccess = await _checkRouteAccess(loc, user);
         if (!hasAccess) return '/home';
       } catch (e) {
@@ -43,6 +46,10 @@ class AuthGuard {
     // /branch/edit/:id needs locations.manage at that location.
     final branchEdit = RegExp(r'^/branch/edit/(\d+)').firstMatch(route);
     if (branchEdit != null) return user.access.can('locations.manage', int.parse(branchEdit.group(1)!));
+    // The finance tab: expenses / pulsa deposit, a branch's own reports, or the books.
+    if (route.startsWith('/finance')) {
+      return user.access.can('expenses.manage') || user.access.can('reports.view_location') || user.access.can('accounting.view');
+    }
     for (final entry in _routePermissions.entries) {
       if (route.startsWith(entry.key)) return user.access.can(entry.value);
     }

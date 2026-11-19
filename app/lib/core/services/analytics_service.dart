@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../config/api_config.dart';
+import '../models/business_overview.dart';
 import 'auth_service.dart';
 import 'cache_manager.dart';
 
@@ -156,4 +157,40 @@ class AnalyticsService {
       rethrow;
     }
   }
+
+  /// The owner's home screen in one request (GET /api/analytics/overview).
+  /// [days] is 7, 30 or 90. Offline, the last cached copy comes back with `stale: true`.
+  static Future<OverviewResult> getOverview(int days, {bool forceRefresh = false}) async {
+    final key = 'analytics:overview_$days';
+
+    if (!forceRefresh && CacheManager.isValid(key)) {
+      final entry = CacheManager.get(key);
+      if (entry != null) {
+        return OverviewResult(BusinessOverview.fromJson(_castMap(entry.data)), stale: false, fetchedAt: entry.storedAt);
+      }
+    }
+
+    try {
+      final dio = await _dio();
+      final res = await dio.get('/api/analytics/overview', queryParameters: {'days': days});
+      await CacheManager.put(key, res.data);
+      return OverviewResult(BusinessOverview.fromJson(_castMap(res.data)), stale: false, fetchedAt: DateTime.now());
+    } on DioException {
+      final entry = CacheManager.get(key);
+      if (entry != null) {
+        return OverviewResult(BusinessOverview.fromJson(_castMap(entry.data)), stale: true, fetchedAt: entry.storedAt);
+      }
+      rethrow;
+    }
+  }
+}
+
+class OverviewResult {
+  final BusinessOverview data;
+
+  /// True when the server could not be reached and [data] is the last cached copy.
+  final bool stale;
+  final DateTime fetchedAt;
+
+  const OverviewResult(this.data, {required this.stale, required this.fetchedAt});
 }

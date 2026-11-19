@@ -1,0 +1,44 @@
+{
+ "categories": [
+  {
+   "id": 25,
+   "code": "6-1000",
+   "name": "Beban Sewa"
+  },
+  {
+   "id": 26,
+   "code": "6-1100",
+   "name": "Pajak Bumi & Bangunan"
+  },
+  {
+   "id": 27,
+   "code": "6-2000",
+   "name": "Gaji Karyawan"
+  },
+  {
+   "id": 28,
+   "code": "6-3000",
+   "name": "Listrik, Air & Internet"
+  },
+  {
+   "id": 33,
+   "code": "6-4000",
+   "name": "Biaya Administrasi Bank & MDR"
+  },
+  {
+   "id": 34,
+   "code": "6-5000",
+   "name": "Beban Pemasaran"
+  },
+  {
+   "id": 35,
+   "code": "6-6000",
+   "name": "Perlengkapan Toko"
+  },
+  {
+   "id": 29,
+   "code": "6-9000",
+   "name": "Beban Lain-lain"
+  }
+ ]
+}

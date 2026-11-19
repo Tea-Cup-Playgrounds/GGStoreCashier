@@ -51,14 +51,16 @@ export interface LocationChoice {
 }
 
 /**
- * The location a page works on: one of the locations where the user holds `permission`, remembered
- * across pages. With `allowAll`, null means "every location in scope".
+ * The location a page works on: one of the locations where the user holds `permission` (or any of
+ * several), remembered across pages. With `allowAll`, null means "every location in scope"; it is
+ * only offered when there is more than one location to choose from.
  */
-export function useLocationChoice(permission: string, { allowAll = false } = {}): LocationChoice {
+export function useLocationChoice(permission: string | string[], { allowAll: wantAll = false } = {}): LocationChoice {
   const { access } = useAuth();
   const locations = useLocations();
-  const scope = access.locationsFor(permission);
+  const scope = Array.isArray(permission) ? access.locationsForAny(...permission) : access.locationsFor(permission);
   const options = (locations.data ?? []).filter((l) => scope === null || scope.includes(l.id));
+  const allowAll = wantAll && (scope === null || options.length > 1);
   const [stored, setStored] = useState<number | null>(readStored);
   const match = options.find((l) => l.id === stored);
   const locationId = match ? match.id : allowAll ? null : (options.find((l) => l.type === 'branch') ?? options[0])?.id ?? null;

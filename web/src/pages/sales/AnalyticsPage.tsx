@@ -41,7 +41,7 @@ export function AnalyticsPage() {
       <PageHeader title="Analitik" description="Semua lokasi. Pendapatan = total penjualan dikurangi retur, tanpa transaksi yang dibatalkan." />
       <QueryState query={summary}>
         {s && (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mb-6 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
             <Stat label="Hari ini" value={formatRp(s.today.revenue)} hint={`${formatNumber(s.today.transactions)} transaksi`} />
             <Stat label="Bulan ini" value={formatRp(s.month.revenue)} hint={`${formatNumber(s.month.transactions)} transaksi`} />
             <Stat label="Sepanjang waktu" value={formatRp(s.allTime.revenue)} hint={`${formatNumber(s.allTime.transactions)} transaksi`} />
@@ -71,8 +71,9 @@ export function AnalyticsPage() {
                 const v = toNumber(p.revenue);
                 return (
                   <div key={p.date} className="group relative flex h-full flex-1 items-end">
-                    <div className="w-full rounded-t bg-brand-500 transition-colors group-hover:bg-brand-600" style={{ height: `${Math.max(2, (v / max) * 100)}%` }} />
-                    <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded bg-ink-800 px-2 py-1 text-xs whitespace-nowrap text-white group-hover:block">
+                    {/* Black bars (yellow on white is too faint for a chart); the hovered day turns yellow. */}
+                    <div className="w-full rounded-t-sm bg-ink-900 transition-colors group-hover:bg-brand-500" style={{ height: `${Math.max(2, (v / max) * 100)}%` }} />
+                    <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded border-2 border-brand-500 bg-ink-900 px-2 py-1 text-xs font-bold whitespace-nowrap text-white group-hover:block">
                       {formatDate(p.date)}: {formatRp(v)} · {p.transactions} trx
                     </div>
                   </div>

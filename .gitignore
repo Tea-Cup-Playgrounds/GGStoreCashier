@@ -7,7 +7,5 @@ ApplicationFeature.txt
 .idea
 .vscode
 AGENTS.md
-GETTING_STARTED.md
 
-app/test
 API/uploads

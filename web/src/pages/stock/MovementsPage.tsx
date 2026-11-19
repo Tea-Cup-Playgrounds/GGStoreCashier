@@ -52,7 +52,7 @@ export function MovementsPage() {
             { header: 'Jumlah', align: 'right', cell: (m) => <span className={m.qty_change < 0 ? 'text-red-600' : 'text-green-700'}>{m.qty_change > 0 ? `+${m.qty_change}` : m.qty_change}</span> },
             ...(showCost ? [{ header: 'HPP/unit', align: 'right' as const, cell: (m: Movement) => formatRp(m.unit_cost) }] : []),
             { header: 'Oleh', cell: (m) => m.user_name ?? '—' },
-            { header: 'Catatan', cell: (m) => <span className="text-stone-600">{m.note ?? ''}</span> },
+            { header: 'Catatan', wrap: true, cell: (m) => <span className="text-stone-600">{m.note ?? ''}</span> },
           ]}
         />
         {movements.hasNextPage && (
