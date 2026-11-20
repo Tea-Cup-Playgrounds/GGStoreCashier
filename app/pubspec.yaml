@@ -68,7 +68,7 @@ dependencies:
   # Camera barcode / QR / IMEI scanning (cashier, unit picker).
   mobile_scanner: 7.4.2
   # Classic-Bluetooth receipt printers. Pinned: 1.2.2+ needs Flutter >= 3.44, the project uses 3.38.5 (.fvmrc).
-  print_bluetooth_thermal: 1.2.1
+  print_bluetooth_thermal: ^1.2.5
   material_ui: ^0.0.1
 
 dev_dependencies:
