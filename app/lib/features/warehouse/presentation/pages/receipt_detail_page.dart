@@ -15,6 +15,7 @@ import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 import '../widgets/status_badge.dart';
 import 'receipt_form_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class ReceiptDetailPage extends ConsumerStatefulWidget {
   final String receiptId;
   const ReceiptDetailPage({super.key, required this.receiptId});
@@ -39,7 +40,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
       final receipt = await WarehouseService.getReceipt(widget.receiptId);
       if (mounted) setState(() => _receipt = receipt);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     }
   }
 
@@ -67,7 +68,7 @@ class _ReceiptDetailPageState extends ConsumerState<ReceiptDetailPage> {
     try {
       await action();
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -326,7 +327,7 @@ class _SupplierPaymentSheetState extends State<SupplierPaymentSheet> {
       SnackBarService.success(left > 0 ? 'Pembayaran dicatat, sisa ${CurrencyFormatter.formatToRupiah(left)}' : 'Tagihan lunas');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

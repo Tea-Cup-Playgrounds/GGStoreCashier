@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
 import '../config/api_config.dart';
 import 'auth_service.dart';
+import 'error_handler.dart';
 import 'cache_manager.dart';
 
 /// Thrown with the API's own error message (Indonesian, user-facing).
-class ApiException implements Exception {
+class ApiException implements UserFacingException {
+  @override
   final String message;
   final int? statusCode;
   const ApiException(this.message, [this.statusCode]);

@@ -10,6 +10,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import '../widgets/finance_widgets.dart';
 import 'manual_journal_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Jurnal: every entry, automatic and manual. Entries are never edited; a mistake is corrected by a
 /// reversing entry.
 class JournalsPage extends ConsumerStatefulWidget {
@@ -45,7 +46,7 @@ class _JournalsPageState extends ConsumerState<JournalsPage> {
       final journals = await AccountingService.journals(locationId: _locationId, from: from, to: to, sourceType: _sourceType);
       if (mounted) setState(() => _journals = journals);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -224,7 +225,7 @@ class _JournalDetailSheetState extends ConsumerState<JournalDetailSheet> {
     AccountingService.journal(widget.journalId).then((j) {
       if (mounted) setState(() => _journal = j);
     }).catchError((Object e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     });
   }
 
@@ -237,7 +238,7 @@ class _JournalDetailSheetState extends ConsumerState<JournalDetailSheet> {
       SnackBarService.success('Jurnal dibatalkan');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

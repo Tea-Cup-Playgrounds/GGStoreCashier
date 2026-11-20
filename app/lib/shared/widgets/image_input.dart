@@ -6,6 +6,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class ImageInput extends StatefulWidget {
   final File? file;
   final String? imageUrl;
@@ -114,7 +115,7 @@ class ImageInputState extends State<ImageInput> {
     } catch (e, stack) {
       dev.log('[ImageInput] ERROR picking image: $e');
       dev.log('[ImageInput] stack: $stack');
-      setState(() => _errorText = 'Gagal memilih gambar: $e');
+      setState(() => _errorText = ErrorHandler.describeAs('Gagal memilih gambar', e));
     }
   }
 

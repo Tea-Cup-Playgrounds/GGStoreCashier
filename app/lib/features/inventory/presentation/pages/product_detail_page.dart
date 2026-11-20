@@ -16,6 +16,7 @@ import '../widgets/stock_adjust_sheet.dart';
 import 'product_form_page.dart';
 import 'units_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// One catalog product: its variants, and stock / price at the selected location.
 class ProductDetailPage extends ConsumerStatefulWidget {
   final int productId;
@@ -47,7 +48,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
       final product = await CatalogService.getProduct(widget.productId);
       if (mounted) setState(() => _product = product);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -84,7 +85,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
       SnackBarService.success('Produk berhasil dihapus');
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _deleting = false);
     }

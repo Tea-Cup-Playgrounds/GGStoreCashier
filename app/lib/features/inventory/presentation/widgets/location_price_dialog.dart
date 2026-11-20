@@ -5,6 +5,7 @@ import 'package:gg_store_cashier/core/models/catalog.dart';
 import 'package:gg_store_cashier/core/services/catalog_service.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Sets or clears a variant's price at one location. Returns true when saved.
 Future<bool?> showLocationPriceDialog(
   BuildContext context, {
@@ -28,7 +29,7 @@ Future<bool?> showLocationPriceDialog(
       SnackBarService.success(price == null ? 'Harga kembali ke harga dasar' : 'Harga cabang disimpan');
       if (ctx.mounted) Navigator.pop(ctx, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     }
   }
 

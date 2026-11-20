@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -35,9 +36,32 @@ Future<void> main() async {
     ),
   );
 
-  await dotenv.load(fileName: ".env").catchError((_) {
-    // .env not found — app will use fallback values from ApiConfig
-  });
+  // isOptional: a missing or empty .env still marks dotenv as loaded (with no values), so
+  // ApiConfig falls back to its defaults. Swallowing the error instead left dotenv
+  // uninitialised, and every later dotenv.env read threw NotInitializedError (login broke on
+  // builds made without app/.env). The catch covers a malformed file the same way.
+  try {
+    await dotenv.load(fileName: '.env', isOptional: true);
+  } catch (_) {
+    dotenv.loadFromString(envString: '', isOptional: true);
+  }
+
+  // In release a widget that throws while building shows a blank grey box; show a readable
+  // message instead. Debug builds keep Flutter's red error screen with the full detail.
+  if (kReleaseMode) {
+    ErrorWidget.builder = (details) => const Material(
+          color: Colors.transparent,
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Bagian ini gagal ditampilkan. Coba buka ulang halaman.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        );
+  }
 
   // Clear non-persistent session if user didn't check "remember me"
   await AuthService.clearSessionIfNotRemembered();

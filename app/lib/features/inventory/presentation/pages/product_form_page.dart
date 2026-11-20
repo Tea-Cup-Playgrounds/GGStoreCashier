@@ -12,6 +12,7 @@ import 'package:gg_store_cashier/shared/widgets/image_input.dart';
 import 'package:gg_store_cashier/shared/widgets/searchable_dropdown.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 String _rupiahText(double value) => RupiahInputFormatter()
     .formatEditUpdate(TextEditingValue.empty, TextEditingValue(text: value.round().toString()))
     .text;
@@ -108,7 +109,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
         });
       }
     } catch (e) {
-      SnackBarService.error('Gagal memuat merek/kategori: $e');
+      SnackBarService.error(ErrorHandler.describeAs('Gagal memuat merek/kategori', e));
     } finally {
       if (mounted) setState(() => _loadingRefs = false);
     }
@@ -154,7 +155,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
         });
       }
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     }
   }
 
@@ -213,7 +214,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
       SnackBarService.success(_isEdit ? 'Produk diperbarui' : 'Produk ditambahkan');
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -11,6 +11,7 @@ import '../widgets/status_badge.dart';
 import 'transfer_detail_page.dart';
 import 'transfer_form_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Transfers leaving (Keluar) or arriving at (Masuk) one location.
 class TransfersPage extends ConsumerStatefulWidget {
   final Location location;
@@ -53,7 +54,7 @@ class _TransfersPageState extends ConsumerState<TransfersPage> with SingleTicker
       final transfers = await WarehouseService.getTransfers(locationId: widget.location.id, direction: _direction);
       if (mounted) setState(() => _transfers = transfers);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -9,6 +9,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Registers several serialized units at once (opening stock / correction). Pops with the
 /// number of units registered.
 ///
@@ -158,7 +159,7 @@ class _RegisterUnitsPageState extends State<RegisterUnitsPage> {
       SnackBarService.success('$count unit didaftarkan');
       if (mounted) Navigator.of(context).pop(count);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

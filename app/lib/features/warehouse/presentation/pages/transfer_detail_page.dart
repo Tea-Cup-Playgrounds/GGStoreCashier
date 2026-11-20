@@ -14,6 +14,7 @@ import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import '../widgets/status_badge.dart';
 import 'transfer_form_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class TransferDetailPage extends ConsumerStatefulWidget {
   final String transferId;
   const TransferDetailPage({super.key, required this.transferId});
@@ -38,7 +39,7 @@ class _TransferDetailPageState extends ConsumerState<TransferDetailPage> {
       final t = await WarehouseService.getTransfer(widget.transferId);
       if (mounted) setState(() => _transfer = t);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     }
   }
 
@@ -49,7 +50,7 @@ class _TransferDetailPageState extends ConsumerState<TransferDetailPage> {
       SnackBarService.success(success);
       if (mounted && updated != null) setState(() => _transfer = updated);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -316,7 +317,7 @@ class _ReceiveTransferSheetState extends State<ReceiveTransferSheet> {
       SnackBarService.success(updated.status == 'received' ? 'Diterima lengkap' : 'Diterima sebagian — selisih dicatat');
       if (mounted) Navigator.pop(context, updated);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

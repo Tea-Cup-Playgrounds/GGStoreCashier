@@ -5,6 +5,7 @@ import '../models/branch.dart';
 import 'auth_service.dart';
 import 'cache_manager.dart';
 import 'connectivity_monitor.dart';
+import 'error_handler.dart';
 import 'pending_operations_queue.dart';
 
 class BranchService {
@@ -50,7 +51,7 @@ class BranchService {
       }
       final isOffline =
           ConnectivityMonitor.instance.currentStatus == ConnectivityStatus.offline;
-      throw Exception(isOffline
+      throw UserMessage(isOffline
           ? 'Kamu sedang offline dan belum ada data tersimpan untuk cabang ini.'
           : 'Gagal memuat data cabang. Coba lagi.');
     }

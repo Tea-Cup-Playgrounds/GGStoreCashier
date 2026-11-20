@@ -15,6 +15,7 @@ import 'package:gg_store_cashier/shared/widgets/searchable_dropdown.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 import 'receipt_detail_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 const _ppnRate = 11.0;
 
 String _rupiahText(double value) => RupiahInputFormatter()
@@ -151,7 +152,7 @@ class _ReceiptFormPageState extends State<ReceiptFormPage> {
       final suppliers = await WarehouseService.getSuppliers();
       if (mounted) setState(() => _suppliers = suppliers);
     } catch (e) {
-      SnackBarService.error('Gagal memuat supplier: $e');
+      SnackBarService.error(ErrorHandler.describeAs('Gagal memuat supplier', e));
     }
   }
 
@@ -248,7 +249,7 @@ class _ReceiptFormPageState extends State<ReceiptFormPage> {
         Navigator.of(context).pop(true);
       }
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

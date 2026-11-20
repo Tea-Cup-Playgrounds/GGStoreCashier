@@ -9,6 +9,7 @@ import '../../domain/receipt_config.dart';
 import '../../domain/receipt_layout.dart';
 import 'receipt_preview.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// A sale's receipt on screen (to show the customer or check it) with a print button.
 class SaleReceiptSheet extends StatefulWidget {
   /// The receipt, or null while [saleId] is being loaded.
@@ -84,7 +85,7 @@ class _SaleReceiptSheetState extends State<SaleReceiptSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e is PrinterException ? e.message : 'Gagal mencetak: $e'),
+          content: Text(e is PrinterException ? e.message : ErrorHandler.describeAs('Gagal mencetak', e)),
           backgroundColor: AppTheme.destructive,
         ));
       }

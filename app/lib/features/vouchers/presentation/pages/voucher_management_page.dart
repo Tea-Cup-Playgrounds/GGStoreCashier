@@ -9,6 +9,7 @@ import '../../../../shared/widgets/pull_to_refresh.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_router.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class VoucherManagementPage extends ConsumerStatefulWidget {
   const VoucherManagementPage({super.key});
 
@@ -43,7 +44,7 @@ class _VoucherManagementPageState extends ConsumerState<VoucherManagementPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.describe(e);
           _isLoading = false;
         });
       }
@@ -89,7 +90,7 @@ class _VoucherManagementPageState extends ConsumerState<VoucherManagementPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString()),
+          content: Text(ErrorHandler.describe(e)),
           backgroundColor: AppTheme.destructive,
           behavior: SnackBarBehavior.floating,
         ));

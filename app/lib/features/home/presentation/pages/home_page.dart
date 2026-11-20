@@ -126,7 +126,7 @@ class _HomePageState extends ConsumerState<HomePage>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.describe(e);
           _isLoading = false;
         });
       }

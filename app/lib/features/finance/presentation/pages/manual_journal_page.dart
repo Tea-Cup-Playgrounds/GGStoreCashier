@@ -11,6 +11,7 @@ import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 import '../widgets/finance_widgets.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Common entries the accountant makes by hand: (label, memo, [(account code, side)]).
 const _templates = <(String, String, List<(String, bool)>)>[
   ('Setor kas ke bank', 'Setoran tunai ke bank', [('1-1200', true), ('1-1100', false)]),
@@ -62,7 +63,7 @@ class _ManualJournalPageState extends ConsumerState<ManualJournalPage> {
     super.initState();
     AccountingService.accounts().then((a) {
       if (mounted) setState(() => _accounts = a.where((x) => x.isPostable && x.isActive).toList());
-    }).catchError((Object e) => SnackBarService.error(e.toString()));
+    }).catchError((Object e) => SnackBarService.error(ErrorHandler.describe(e)));
   }
 
   @override
@@ -142,7 +143,7 @@ class _ManualJournalPageState extends ConsumerState<ManualJournalPage> {
       SnackBarService.success(message);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

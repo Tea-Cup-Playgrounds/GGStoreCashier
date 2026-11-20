@@ -11,6 +11,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Edit a unit's IMEI/serial, condition, price and notes, or take it out of stock.
 /// Returns true when something changed.
 class UnitEditSheet extends ConsumerStatefulWidget {
@@ -87,7 +88,7 @@ class _UnitEditSheetState extends ConsumerState<UnitEditSheet> {
       SnackBarService.success('Unit diperbarui');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -122,7 +123,7 @@ class _UnitEditSheetState extends ConsumerState<UnitEditSheet> {
       SnackBarService.success(status == 'defective' ? 'Unit ditandai rusak' : 'Unit dihapus dari stok');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     }
   }
 

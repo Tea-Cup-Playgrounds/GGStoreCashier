@@ -12,6 +12,7 @@ import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 import '../widgets/unit_picker_sheet.dart';
 import 'transfer_detail_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class _Line {
   final int variantId;
   final String name;
@@ -72,7 +73,7 @@ class _TransferFormPageState extends State<TransferFormPage> {
       final all = await CatalogService.getLocations(destinations: true);
       if (mounted) setState(() => _destinations = all.where((l) => l.id != widget.from.id && l.isActive).toList());
     } catch (e) {
-      SnackBarService.error('Gagal memuat lokasi tujuan: $e');
+      SnackBarService.error(ErrorHandler.describeAs('Gagal memuat lokasi tujuan', e));
     }
   }
 
@@ -146,7 +147,7 @@ class _TransferFormPageState extends State<TransferFormPage> {
         Navigator.of(context).pop(true);
       }
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -20,6 +20,7 @@ import '../widgets/location_selector.dart';
 import 'category_management_page.dart';
 import '../../../../shared/widgets/pull_to_refresh.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
 
@@ -83,7 +84,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     } catch (e) {
       if (mounted) {
         setState(() {
-          _productsError = e.toString();
+          _productsError = ErrorHandler.describe(e);
           _isLoadingProducts = false;
         });
       }
@@ -226,7 +227,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> with SingleTicker
     final locationsAsync = ref.watch(stockLocationsProvider);
 
     if (locationsAsync.hasError) {
-      return _ErrorState(message: locationsAsync.error.toString(), onRetry: () => ref.invalidate(accessProvider));
+      return _ErrorState(message: ErrorHandler.describe(locationsAsync.error), onRetry: () => ref.invalidate(accessProvider));
     }
     if (!locationsAsync.isLoading && location == null) {
       return Center(

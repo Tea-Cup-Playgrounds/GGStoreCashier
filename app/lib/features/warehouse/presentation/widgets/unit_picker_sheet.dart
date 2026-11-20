@@ -6,6 +6,7 @@ import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/barcode_scanner_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Picks in-stock units of one variant at a location. Scanning (or typing) an IMEI and pressing
 /// enter ticks the matching unit. Returns the selected unit ids, or null when dismissed.
 class UnitPickerSheet extends StatefulWidget {
@@ -62,7 +63,7 @@ class _UnitPickerSheetState extends State<UnitPickerSheet> {
           locationId: widget.locationId, variantId: widget.variantId, status: 'in_stock');
       if (mounted) setState(() => _units = units);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

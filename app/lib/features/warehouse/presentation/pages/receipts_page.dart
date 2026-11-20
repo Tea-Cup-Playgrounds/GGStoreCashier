@@ -12,6 +12,7 @@ import '../widgets/status_badge.dart';
 import 'receipt_detail_page.dart';
 import 'receipt_form_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Goods receipts (penerimaan barang) at one location.
 class ReceiptsPage extends ConsumerStatefulWidget {
   final Location location;
@@ -49,7 +50,7 @@ class _ReceiptsPageState extends ConsumerState<ReceiptsPage> {
             : receipts);
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

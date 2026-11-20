@@ -9,6 +9,7 @@ import 'package:gg_store_cashier/features/warehouse/presentation/widgets/status_
 import '../widgets/finance_widgets.dart';
 import 'finance_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Laba Rugi for a month or the year to date, per location or for the whole company.
 class ProfitLossPage extends ConsumerStatefulWidget {
   const ProfitLossPage({super.key});
@@ -54,7 +55,7 @@ class _ProfitLossPageState extends ConsumerState<ProfitLossPage> {
       final data = await AccountingService.profitLoss(locationId: _locationId, from: from, to: to);
       if (mounted) setState(() => _data = data);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -181,7 +182,7 @@ class _BalanceSheetPageState extends ConsumerState<BalanceSheetPage> {
       final data = await AccountingService.balanceSheet(locationId: _locationId, to: ymd(_date));
       if (mounted) setState(() => _data = data);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

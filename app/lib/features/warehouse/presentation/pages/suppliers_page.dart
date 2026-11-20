@@ -10,6 +10,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class SuppliersPage extends ConsumerStatefulWidget {
   const SuppliersPage({super.key});
 
@@ -44,7 +45,7 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
       final suppliers = await WarehouseService.getSuppliers(includeInactive: true);
       if (mounted) setState(() => _suppliers = suppliers);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -196,7 +197,7 @@ class _SupplierFormSheetState extends State<SupplierFormSheet> {
       SnackBarService.success('Supplier disimpan');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

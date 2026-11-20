@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -103,7 +104,7 @@ class SyncService {
       if (body is Map && body['error'] != null) return body['error'].toString();
       return 'Ditolak server (${error.response?.statusCode ?? error.type.name})';
     }
-    return error.toString();
+    return ErrorHandler.describe(error);
   }
 
   static Future<Options> _authOptions() async {

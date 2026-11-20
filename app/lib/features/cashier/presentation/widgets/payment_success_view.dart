@@ -9,6 +9,7 @@ import '../../../devices/data/receipt_printer.dart';
 import '../../../devices/domain/receipt.dart';
 import '../../../devices/presentation/widgets/sale_receipt_sheet.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class PaymentSuccessView extends StatefulWidget {
   final double total;
   final Map<String, dynamic>? appliedCoupon;
@@ -79,7 +80,7 @@ class _PaymentSuccessViewState extends State<PaymentSuccessView> with TickerProv
       await ReceiptPrinter.printReceipt(first ? receipt : receipt.asCopy(), openDrawer: first);
       if (mounted) setState(() => _printedCount++);
     } catch (e) {
-      if (mounted) setState(() => _printError = e is PrinterException ? e.message : 'Gagal mencetak: $e');
+      if (mounted) setState(() => _printError = e is PrinterException ? e.message : ErrorHandler.describeAs('Gagal mencetak', e));
     } finally {
       if (mounted) setState(() => _printing = false);
     }

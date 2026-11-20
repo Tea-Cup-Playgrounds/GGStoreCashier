@@ -11,6 +11,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import '../widgets/status_badge.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Counting screen: enter counted quantities for accessories, scan IMEIs for phones, then approve.
 class OpnameDetailPage extends ConsumerStatefulWidget {
   final String opnameId;
@@ -60,7 +61,7 @@ class _OpnameDetailPageState extends ConsumerState<OpnameDetailPage> {
     try {
       _apply(await WarehouseService.getOpname(widget.opnameId));
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     }
   }
 
@@ -76,7 +77,7 @@ class _OpnameDetailPageState extends ConsumerState<OpnameDetailPage> {
       _apply(updated);
       SnackBarService.success('Hitungan disimpan');
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -98,7 +99,7 @@ class _OpnameDetailPageState extends ConsumerState<OpnameDetailPage> {
       }
       await _load();
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     }
   }
 
@@ -133,7 +134,7 @@ class _OpnameDetailPageState extends ConsumerState<OpnameDetailPage> {
       SnackBarService.success('Disetujui: ${summary['adjusted']} barang disesuaikan, ${summary['unitsWrittenOff']} unit dihapus');
       await _load();
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -161,7 +162,7 @@ class _OpnameDetailPageState extends ConsumerState<OpnameDetailPage> {
       SnackBarService.success('Stok opname dibatalkan');
       await _load();
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     }
   }
 
@@ -330,7 +331,7 @@ class _OpnameDetailPageState extends ConsumerState<OpnameDetailPage> {
                             await WarehouseService.unscanOpname(widget.opnameId, u.unitId);
                             await _load();
                           } catch (e) {
-                            SnackBarService.error(e.toString());
+                            SnackBarService.error(ErrorHandler.describe(e));
                           }
                         }
                       : null,

@@ -16,6 +16,7 @@ import 'periods_page.dart';
 import 'pulsa_deposit_page.dart';
 import 'reports_pages.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Laba Rugi and Neraca: the books (accounting.view) or a location's own reports (branch managers).
 const statementPermissions = ['accounting.view', 'reports.view_location'];
 
@@ -84,7 +85,7 @@ class _FinancePageState extends ConsumerState<FinancePage> {
         _profit = results[2] as ProfitLoss?;
       });
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

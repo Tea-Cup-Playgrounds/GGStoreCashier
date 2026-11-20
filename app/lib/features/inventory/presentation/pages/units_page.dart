@@ -9,6 +9,7 @@ import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import '../widgets/unit_edit_sheet.dart';
 import 'register_units_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Serialized units of one variant at one location.
 class UnitsPage extends ConsumerStatefulWidget {
   final CatalogProduct product;
@@ -53,7 +54,7 @@ class _UnitsPageState extends ConsumerState<UnitsPage> {
       );
       if (mounted) setState(() => _units = units);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

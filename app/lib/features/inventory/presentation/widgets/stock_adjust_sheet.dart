@@ -7,6 +7,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Adds or removes stock of a non-serialized variant at one location. Returns true when saved.
 class StockAdjustSheet extends StatefulWidget {
   final Location location;
@@ -59,7 +60,7 @@ class _StockAdjustSheetState extends State<StockAdjustSheet> {
       SnackBarService.success('Stok sekarang $newQty');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

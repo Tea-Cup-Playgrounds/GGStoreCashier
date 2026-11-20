@@ -39,6 +39,7 @@ import '../../../warehouse/presentation/widgets/unit_picker_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 enum CashierView { products, cart, coupon, success }
 
 class CashierPage extends ConsumerStatefulWidget {
@@ -133,7 +134,7 @@ class _CashierPageState extends ConsumerState<CashierPage> with TickerProviderSt
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _productsError = e.toString();
+        _productsError = ErrorHandler.describe(e);
         _isLoadingProducts = false;
       });
     }

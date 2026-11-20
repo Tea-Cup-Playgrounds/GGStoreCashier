@@ -14,6 +14,7 @@ import '../../../../shared/widgets/searchable_dropdown.dart';
 import '../../../../shared/utils/snackbar_service.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class VoucherFormPage extends StatefulWidget {
   final Voucher? voucher;
   const VoucherFormPage({super.key, this.voucher});
@@ -123,7 +124,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _targetLoadError = e.toString();
+          _targetLoadError = ErrorHandler.describe(e);
           _isLoadingTargets = false;
         });
       }
@@ -182,11 +183,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        String msg = e.toString();
-        if (e is DioException && e.response?.data?['error'] != null) {
-          msg = e.response!.data['error'];
-        }
-        SnackBarService.error(msg);
+        SnackBarService.error(ErrorHandler.describe(e));
       }
     }
   }

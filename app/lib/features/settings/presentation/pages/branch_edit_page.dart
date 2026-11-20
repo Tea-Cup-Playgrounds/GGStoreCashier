@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/widgets/text_input.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class BranchEditPage extends ConsumerStatefulWidget {
   final int branchId;
   const BranchEditPage({super.key, required this.branchId});
@@ -63,7 +64,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.describe(e);
           _isLoading = false;
         });
       }
@@ -85,7 +86,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString()),
+          content: Text(ErrorHandler.describe(e)),
           backgroundColor: AppTheme.destructive,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -120,7 +121,7 @@ class _BranchEditPageState extends ConsumerState<BranchEditPage> {
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString()),
+          content: Text(ErrorHandler.describe(e)),
           backgroundColor: AppTheme.destructive,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

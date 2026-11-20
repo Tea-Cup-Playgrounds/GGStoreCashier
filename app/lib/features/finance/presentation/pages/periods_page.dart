@@ -9,6 +9,7 @@ import 'package:gg_store_cashier/features/warehouse/presentation/widgets/status_
 import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import '../widgets/finance_widgets.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Periode: a closed month accepts no new journals dated in it. Late automatic postings (e.g. an
 /// offline sale uploaded after closing) are booked on today instead.
 class PeriodsPage extends ConsumerStatefulWidget {
@@ -39,7 +40,7 @@ class _PeriodsPageState extends ConsumerState<PeriodsPage> {
       final periods = await AccountingService.periods();
       if (mounted) setState(() => _periods = periods);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -75,7 +76,7 @@ class _PeriodsPageState extends ConsumerState<PeriodsPage> {
       SnackBarService.success(await AccountingService.setPeriod(p.year, p.month, close: close));
       await _load();
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = null);
     }

@@ -5,6 +5,7 @@ import '../../../../shared/widgets/custom_button.dart';
 import '../../../../shared/utils/snackbar_service.dart';
 import '../providers/user_management_provider.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class UserDeleteDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic> user;
 
@@ -26,7 +27,7 @@ class _UserDeleteDialogState extends ConsumerState<UserDeleteDialog> {
         Navigator.of(context).pop();
       }
     } catch (e) {
-      if (mounted) SnackBarService.error(e.toString());
+      if (mounted) SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -11,6 +11,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Opens a shift (no [session]) or shows the open one with its totals and closes it after the
 /// cash is counted. Pops with the open session, or null once closed.
 class ShiftSheet extends StatefulWidget {
@@ -59,7 +60,7 @@ class _ShiftSheetState extends State<ShiftSheet> {
       final s = await SalesService.getShift(_session!.id);
       if (mounted) setState(() => _session = s);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     }
   }
 
@@ -73,7 +74,7 @@ class _ShiftSheetState extends State<ShiftSheet> {
       SnackBarService.success('Shift dibuka');
       if (mounted) Navigator.pop(context, (true, s));
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -106,7 +107,7 @@ class _ShiftSheetState extends State<ShiftSheet> {
       }
       if (mounted) Navigator.pop(context, (true, null));
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

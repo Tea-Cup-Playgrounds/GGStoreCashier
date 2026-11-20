@@ -5,6 +5,7 @@ import 'package:gg_store_cashier/core/models/catalog.dart';
 import 'package:gg_store_cashier/core/services/catalog_service.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Finds a unit by IMEI or serial number across every location the user may view.
 /// Barcode scanners in keyboard mode type straight into the field.
 class ImeiLookupSheet extends StatefulWidget {
@@ -41,7 +42,7 @@ class _ImeiLookupSheetState extends State<ImeiLookupSheet> {
       final units = await CatalogService.getUnits(search: query);
       if (mounted) setState(() => _results = units);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

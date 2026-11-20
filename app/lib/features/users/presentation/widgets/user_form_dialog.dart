@@ -10,6 +10,7 @@ import '../../../../shared/widgets/password_strength_indicator.dart';
 import '../../../../shared/utils/snackbar_service.dart';
 import '../providers/user_management_provider.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// One editable row: a location (null = every location, owners only) and a role.
 class _AssignmentRow {
   int? locationId;
@@ -116,7 +117,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      if (mounted) SnackBarService.error(e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -329,7 +330,7 @@ class _AssignmentsEditor extends ConsumerWidget {
 
     final error = rolesAsync.error ?? locationsAsync.error;
     if (error != null) {
-      return Text('Gagal memuat role/lokasi: $error', style: TextStyle(color: cs.error));
+      return Text(ErrorHandler.describeAs('Gagal memuat role/lokasi', error), style: TextStyle(color: cs.error));
     }
     final roles = rolesAsync.valueOrNull;
     final allLocations = locationsAsync.valueOrNull;

@@ -9,6 +9,7 @@ import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/cache_manager.dart';
 import '../../../../core/services/catalog_service.dart';
 import '../../../../core/services/connectivity_monitor.dart';
+import '../../../../core/services/error_handler.dart';
 import '../../../../core/services/pending_operations_queue.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -217,7 +218,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     try {
       await _dio.post('/api/users', data: userData);
     } on DioException catch (e) {
-      throw Exception(_errorMessage(e));
+      throw UserMessage(_errorMessage(e));
     }
     await loadUsers();
   }
@@ -249,7 +250,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     try {
       await _dio.put('/api/users/$userId', data: userData);
     } on DioException catch (e) {
-      throw Exception(_errorMessage(e));
+      throw UserMessage(_errorMessage(e));
     }
     await loadUsers();
   }
@@ -278,7 +279,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
       await loadUsers();
       return response.data['message']?.toString() ?? 'Pengguna berhasil dihapus';
     } on DioException catch (e) {
-      throw Exception(_errorMessage(e));
+      throw UserMessage(_errorMessage(e));
     }
   }
 
@@ -311,7 +312,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
           return 'Terjadi kesalahan yang tidak terduga.';
       }
     }
-    return error.toString();
+    return ErrorHandler.describe(error);
   }
 }
 

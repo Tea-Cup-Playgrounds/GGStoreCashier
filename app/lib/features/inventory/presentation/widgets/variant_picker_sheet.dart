@@ -5,6 +5,7 @@ import 'package:gg_store_cashier/core/models/catalog.dart';
 import 'package:gg_store_cashier/core/services/catalog_service.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// A variant chosen in [VariantPickerSheet], with its product for name / IMEI settings.
 class PickedVariant {
   final CatalogProduct product;
@@ -63,7 +64,7 @@ class _VariantPickerSheetState extends State<VariantPickerSheet> {
       final products = await CatalogService.getProducts(locationId: widget.locationId, search: _search.text.trim());
       if (mounted) setState(() => _products = products.where((p) => p.kind == 'goods').toList());
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

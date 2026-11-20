@@ -5,6 +5,7 @@ import 'package:gg_store_cashier/core/models/catalog.dart';
 import 'package:gg_store_cashier/core/services/catalog_service.dart';
 import 'package:gg_store_cashier/core/theme/app_theme.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Stock history of one variant at one location.
 class MovementsSheet extends StatelessWidget {
   final Location location;
@@ -44,7 +45,7 @@ class MovementsSheet extends StatelessWidget {
                   if (snap.connectionState != ConnectionState.done) {
                     return const Center(child: CircularProgressIndicator(color: AppTheme.gold));
                   }
-                  if (snap.hasError) return Center(child: Text(snap.error.toString()));
+                  if (snap.hasError) return Center(child: Text(ErrorHandler.describe(snap.error)));
                   final moves = snap.data!;
                   if (moves.isEmpty) {
                     return Center(child: Text('Belum ada riwayat', style: TextStyle(color: cs.onSurfaceVariant)));

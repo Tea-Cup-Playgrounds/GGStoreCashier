@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 class AuthState {
   final bool isAuthenticated;
   final User? user;
@@ -82,7 +83,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isAuthenticated: false,
         user: null,
         isLoading: false,
-        error: e.toString(),
+        error: ErrorHandler.describe(e),
       );
       return false;
     }

@@ -10,6 +10,7 @@ import '../../domain/receipt_config.dart';
 import '../../domain/receipt_layout.dart';
 import '../widgets/receipt_preview.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Pengaturan → Printer Struk: which printer this device prints receipts on (a paired Bluetooth
 /// printer or one on the network), automatic printing, the cash drawer, and a test print.
 class PrinterDevicesPage extends StatefulWidget {
@@ -104,7 +105,7 @@ class _PrinterDevicesPageState extends State<PrinterDevicesPage> {
     } on PrinterException catch (e) {
       SnackBarService.error(e.message);
     } catch (e) {
-      SnackBarService.error('Gagal mencetak: $e');
+      SnackBarService.error(ErrorHandler.describeAs('Gagal mencetak', e));
     } finally {
       if (mounted) setState(() => _testing = false);
     }

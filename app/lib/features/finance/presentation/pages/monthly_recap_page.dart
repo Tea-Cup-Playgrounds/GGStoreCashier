@@ -8,6 +8,7 @@ import 'package:gg_store_cashier/core/theme/app_theme.dart';
 import '../widgets/finance_widgets.dart';
 import 'reports_pages.dart' show defaultReportLocation;
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Who may open the recap: branch managers (their branch), owner and accountant.
 const recapPermissions = ['reports.view_location', 'reports.view_all', 'accounting.view'];
 
@@ -63,7 +64,7 @@ class _MonthlyRecapPageState extends ConsumerState<MonthlyRecapPage> {
       final data = await AccountingService.monthlyRecap(locationId: _locationId, month: _monthParam);
       if (mounted) setState(() => _data = data);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -11,6 +11,7 @@ import 'package:gg_store_cashier/shared/widgets/custom_button.dart';
 import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 import '../widgets/finance_widgets.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Biaya: operating costs (rent, salaries, electricity, supplies...). Each one is journaled at once
 /// (Dr expense account, Cr Kas / Bank); a mistake is corrected by voiding it.
 class ExpensesPage extends ConsumerStatefulWidget {
@@ -54,7 +55,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
       final data = await AccountingService.expenses(locationId: _locationId, from: from, to: to);
       if (mounted) setState(() => _data = data);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -225,7 +226,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
     super.initState();
     AccountingService.expenseCategories().then((c) {
       if (mounted) setState(() => _categories = c);
-    }).catchError((Object e) => SnackBarService.error(e.toString()));
+    }).catchError((Object e) => SnackBarService.error(ErrorHandler.describe(e)));
   }
 
   @override
@@ -252,7 +253,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
       SnackBarService.success('Biaya ${expense.number} dicatat');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -348,7 +349,7 @@ class _ExpenseDetailSheetState extends State<ExpenseDetailSheet> {
     AccountingService.expense(widget.expenseId).then((x) {
       if (mounted) setState(() => _expense = x);
     }).catchError((Object e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     });
   }
 
@@ -368,7 +369,7 @@ class _ExpenseDetailSheetState extends State<ExpenseDetailSheet> {
       SnackBarService.success('Biaya dibatalkan');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -11,6 +11,7 @@ import 'package:gg_store_cashier/shared/utils/snackbar_service.dart';
 import '../widgets/status_badge.dart';
 import 'opname_detail_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Stock counts (stok opname) at one location.
 class OpnamesPage extends ConsumerStatefulWidget {
   final Location location;
@@ -41,7 +42,7 @@ class _OpnamesPageState extends ConsumerState<OpnamesPage> {
       final opnames = await WarehouseService.getOpnames(locationId: widget.location.id);
       if (mounted) setState(() => _opnames = opnames);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -78,7 +79,7 @@ class _OpnamesPageState extends ConsumerState<OpnamesPage> {
       final opname = await WarehouseService.startOpname(locationId: widget.location.id, note: text);
       await _open(opname.id);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _starting = false);
     }

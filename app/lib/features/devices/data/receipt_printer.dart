@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,7 +108,8 @@ final printerSettingsProvider = FutureProvider<PrinterSettings>((ref) {
 });
 
 /// A printing problem, with a message for the cashier (Indonesian).
-class PrinterException implements Exception {
+class PrinterException implements UserFacingException {
+  @override
   final String message;
   const PrinterException(this.message);
 

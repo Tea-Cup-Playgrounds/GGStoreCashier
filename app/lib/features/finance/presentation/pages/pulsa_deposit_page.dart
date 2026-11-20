@@ -12,6 +12,7 @@ import 'package:gg_store_cashier/shared/widgets/text_input.dart';
 import '../widgets/finance_widgets.dart';
 import 'journals_page.dart';
 
+import 'package:gg_store_cashier/core/services/error_handler.dart';
 /// Deposit Pulsa: money paid in advance to the pulsa / digital provider. Top-ups add to it; every
 /// pulsa sale uses it at the item's harga modal.
 class PulsaDepositPage extends ConsumerStatefulWidget {
@@ -55,7 +56,7 @@ class _PulsaDepositPageState extends ConsumerState<PulsaDepositPage> {
       final data = await AccountingService.pulsaDeposit(locationId: _locationId, from: '$_year-01-01', to: to);
       if (mounted) setState(() => _data = data);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -236,7 +237,7 @@ class _PulsaTopUpSheetState extends ConsumerState<PulsaTopUpSheet> {
       SnackBarService.success(message);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      SnackBarService.error(e.toString());
+      SnackBarService.error(ErrorHandler.describe(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

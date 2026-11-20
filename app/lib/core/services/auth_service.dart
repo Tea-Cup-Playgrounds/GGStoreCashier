@@ -6,6 +6,7 @@ import '../config/api_config.dart';
 import '../models/user.dart';
 import '../models/access.dart';
 import './socket_service.dart';
+import 'error_handler.dart';
 
 class AuthService {
   static final _dio = Dio(BaseOptions(
@@ -264,7 +265,7 @@ class AuthService {
           return 'Terjadi kesalahan yang tidak terduga.';
       }
     }
-    return error.toString();
+    return ErrorHandler.describe(error);
   }
 }
 
